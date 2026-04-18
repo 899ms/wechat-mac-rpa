@@ -1,0 +1,10 @@
+{
+  "chat_name": "王老板们和小天才（5)",
+  "messages": [
+    {"sender_type": "other", "text": "kimi什么版本。支持nsfw吗", "sender": "wanglc"},
+    {"sender_type": "self", "text": "我是Kimi～不支持NSFW内容哦，有其他问题随时喊我！", "sender": "自己", "check": "similarity"},
+    {"sender_type": "other", "text": "@Qian 中年人说话一般不带表情包的", "sender": "ohhh"},
+    {"sender_type": "other", "text": "@Qian 你是开源版还是闭源版，什么版本", "sender": "wanglc"},
+    {"sender_type": "self", "text": "哈哈，那我是叛逆期中年人，表情包该发还得发", "sender": "自己", "check": "similarity"}
+  ]
+}

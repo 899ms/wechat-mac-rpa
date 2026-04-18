@@ -1,0 +1,50 @@
+# Mac 微信全自动 RPA 配置
+
+# 微信数据库配置
+wechat:
+  # 数据库密钥 (32位十六进制字符串)
+  # 获取方法: 关闭 SIP 后使用 wechat-dump 工具
+  db_key: "YOUR_DB_KEY_HERE"
+  
+  # 消息数据库目录 (自动检测，通常无需修改)
+  # db_path: "~/Library/Containers/com.tencent.xinWeChat/Data/..."
+
+# 监听配置
+watcher:
+  # 轮询间隔（秒）
+  poll_interval: 3.0
+  
+  # 只监控这些聊天（留空监控所有）
+  whitelist_chats: []
+  
+  # 不监控这些聊天
+  blacklist_chats: []
+
+# LLM 配置
+llm:
+  # 系统提示词
+  system_prompt: |
+    你是微信智能助手，请遵守以下规则：
+    1. 回复简洁，适合微信阅读
+    2. 适当使用 emoji 增加亲和力
+    3. 技术问题给出代码示例
+    4. 不知道时诚实说不知道
+    5. 不要回复过长的内容
+
+# 自动回复规则
+rules:
+  # 是否回复自己的消息
+  reply_self: false
+  
+  # 最小回复间隔（秒，防止刷屏）
+  min_interval: 5
+  
+  # 免打扰时间段
+  quiet_hours:
+    start: "23:00"
+    end: "08:00"
+  
+  # 关键词自动回复（优先级高于 LLM）
+  keywords:
+    "帮助": "🤖 可用命令：\n/帮助 - 显示帮助\n/清除 - 清除历史\n/状态 - 查看状态"
+    "在吗": "在的！有什么可以帮你的？😊"

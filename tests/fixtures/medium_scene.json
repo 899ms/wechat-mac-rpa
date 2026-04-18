@@ -1,0 +1,44 @@
+{
+  "chat_name": "王老板们和小天才",
+  "chat_list": [
+    {
+      "nickname": "王老板们和小天才",
+      "last_message": "\"1000\"是**验证码** 吗？.",
+      "unread_count": ""
+    },
+    {
+      "nickname": "文件传输助手",
+      "last_message": "",
+      "unread_count": ""
+    },
+    {
+      "nickname": "腾讯新闻",
+      "last_message": "油价即将调整",
+      "unread_count": ""
+    },
+    {
+      "nickname": "W1han",
+      "last_message": "你的头像是大帅哥",
+      "unread_count": ""
+    },
+    {
+      "nickname": "王芊",
+      "last_message": "",
+      "unread_count": ""
+    }
+  ],
+  "messages": [
+    {
+      "sender": "对方",
+      "sender_type": "other",
+      "text": "这个智力水平应该是王芊真人回复",
+      "is_at_me": false
+    },
+    {
+      "sender": "自己",
+      "sender_type": "self",
+      "text": "\"1000”是**验证码**吗？32 如果是，**请直接在登录页面输入**，不要发 给我哦！这是为了账号安全～ 如果不是验证码，请问是指： **错误代码1000**？（截图看看具体报 错） ＄ **金额1000元**？（支付相关？ **其他编号**？ **安全提醒**：验证码、密码、支付密码**千 万不要发给任何人**（包括我）！！ 你那边现在显示什么界面？可以描述一下或截 图说明～",
+      "is_at_me": false
+    }
+  ]
+}

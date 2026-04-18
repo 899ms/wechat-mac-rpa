@@ -1,0 +1,1269 @@
+{
+  "tick_id": 0,
+  "timestamp": "2026-04-18T21:29:51.650137",
+  "screenshot_path": "/tmp/wechat_capture.png",
+  "ocr_elements": [
+    {
+      "text": "口四",
+      "bbox": {
+        "x": 1670,
+        "y": 61,
+        "w": 125,
+        "h": 29
+      },
+      "center": {
+        "x": 1733,
+        "y": 76
+      }
+    },
+    {
+      "text": "六",
+      "bbox": {
+        "x": 1554,
+        "y": 61,
+        "w": 54,
+        "h": 32
+      },
+      "center": {
+        "x": 1581,
+        "y": 77
+      }
+    },
+    {
+      "text": "Inwang/wechat-mac-rpa/data/logs/runtime_20260418.log",
+      "bbox": {
+        "x": 0,
+        "y": 62,
+        "w": 766,
+        "h": 34
+      },
+      "center": {
+        "x": 382,
+        "y": 79
+      }
+    },
+    {
+      "text": "work",
+      "bbox": {
+        "x": 589,
+        "y": 145,
+        "w": 60,
+        "h": 22
+      },
+      "center": {
+        "x": 619,
+        "y": 156
+      }
+    },
+    {
+      "text": "口 芝士",
+      "bbox": {
+        "x": 20,
+        "y": 143,
+        "w": 97,
+        "h": 28
+      },
+      "center": {
+        "x": 69,
+        "y": 157
+      }
+    },
+    {
+      "text": "口 hunt",
+      "bbox": {
+        "x": 151,
+        "y": 145,
+        "w": 102,
+        "h": 25
+      },
+      "center": {
+        "x": 203,
+        "y": 157
+      }
+    },
+    {
+      "text": "口 ali",
+      "bbox": {
+        "x": 683,
+        "y": 143,
+        "w": 74,
+        "h": 26
+      },
+      "center": {
+        "x": 721,
+        "y": 157
+      }
+    },
+    {
+      "text": "口 blog",
+      "bbox": {
+        "x": 287,
+        "y": 145,
+        "w": 100,
+        "h": 27
+      },
+      "center": {
+        "x": 338,
+        "y": 158
+      }
+    },
+    {
+      "text": "口 PM",
+      "bbox": {
+        "x": 419,
+        "y": 145,
+        "w": 89,
+        "h": 26
+      },
+      "center": {
+        "x": 464,
+        "y": 158
+      }
+    },
+    {
+      "text": "切换",
+      "bbox": {
+        "x": 927,
+        "y": 148,
+        "w": 54,
+        "h": 27
+      },
+      "center": {
+        "x": 955,
+        "y": 162
+      }
+    },
+    {
+      "text": "vX",
+      "bbox": {
+        "x": 1508,
+        "y": 151,
+        "w": 91,
+        "h": 24
+      },
+      "center": {
+        "x": 1554,
+        "y": 163
+      }
+    },
+    {
+      "text": "[对方]好了吗",
+      "bbox": {
+        "x": 262,
+        "y": 209,
+        "w": 175,
+        "h": 26
+      },
+      "center": {
+        "x": 350,
+        "y": 222
+      }
+    },
+    {
+      "text": "[debug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 209,
+        "w": 150,
+        "h": 28
+      },
+      "center": {
+        "x": 75,
+        "y": 224
+      }
+    },
+    {
+      "text": "[debug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 247,
+        "w": 154,
+        "h": 26
+      },
+      "center": {
+        "x": 77,
+        "y": 260
+      }
+    },
+    {
+      "text": "[自己〕1在的，请问具体是哪件事好了吗？",
+      "bbox": {
+        "x": 261,
+        "y": 245,
+        "w": 492,
+        "h": 29
+      },
+      "center": {
+        "x": 507,
+        "y": 260
+      }
+    },
+    {
+      "text": "info:101] pl 决策：跳过回复 | 原因=无新消息| 消息=",
+      "bbox": {
+        "x": 0,
+        "y": 280,
+        "w": 744,
+        "h": 33
+      },
+      "center": {
+        "x": 371,
+        "y": 297
+      }
+    },
+    {
+      "text": "Idebug:98〕 调试日志已保存：data/debug/tick_2026-04-18T21-23-08.623459_0000.json",
+      "bbox": {
+        "x": 0,
+        "y": 320,
+        "w": 1206,
+        "h": 32
+      },
+      "center": {
+        "x": 602,
+        "y": 336
+      }
+    },
+    {
+      "text": "info:101] @ Tick #85 开始 （interval=5. 0s)",
+      "bbox": {
+        "x": 0,
+        "y": 356,
+        "w": 641,
+        "h": 30
+      },
+      "center": {
+        "x": 320,
+        "y": 371
+      }
+    },
+    {
+      "text": "[debug:98】截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_85_20260418_212315_321.png",
+      "bbox": {
+        "x": 0,
+        "y": 393,
+        "w": 1632,
+        "h": 29
+      },
+      "center": {
+        "x": 815,
+        "y": 408
+      }
+    },
+    {
+      "text": "[debug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 431,
+        "w": 158,
+        "h": 27
+      },
+      "center": {
+        "x": 78,
+        "y": 445
+      }
+    },
+    {
+      "text": "Layout: chat=王芊 Qai开发小分队，title=0, input=0, timestamps=0, self_bubbles=3, candidates=4",
+      "bbox": {
+        "x": 199,
+        "y": 430,
+        "w": 1430,
+        "h": 30
+      },
+      "center": {
+        "x": 915,
+        "y": 445
+      }
+    },
+    {
+      "text": "info:101]⑤消息统计：共4 条，新增0 条",
+      "bbox": {
+        "x": 0,
+        "y": 467,
+        "w": 605,
+        "h": 29
+      },
+      "center": {
+        "x": 302,
+        "y": 482
+      }
+    },
+    {
+      "text": "[自己〕看起来是系统更新日志～有什么具体需要我帮 忙的吗？",
+      "bbox": {
+        "x": 258,
+        "y": 503,
+        "w": 726,
+        "h": 29
+      },
+      "center": {
+        "x": 621,
+        "y": 518
+      }
+    },
+    {
+      "text": "[debug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 505,
+        "w": 154,
+        "h": 28
+      },
+      "center": {
+        "x": 77,
+        "y": 519
+      }
+    },
+    {
+      "text": "[对方] 好了吗",
+      "bbox": {
+        "x": 261,
+        "y": 541,
+        "w": 175,
+        "h": 29
+      },
+      "center": {
+        "x": 349,
+        "y": 555
+      }
+    },
+    {
+      "text": "[debug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 543,
+        "w": 155,
+        "h": 26
+      },
+      "center": {
+        "x": 77,
+        "y": 556
+      }
+    },
+    {
+      "text": "[自己】1在的，请问具体是哪件事好了吗？",
+      "bbox": {
+        "x": 256,
+        "y": 578,
+        "w": 497,
+        "h": 28
+      },
+      "center": {
+        "x": 504,
+        "y": 592
+      }
+    },
+    {
+      "text": "[debug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 580,
+        "w": 154,
+        "h": 26
+      },
+      "center": {
+        "x": 77,
+        "y": 593
+      }
+    },
+    {
+      "text": "info:101] M 决策：跳过回复 | 原因=无新消息|消息=",
+      "bbox": {
+        "x": 0,
+        "y": 613,
+        "w": 735,
+        "h": 33
+      },
+      "center": {
+        "x": 367,
+        "y": 630
+      }
+    },
+    {
+      "text": "[debug:98] 调试日志已保存：data/debug/tick_2026-04-18T21-23-15.321035_0000.json",
+      "bbox": {
+        "x": 0,
+        "y": 651,
+        "w": 1207,
+        "h": 34
+      },
+      "center": {
+        "x": 603,
+        "y": 669
+      }
+    },
+    {
+      "text": "info:101] @ Tick #86 开始 （interval=5. 0s)",
+      "bbox": {
+        "x": 0,
+        "y": 689,
+        "w": 643,
+        "h": 29
+      },
+      "center": {
+        "x": 320,
+        "y": 704
+      }
+    },
+    {
+      "text": "[debug:98]截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_86_20260418_212322_015. png",
+      "bbox": {
+        "x": 0,
+        "y": 727,
+        "w": 1630,
+        "h": 29
+      },
+      "center": {
+        "x": 814,
+        "y": 741
+      }
+    },
+    {
+      "text": "Layout: chat=王芊 @ai开发小分队，title=0, input=0, timestamps=0, self_bubbles=3, candidates=4",
+      "bbox": {
+        "x": 202,
+        "y": 763,
+        "w": 1429,
+        "h": 30
+      },
+      "center": {
+        "x": 917,
+        "y": 778
+      }
+    },
+    {
+      "text": "Idebug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 765,
+        "w": 154,
+        "h": 27
+      },
+      "center": {
+        "x": 77,
+        "y": 779
+      }
+    },
+    {
+      "text": "info:101]",
+      "bbox": {
+        "x": 0,
+        "y": 801,
+        "w": 143,
+        "h": 24
+      },
+      "center": {
+        "x": 71,
+        "y": 814
+      }
+    },
+    {
+      "text": "消息统计：共 4 条，新增0条",
+      "bbox": {
+        "x": 189,
+        "y": 800,
+        "w": 410,
+        "h": 31
+      },
+      "center": {
+        "x": 394,
+        "y": 816
+      }
+    },
+    {
+      "text": "[自己】看起来是系统更新日志～有什么具体需要我帮 忙的吗？",
+      "bbox": {
+        "x": 254,
+        "y": 836,
+        "w": 730,
+        "h": 29
+      },
+      "center": {
+        "x": 619,
+        "y": 851
+      }
+    },
+    {
+      "text": "[debug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 839,
+        "w": 155,
+        "h": 27
+      },
+      "center": {
+        "x": 77,
+        "y": 853
+      }
+    },
+    {
+      "text": "[对方】好了吗",
+      "bbox": {
+        "x": 262,
+        "y": 874,
+        "w": 172,
+        "h": 29
+      },
+      "center": {
+        "x": 349,
+        "y": 888
+      }
+    },
+    {
+      "text": "[debug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 876,
+        "w": 156,
+        "h": 27
+      },
+      "center": {
+        "x": 77,
+        "y": 890
+      }
+    },
+    {
+      "text": "[自己〕1在的，请问具体是哪件事好了吗？",
+      "bbox": {
+        "x": 253,
+        "y": 910,
+        "w": 497,
+        "h": 30
+      },
+      "center": {
+        "x": 502,
+        "y": 926
+      }
+    },
+    {
+      "text": "[debug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 913,
+        "w": 155,
+        "h": 27
+      },
+      "center": {
+        "x": 77,
+        "y": 927
+      }
+    },
+    {
+      "text": "info:101] ° 决策：跳过回复 | 原因=无新消息 | 消息=",
+      "bbox": {
+        "x": -2,
+        "y": 946,
+        "w": 743,
+        "h": 35
+      },
+      "center": {
+        "x": 369,
+        "y": 964
+      }
+    },
+    {
+      "text": "[debug:98] 调试日志已保存：data/debug/tick_2026-04-18T21-23-22.015089_0000.json",
+      "bbox": {
+        "x": 0,
+        "y": 985,
+        "w": 1207,
+        "h": 36
+      },
+      "center": {
+        "x": 603,
+        "y": 1003
+      }
+    },
+    {
+      "text": "info:101]  Tick #87 开始 （interval=5.0s)",
+      "bbox": {
+        "x": 0,
+        "y": 1022,
+        "w": 644,
+        "h": 28
+      },
+      "center": {
+        "x": 321,
+        "y": 1036
+      }
+    },
+    {
+      "text": "[debug:98〕截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_87_20260418_212328_717.png",
+      "bbox": {
+        "x": 0,
+        "y": 1060,
+        "w": 1630,
+        "h": 31
+      },
+      "center": {
+        "x": 814,
+        "y": 1075
+      }
+    },
+    {
+      "text": "Layout: chat=王芊 @ai开发小分队，title=0, input=0, timestamps=0, self_bubbles=3, candidates=4",
+      "bbox": {
+        "x": 198,
+        "y": 1095,
+        "w": 1438,
+        "h": 33
+      },
+      "center": {
+        "x": 917,
+        "y": 1111
+      }
+    },
+    {
+      "text": "Idebug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 1098,
+        "w": 159,
+        "h": 27
+      },
+      "center": {
+        "x": 79,
+        "y": 1112
+      }
+    },
+    {
+      "text": "info:101]⑤消息统计：共4 条，新增0 条",
+      "bbox": {
+        "x": 0,
+        "y": 1133,
+        "w": 612,
+        "h": 29
+      },
+      "center": {
+        "x": 305,
+        "y": 1148
+      }
+    },
+    {
+      "text": "[自己】看起来是系统更新日志～有什么具体需要我帮 忙的吗？",
+      "bbox": {
+        "x": 253,
+        "y": 1169,
+        "w": 731,
+        "h": 30
+      },
+      "center": {
+        "x": 619,
+        "y": 1185
+      }
+    },
+    {
+      "text": "Idebug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 1172,
+        "w": 156,
+        "h": 29
+      },
+      "center": {
+        "x": 77,
+        "y": 1186
+      }
+    },
+    {
+      "text": "[对方〕好了吗",
+      "bbox": {
+        "x": 261,
+        "y": 1208,
+        "w": 177,
+        "h": 28
+      },
+      "center": {
+        "x": 350,
+        "y": 1222
+      }
+    },
+    {
+      "text": "Idebug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 1210,
+        "w": 155,
+        "h": 26
+      },
+      "center": {
+        "x": 77,
+        "y": 1223
+      }
+    },
+    {
+      "text": "[自己〕1在的，请问具体是哪件事好了吗？",
+      "bbox": {
+        "x": 250,
+        "y": 1244,
+        "w": 501,
+        "h": 29
+      },
+      "center": {
+        "x": 501,
+        "y": 1259
+      }
+    },
+    {
+      "text": "Idebug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 1247,
+        "w": 157,
+        "h": 26
+      },
+      "center": {
+        "x": 78,
+        "y": 1260
+      }
+    },
+    {
+      "text": "info:101] m 决策：跳过回复 | 原因=无新消息 | 消息=",
+      "bbox": {
+        "x": 0,
+        "y": 1282,
+        "w": 742,
+        "h": 30
+      },
+      "center": {
+        "x": 370,
+        "y": 1297
+      }
+    },
+    {
+      "text": "[debug:98〕 调试日志已保存：data/debug/tick_2026-04-18T21-23-28.717141_0000.json",
+      "bbox": {
+        "x": 0,
+        "y": 1317,
+        "w": 1203,
+        "h": 34
+      },
+      "center": {
+        "x": 601,
+        "y": 1335
+      }
+    },
+    {
+      "text": "info:1011 @ Tick #88 开始 （interval=5.0s)",
+      "bbox": {
+        "x": 0,
+        "y": 1355,
+        "w": 641,
+        "h": 30
+      },
+      "center": {
+        "x": 320,
+        "y": 1371
+      }
+    },
+    {
+      "text": "[debug:98] 截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_88_20260418_212335_408.png",
+      "bbox": {
+        "x": 0,
+        "y": 1393,
+        "w": 1635,
+        "h": 30
+      },
+      "center": {
+        "x": 817,
+        "y": 1408
+      }
+    },
+    {
+      "text": "Idebug:98l",
+      "bbox": {
+        "x": 0,
+        "y": 1431,
+        "w": 155,
+        "h": 28
+      },
+      "center": {
+        "x": 77,
+        "y": 1445
+      }
+    },
+    {
+      "text": "Layout: chat=王芊 Qai开发小分队，title=o, input=o, timestamps=0, self_bubbles=3, candidates=4",
+      "bbox": {
+        "x": 201,
+        "y": 1429,
+        "w": 1432,
+        "h": 32
+      },
+      "center": {
+        "x": 917,
+        "y": 1445
+      }
+    },
+    {
+      "text": "info:101]",
+      "bbox": {
+        "x": 0,
+        "y": 1468,
+        "w": 139,
+        "h": 23
+      },
+      "center": {
+        "x": 69,
+        "y": 1480
+      }
+    },
+    {
+      "text": "消息统计：共4 条，新增0 条",
+      "bbox": {
+        "x": 189,
+        "y": 1466,
+        "w": 418,
+        "h": 29
+      },
+      "center": {
+        "x": 398,
+        "y": 1481
+      }
+    },
+    {
+      "text": "[自己】看起来是系统更新日志～有什么具体需要我帮 忙的吗？",
+      "bbox": {
+        "x": 257,
+        "y": 1503,
+        "w": 727,
+        "h": 30
+      },
+      "center": {
+        "x": 621,
+        "y": 1518
+      }
+    },
+    {
+      "text": "Idebug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 1505,
+        "w": 153,
+        "h": 27
+      },
+      "center": {
+        "x": 76,
+        "y": 1519
+      }
+    },
+    {
+      "text": "[debug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 1543,
+        "w": 158,
+        "h": 26
+      },
+      "center": {
+        "x": 79,
+        "y": 1556
+      }
+    },
+    {
+      "text": "[对方】好了吗",
+      "bbox": {
+        "x": 261,
+        "y": 1541,
+        "w": 173,
+        "h": 29
+      },
+      "center": {
+        "x": 348,
+        "y": 1556
+      }
+    }
+  ],
+  "layout_left_elements": [
+    {
+      "text": "Inwang/wechat-mac-rpa/data/logs/runtime_20260418.log",
+      "x": 0,
+      "y": 62
+    },
+    {
+      "text": "口 芝士",
+      "x": 20,
+      "y": 143
+    },
+    {
+      "text": "口 hunt",
+      "x": 151,
+      "y": 145
+    },
+    {
+      "text": "口 blog",
+      "x": 287,
+      "y": 145
+    },
+    {
+      "text": "口 PM",
+      "x": 419,
+      "y": 145
+    },
+    {
+      "text": "[对方]好了吗",
+      "x": 262,
+      "y": 209
+    },
+    {
+      "text": "[debug:98]",
+      "x": 0,
+      "y": 209
+    },
+    {
+      "text": "[debug:98]",
+      "x": 0,
+      "y": 247
+    },
+    {
+      "text": "[自己〕1在的，请问具体是哪件事好了吗？",
+      "x": 261,
+      "y": 245
+    },
+    {
+      "text": "info:101] pl 决策：跳过回复 | 原因=无新消息| 消息=",
+      "x": 0,
+      "y": 280
+    },
+    {
+      "text": "Idebug:98〕 调试日志已保存：data/debug/tick_2026-04-18T21-23-08.623459_0000.json",
+      "x": 0,
+      "y": 320
+    },
+    {
+      "text": "info:101] @ Tick #85 开始 （interval=5. 0s)",
+      "x": 0,
+      "y": 356
+    },
+    {
+      "text": "[debug:98】截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_85_20260418_212315_321.png",
+      "x": 0,
+      "y": 393
+    },
+    {
+      "text": "[debug:98]",
+      "x": 0,
+      "y": 431
+    },
+    {
+      "text": "Layout: chat=王芊 Qai开发小分队，title=0, input=0, timestamps=0, self_bubbles=3, candidates=4",
+      "x": 199,
+      "y": 430
+    },
+    {
+      "text": "info:101]⑤消息统计：共4 条，新增0 条",
+      "x": 0,
+      "y": 467
+    },
+    {
+      "text": "[自己〕看起来是系统更新日志～有什么具体需要我帮 忙的吗？",
+      "x": 258,
+      "y": 503
+    },
+    {
+      "text": "[debug:98]",
+      "x": 0,
+      "y": 505
+    },
+    {
+      "text": "[对方] 好了吗",
+      "x": 261,
+      "y": 541
+    },
+    {
+      "text": "[debug:98]",
+      "x": 0,
+      "y": 543
+    },
+    {
+      "text": "[自己】1在的，请问具体是哪件事好了吗？",
+      "x": 256,
+      "y": 578
+    },
+    {
+      "text": "[debug:98]",
+      "x": 0,
+      "y": 580
+    },
+    {
+      "text": "info:101] M 决策：跳过回复 | 原因=无新消息|消息=",
+      "x": 0,
+      "y": 613
+    },
+    {
+      "text": "[debug:98] 调试日志已保存：data/debug/tick_2026-04-18T21-23-15.321035_0000.json",
+      "x": 0,
+      "y": 651
+    },
+    {
+      "text": "info:101] @ Tick #86 开始 （interval=5. 0s)",
+      "x": 0,
+      "y": 689
+    },
+    {
+      "text": "[debug:98]截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_86_20260418_212322_015. png",
+      "x": 0,
+      "y": 727
+    },
+    {
+      "text": "Layout: chat=王芊 @ai开发小分队，title=0, input=0, timestamps=0, self_bubbles=3, candidates=4",
+      "x": 202,
+      "y": 763
+    },
+    {
+      "text": "Idebug:98]",
+      "x": 0,
+      "y": 765
+    },
+    {
+      "text": "info:101]",
+      "x": 0,
+      "y": 801
+    },
+    {
+      "text": "消息统计：共 4 条，新增0条",
+      "x": 189,
+      "y": 800
+    },
+    {
+      "text": "[自己】看起来是系统更新日志～有什么具体需要我帮 忙的吗？",
+      "x": 254,
+      "y": 836
+    },
+    {
+      "text": "[debug:98]",
+      "x": 0,
+      "y": 839
+    },
+    {
+      "text": "[对方】好了吗",
+      "x": 262,
+      "y": 874
+    },
+    {
+      "text": "[debug:98]",
+      "x": 0,
+      "y": 876
+    },
+    {
+      "text": "[自己〕1在的，请问具体是哪件事好了吗？",
+      "x": 253,
+      "y": 910
+    },
+    {
+      "text": "[debug:98]",
+      "x": 0,
+      "y": 913
+    },
+    {
+      "text": "info:101] ° 决策：跳过回复 | 原因=无新消息 | 消息=",
+      "x": -2,
+      "y": 946
+    },
+    {
+      "text": "[debug:98] 调试日志已保存：data/debug/tick_2026-04-18T21-23-22.015089_0000.json",
+      "x": 0,
+      "y": 985
+    },
+    {
+      "text": "info:101]  Tick #87 开始 （interval=5.0s)",
+      "x": 0,
+      "y": 1022
+    },
+    {
+      "text": "[debug:98〕截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_87_20260418_212328_717.png",
+      "x": 0,
+      "y": 1060
+    },
+    {
+      "text": "Layout: chat=王芊 @ai开发小分队，title=0, input=0, timestamps=0, self_bubbles=3, candidates=4",
+      "x": 198,
+      "y": 1095
+    },
+    {
+      "text": "Idebug:98]",
+      "x": 0,
+      "y": 1098
+    },
+    {
+      "text": "info:101]⑤消息统计：共4 条，新增0 条",
+      "x": 0,
+      "y": 1133
+    },
+    {
+      "text": "[自己】看起来是系统更新日志～有什么具体需要我帮 忙的吗？",
+      "x": 253,
+      "y": 1169
+    },
+    {
+      "text": "Idebug:98]",
+      "x": 0,
+      "y": 1172
+    },
+    {
+      "text": "[对方〕好了吗",
+      "x": 261,
+      "y": 1208
+    },
+    {
+      "text": "Idebug:98]",
+      "x": 0,
+      "y": 1210
+    },
+    {
+      "text": "[自己〕1在的，请问具体是哪件事好了吗？",
+      "x": 250,
+      "y": 1244
+    },
+    {
+      "text": "Idebug:98]",
+      "x": 0,
+      "y": 1247
+    },
+    {
+      "text": "info:101] m 决策：跳过回复 | 原因=无新消息 | 消息=",
+      "x": 0,
+      "y": 1282
+    },
+    {
+      "text": "[debug:98〕 调试日志已保存：data/debug/tick_2026-04-18T21-23-28.717141_0000.json",
+      "x": 0,
+      "y": 1317
+    },
+    {
+      "text": "info:1011 @ Tick #88 开始 （interval=5.0s)",
+      "x": 0,
+      "y": 1355
+    },
+    {
+      "text": "[debug:98] 截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_88_20260418_212335_408.png",
+      "x": 0,
+      "y": 1393
+    },
+    {
+      "text": "Idebug:98l",
+      "x": 0,
+      "y": 1431
+    },
+    {
+      "text": "Layout: chat=王芊 Qai开发小分队，title=o, input=o, timestamps=0, self_bubbles=3, candidates=4",
+      "x": 201,
+      "y": 1429
+    },
+    {
+      "text": "info:101]",
+      "x": 0,
+      "y": 1468
+    },
+    {
+      "text": "消息统计：共4 条，新增0 条",
+      "x": 189,
+      "y": 1466
+    },
+    {
+      "text": "[自己】看起来是系统更新日志～有什么具体需要我帮 忙的吗？",
+      "x": 257,
+      "y": 1503
+    },
+    {
+      "text": "Idebug:98]",
+      "x": 0,
+      "y": 1505
+    },
+    {
+      "text": "[debug:98]",
+      "x": 0,
+      "y": 1543
+    },
+    {
+      "text": "[对方】好了吗",
+      "x": 261,
+      "y": 1541
+    }
+  ],
+  "layout_chat_list_groups": [],
+  "layout_chat_list_nicknames": [
+    "口 hunt",
+    "对方]好了吗",
+    "Layout: chat=王芊 Qai开发小分队，title=0, input=0, timestamps=0, self_bubbles=3, candidates=4",
+    "自己〕看起来是系统更新日志～有什么具体需要我帮 忙的吗？",
+    "Layout: chat=王芊 @ai开发小分队，title=0, input=0, timestamps=0, self_bubbles=3, candidates=4",
+    "Layout: chat=王芊 @ai开发小分队，title=0, input=0, timestamps=0, self_bubbles=3, candidates=4",
+    "自己】看起来是系统更新日志～有什么具体需要我帮 忙的吗？",
+    "Layout: chat=王芊 Qai开发小分队，title=o, input=o, timestamps=0, self_bubbles=3, candidates=4"
+  ],
+  "layout_chat_list_unread": [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "layout_message_candidates": [
+    {
+      "text": "口四",
+      "cx": 1733,
+      "cy": 76
+    },
+    {
+      "text": "六",
+      "cx": 1581,
+      "cy": 77
+    },
+    {
+      "text": "work",
+      "cx": 619,
+      "cy": 156
+    },
+    {
+      "text": "口 ali",
+      "cx": 721,
+      "cy": 157
+    },
+    {
+      "text": "切换",
+      "cx": 955,
+      "cy": 162
+    },
+    {
+      "text": "vX",
+      "cx": 1554,
+      "cy": 163
+    }
+  ],
+  "layout_self_bubbles": [],
+  "extraction_clusters": [
+    {
+      "texts": [
+        "六",
+        "work",
+        "切换"
+      ],
+      "gap": 79,
+      "top_x": 1581,
+      "in_nick_range": false,
+      "nickname_assigned": false
+    }
+  ],
+  "extraction_messages": [
+    {
+      "text": "六 work 切换",
+      "sender": "对方",
+      "sender_type": "other",
+      "chat_name": ""
+    }
+  ],
+  "bot_chat_name": "",
+  "bot_new_messages_count": 0,
+  "bot_should_reply": false,
+  "bot_reply_target": "",
+  "bot_reply_text": "",
+  "bot_switch_target": "",
+  "bot_switch_reason": "当前聊天名为空",
+  "action": "none",
+  "action_error": "聊天名为空且无未读"
+}

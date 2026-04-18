@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""OpenClaw LLM 客户端
+
+通过 OpenClaw Gateway / Kimi Code 代理调用大模型。
+默认连接本地代理 http://127.0.0.1:18790，模型 kimi-for-coding。
+"""
+
+import os
+from typing import List, Dict, Any, Optional
+
+
+def _get_openai_client():
+    """延迟导入 openai，避免未安装时崩溃"""
+    try:
+        from openai import OpenAI
+        return OpenAI
+    except ImportError:
+        raise ImportError(
+            "使用 OpenClawClient 需要安装 openai 库: pip install openai"
+        )
+
+
+class OpenClawClient:
+    """OpenClaw / Kimi Code 代理客户端"""
+
+    def __init__(
+        self,
+        base_url: str = "http://127.0.0.1:18790",
+        api_key: Optional[str] = None,
+        model: str = "kimi-for-coding",
+        max_tokens: int = 1024,
+        system_prompt: Optional[str] = None,
+        timeout: float = 30.0,
+    ):
+        OpenAI = _get_openai_client()
+        self.client = OpenAI(
+            base_url=base_url,
+            api_key=api_key or os.getenv("OPENCLAW_API_KEY", "openclaw-local"),
+            timeout=timeout,
+        )
+        self.model = model
+        # 注意：kimi-for-coding 的 reasoning_content 也占用 max_tokens 配额。
+        # 1024 足够覆盖典型思考过程（~300 chars）+ 回复内容（~50 chars）。
+        self.max_tokens = max_tokens
+        self.system_prompt = system_prompt or (
+            "你是一个友好、简洁的微信助手。回复要求："
+            "1. 友好自然；"
+            "2. 简洁（不超过50字）；"
+            "3. 群聊中被@时直接回答问题。"
+        )
+
+    def chat(self, messages: List[Dict[str, str]]) -> str:
+        """
+        调用 OpenClaw 生成回复。
+
+        Args:
+            messages: OpenAI 格式的消息列表，如
+                [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]
+
+        Returns:
+            模型生成的文本内容
+        """
+        # 如果没有 system prompt，注入默认的
+        has_system = any(m.get("role") == "system" for m in messages)
+        if not has_system:
+            messages = [{"role": "system", "content": self.system_prompt}] + messages
+
+        try:
+            resp = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,  # type: ignore[arg-type]
+                max_tokens=self.max_tokens,
+            )
+            choice = resp.choices[0]
+            content = choice.message.content or ""
+            finish_reason = choice.get("finish_reason", "")
+
+            # kimi-for-coding 的思考过程（reasoning_content）也占用 max_tokens。
+            # 当 max_tokens 不足时 content 为空，finish_reason="length"。
+            # 此时绝不能从 reasoning_content 取内容——那是思考过程，不是回复。
+            if not content.strip():
+                reasoning = getattr(choice.message, "reasoning_content", "")
+                if reasoning:
+                    # 记录诊断信息，便于排查 token 是否足够
+                    import logging
+                    logging.getLogger("wechat_rpa.openclaw").warning(
+                        f"LLM content 为空 (finish_reason={finish_reason!r}, "
+                        f"reasoning_len={len(reasoning)}, max_tokens={self.max_tokens})"
+                    )
+                return "收到"
+
+            return content.strip()
+        except Exception as exc:
+            raise RuntimeError(f"OpenClaw 调用失败: {exc}") from exc
+
+    @classmethod
+    def from_openclaw_config(cls, config_path: Optional[str] = None) -> "OpenClawClient":
+        """从 OpenClaw 配置文件自动读取 base_url 和模型配置"""
+        import json
+        from pathlib import Path
+
+        if config_path is None:
+            config_path = str(Path.home() / ".openclaw" / "openclaw.json")
+
+        if not os.path.exists(config_path):
+            # 使用默认值
+            return cls()
+
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+
+        providers = cfg.get("models", {}).get("providers", {})
+        openai_cfg = providers.get("openai", {})
+        base_url = openai_cfg.get("baseUrl", "http://127.0.0.1:18790")
+        models = openai_cfg.get("models", [])
+        model = models[0]["id"] if models else "kimi-for-coding"
+
+        return cls(base_url=base_url, model=model)

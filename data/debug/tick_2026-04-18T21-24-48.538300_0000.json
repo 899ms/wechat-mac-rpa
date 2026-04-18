@@ -1,0 +1,547 @@
+{
+  "tick_id": 0,
+  "timestamp": "2026-04-18T21:24:48.538300",
+  "screenshot_path": "/tmp/wechat_capture.png",
+  "ocr_elements": [
+    {
+      "text": "K",
+      "bbox": {
+        "x": 1754,
+        "y": 25,
+        "w": 31,
+        "h": 27
+      },
+      "center": {
+        "x": 1769,
+        "y": 38
+      }
+    },
+    {
+      "text": "OIOIOI60v1HOIIOIRI3￥90119v⑤＄1③1",
+      "bbox": {
+        "x": 0,
+        "y": 21,
+        "w": 1620,
+        "h": 40
+      },
+      "center": {
+        "x": 809,
+        "y": 41
+      }
+    },
+    {
+      "text": "六",
+      "bbox": {
+        "x": 1577,
+        "y": 108,
+        "w": 28,
+        "h": 32
+      },
+      "center": {
+        "x": 1592,
+        "y": 125
+      }
+    },
+    {
+      "text": "Inwang/wechat-mac-rpa/data/logs/",
+      "bbox": {
+        "x": 0,
+        "y": 113,
+        "w": 467,
+        "h": 28
+      },
+      "center": {
+        "x": 233,
+        "y": 127
+      }
+    },
+    {
+      "text": "口芝士",
+      "bbox": {
+        "x": 18,
+        "y": 190,
+        "w": 101,
+        "h": 28
+      },
+      "center": {
+        "x": 69,
+        "y": 205
+      }
+    },
+    {
+      "text": "口 work",
+      "bbox": {
+        "x": 541,
+        "y": 191,
+        "w": 108,
+        "h": 28
+      },
+      "center": {
+        "x": 595,
+        "y": 205
+      }
+    },
+    {
+      "text": "D hunt",
+      "bbox": {
+        "x": 150,
+        "y": 193,
+        "w": 105,
+        "h": 26
+      },
+      "center": {
+        "x": 203,
+        "y": 206
+      }
+    },
+    {
+      "text": "口 blog",
+      "bbox": {
+        "x": 285,
+        "y": 193,
+        "w": 102,
+        "h": 26
+      },
+      "center": {
+        "x": 336,
+        "y": 206
+      }
+    },
+    {
+      "text": "口 PM",
+      "bbox": {
+        "x": 420,
+        "y": 193,
+        "w": 85,
+        "h": 25
+      },
+      "center": {
+        "x": 463,
+        "y": 206
+      }
+    },
+    {
+      "text": "Dali",
+      "bbox": {
+        "x": 681,
+        "y": 193,
+        "w": 77,
+        "h": 25
+      },
+      "center": {
+        "x": 720,
+        "y": 206
+      }
+    },
+    {
+      "text": "1g/wechat-mac-rpa/data/logs/ 的索引",
+      "bbox": {
+        "x": 0,
+        "y": 248,
+        "w": 1185,
+        "h": 75
+      },
+      "center": {
+        "x": 591,
+        "y": 286
+      }
+    },
+    {
+      "text": "修改日期",
+      "bbox": {
+        "x": 165,
+        "y": 461,
+        "w": 139,
+        "h": 33
+      },
+      "center": {
+        "x": 234,
+        "y": 478
+      }
+    },
+    {
+      "text": "kB",
+      "bbox": {
+        "x": 7,
+        "y": 513,
+        "w": 41,
+        "h": 26
+      },
+      "center": {
+        "x": 28,
+        "y": 526
+      }
+    },
+    {
+      "text": "2026/4/17 00:29:29",
+      "bbox": {
+        "x": 111,
+        "y": 510,
+        "w": 307,
+        "h": 33
+      },
+      "center": {
+        "x": 265,
+        "y": 527
+      }
+    },
+    {
+      "text": "MB",
+      "bbox": {
+        "x": 0,
+        "y": 562,
+        "w": 47,
+        "h": 26
+      },
+      "center": {
+        "x": 23,
+        "y": 575
+      }
+    },
+    {
+      "text": "2026/4/18 21:21:57",
+      "bbox": {
+        "x": 122,
+        "y": 559,
+        "w": 294,
+        "h": 32
+      },
+      "center": {
+        "x": 269,
+        "y": 575
+      }
+    },
+    {
+      "text": "KB",
+      "bbox": {
+        "x": 9,
+        "y": 612,
+        "w": 40,
+        "h": 25
+      },
+      "center": {
+        "x": 29,
+        "y": 625
+      }
+    },
+    {
+      "text": "2026/4/17 00:29:29",
+      "bbox": {
+        "x": 107,
+        "y": 609,
+        "w": 310,
+        "h": 32
+      },
+      "center": {
+        "x": 262,
+        "y": 625
+      }
+    },
+    {
+      "text": "KB",
+      "bbox": {
+        "x": 8,
+        "y": 661,
+        "w": 39,
+        "h": 25
+      },
+      "center": {
+        "x": 28,
+        "y": 674
+      }
+    },
+    {
+      "text": "2026/4/17 10:02:36",
+      "bbox": {
+        "x": 114,
+        "y": 658,
+        "w": 306,
+        "h": 30
+      },
+      "center": {
+        "x": 267,
+        "y": 674
+      }
+    },
+    {
+      "text": "kB",
+      "bbox": {
+        "x": 8,
+        "y": 710,
+        "w": 39,
+        "h": 25
+      },
+      "center": {
+        "x": 27,
+        "y": 723
+      }
+    },
+    {
+      "text": "2026/4/16 23:52:01",
+      "bbox": {
+        "x": 117,
+        "y": 708,
+        "w": 299,
+        "h": 30
+      },
+      "center": {
+        "x": 266,
+        "y": 723
+      }
+    },
+    {
+      "text": "MB",
+      "bbox": {
+        "x": 0,
+        "y": 759,
+        "w": 47,
+        "h": 25
+      },
+      "center": {
+        "x": 23,
+        "y": 772
+      }
+    },
+    {
+      "text": "2026/4/18 21:13:14",
+      "bbox": {
+        "x": 126,
+        "y": 756,
+        "w": 292,
+        "h": 32
+      },
+      "center": {
+        "x": 272,
+        "y": 772
+      }
+    },
+    {
+      "text": "KB",
+      "bbox": {
+        "x": 8,
+        "y": 809,
+        "w": 39,
+        "h": 24
+      },
+      "center": {
+        "x": 28,
+        "y": 821
+      }
+    },
+    {
+      "text": "2026/4/18 21:21:57",
+      "bbox": {
+        "x": 123,
+        "y": 806,
+        "w": 295,
+        "h": 32
+      },
+      "center": {
+        "x": 271,
+        "y": 822
+      }
+    }
+  ],
+  "layout_left_elements": [
+    {
+      "text": "OIOIOI60v1HOIIOIRI3￥90119v⑤＄1③1",
+      "x": 0,
+      "y": 21
+    },
+    {
+      "text": "Inwang/wechat-mac-rpa/data/logs/",
+      "x": 0,
+      "y": 113
+    },
+    {
+      "text": "口芝士",
+      "x": 18,
+      "y": 190
+    },
+    {
+      "text": "D hunt",
+      "x": 150,
+      "y": 193
+    },
+    {
+      "text": "口 blog",
+      "x": 285,
+      "y": 193
+    },
+    {
+      "text": "口 PM",
+      "x": 420,
+      "y": 193
+    },
+    {
+      "text": "1g/wechat-mac-rpa/data/logs/ 的索引",
+      "x": 0,
+      "y": 248
+    },
+    {
+      "text": "修改日期",
+      "x": 165,
+      "y": 461
+    },
+    {
+      "text": "kB",
+      "x": 7,
+      "y": 513
+    },
+    {
+      "text": "2026/4/17 00:29:29",
+      "x": 111,
+      "y": 510
+    },
+    {
+      "text": "MB",
+      "x": 0,
+      "y": 562
+    },
+    {
+      "text": "2026/4/18 21:21:57",
+      "x": 122,
+      "y": 559
+    },
+    {
+      "text": "KB",
+      "x": 9,
+      "y": 612
+    },
+    {
+      "text": "2026/4/17 00:29:29",
+      "x": 107,
+      "y": 609
+    },
+    {
+      "text": "KB",
+      "x": 8,
+      "y": 661
+    },
+    {
+      "text": "2026/4/17 10:02:36",
+      "x": 114,
+      "y": 658
+    },
+    {
+      "text": "kB",
+      "x": 8,
+      "y": 710
+    },
+    {
+      "text": "2026/4/16 23:52:01",
+      "x": 117,
+      "y": 708
+    },
+    {
+      "text": "MB",
+      "x": 0,
+      "y": 759
+    },
+    {
+      "text": "2026/4/18 21:13:14",
+      "x": 126,
+      "y": 756
+    },
+    {
+      "text": "KB",
+      "x": 8,
+      "y": 809
+    },
+    {
+      "text": "2026/4/18 21:21:57",
+      "x": 123,
+      "y": 806
+    }
+  ],
+  "layout_chat_list_groups": [],
+  "layout_chat_list_nicknames": [
+    "D hunt",
+    "修改日期"
+  ],
+  "layout_chat_list_unread": [
+    "",
+    ""
+  ],
+  "layout_message_candidates": [
+    {
+      "text": "K",
+      "cx": 1769,
+      "cy": 38
+    },
+    {
+      "text": "六",
+      "cx": 1592,
+      "cy": 125
+    },
+    {
+      "text": "口 work",
+      "cx": 595,
+      "cy": 205
+    },
+    {
+      "text": "Dali",
+      "cx": 720,
+      "cy": 206
+    }
+  ],
+  "layout_self_bubbles": [],
+  "extraction_clusters": [
+    {
+      "texts": [
+        "K"
+      ],
+      "gap": null,
+      "top_x": 1769,
+      "in_nick_range": false,
+      "nickname_assigned": false
+    },
+    {
+      "texts": [
+        "六"
+      ],
+      "gap": null,
+      "top_x": 1592,
+      "in_nick_range": false,
+      "nickname_assigned": false
+    },
+    {
+      "texts": [
+        "口 work"
+      ],
+      "gap": null,
+      "top_x": 595,
+      "in_nick_range": true,
+      "nickname_assigned": false
+    }
+  ],
+  "extraction_messages": [
+    {
+      "text": "K",
+      "sender": "对方",
+      "sender_type": "other",
+      "chat_name": ""
+    },
+    {
+      "text": "六",
+      "sender": "对方",
+      "sender_type": "other",
+      "chat_name": ""
+    },
+    {
+      "text": "口 work",
+      "sender": "对方",
+      "sender_type": "other",
+      "chat_name": ""
+    }
+  ],
+  "bot_chat_name": "",
+  "bot_new_messages_count": 0,
+  "bot_should_reply": false,
+  "bot_reply_target": "",
+  "bot_reply_text": "",
+  "bot_switch_target": "",
+  "bot_switch_reason": "当前聊天名为空",
+  "action": "none",
+  "action_error": "聊天名为空且无未读"
+}

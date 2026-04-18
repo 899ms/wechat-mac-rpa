@@ -1,0 +1,23 @@
+{
+  "tick_id": 1,
+  "timestamp": "2026-04-18T20:18:40.609239",
+  "screenshot_path": "/tmp/test.png",
+  "ocr_elements": [],
+  "layout_left_elements": [],
+  "layout_chat_list_groups": [],
+  "layout_chat_list_nicknames": [],
+  "layout_chat_list_unread": [],
+  "layout_message_candidates": [],
+  "layout_self_bubbles": [],
+  "extraction_clusters": [],
+  "extraction_messages": [],
+  "bot_chat_name": "",
+  "bot_new_messages_count": 0,
+  "bot_should_reply": false,
+  "bot_reply_target": "",
+  "bot_reply_text": "",
+  "bot_switch_target": "",
+  "bot_switch_reason": "",
+  "action": "none",
+  "action_error": "异常: 'Mock' object is not iterable"
+}

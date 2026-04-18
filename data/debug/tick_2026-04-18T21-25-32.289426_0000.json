@@ -1,0 +1,372 @@
+{
+  "tick_id": 0,
+  "timestamp": "2026-04-18T21:25:32.289426",
+  "screenshot_path": "/tmp/wechat_capture.png",
+  "ocr_elements": [
+    {
+      "text": "R口四",
+      "bbox": {
+        "x": 1528,
+        "y": 58,
+        "w": 301,
+        "h": 38
+      },
+      "center": {
+        "x": 1679,
+        "y": 77
+      }
+    },
+    {
+      "text": "Inwang/wechat-mac-rpa/TROUBLESHOOTING.md",
+      "bbox": {
+        "x": 0,
+        "y": 63,
+        "w": 658,
+        "h": 31
+      },
+      "center": {
+        "x": 328,
+        "y": 78
+      }
+    },
+    {
+      "text": "芝士",
+      "bbox": {
+        "x": 63,
+        "y": 143,
+        "w": 55,
+        "h": 24
+      },
+      "center": {
+        "x": 90,
+        "y": 156
+      }
+    },
+    {
+      "text": "L hunt",
+      "bbox": {
+        "x": 149,
+        "y": 145,
+        "w": 105,
+        "h": 25
+      },
+      "center": {
+        "x": 201,
+        "y": 157
+      }
+    },
+    {
+      "text": "口 work",
+      "bbox": {
+        "x": 543,
+        "y": 143,
+        "w": 107,
+        "h": 28
+      },
+      "center": {
+        "x": 597,
+        "y": 157
+      }
+    },
+    {
+      "text": "口 ali",
+      "bbox": {
+        "x": 682,
+        "y": 143,
+        "w": 74,
+        "h": 28
+      },
+      "center": {
+        "x": 720,
+        "y": 157
+      }
+    },
+    {
+      "text": "口 blog",
+      "bbox": {
+        "x": 286,
+        "y": 146,
+        "w": 101,
+        "h": 24
+      },
+      "center": {
+        "x": 337,
+        "y": 158
+      }
+    },
+    {
+      "text": "口 PM",
+      "bbox": {
+        "x": 420,
+        "y": 145,
+        "w": 85,
+        "h": 26
+      },
+      "center": {
+        "x": 463,
+        "y": 158
+      }
+    },
+    {
+      "text": "-_WLCINTInCLIUUNLLUU1",
+      "bbox": {
+        "x": 0,
+        "y": 189,
+        "w": 406,
+        "h": 16
+      },
+      "center": {
+        "x": 202,
+        "y": 198
+      }
+    },
+    {
+      "text": "value = CaptureResult(image_path=str(png), window_rect=Rect(0, 0, 1760, 1280), scale_factor=1.0)",
+      "bbox": {
+        "x": -2,
+        "y": 234,
+        "w": 1464,
+        "h": 34
+      },
+      "center": {
+        "x": 730,
+        "y": 252
+      }
+    },
+    {
+      "text": "xt}\"}",
+      "bbox": {
+        "x": 0,
+        "y": 447,
+        "w": 67,
+        "h": 28
+      },
+      "center": {
+        "x": 33,
+        "y": 461
+      }
+    },
+    {
+      "text": "dfi. unread_count}')",
+      "bbox": {
+        "x": 0,
+        "y": 537,
+        "w": 320,
+        "h": 30
+      },
+      "center": {
+        "x": 160,
+        "y": 552
+      }
+    },
+    {
+      "text": "mport VisionOCREng ine",
+      "bbox": {
+        "x": 0,
+        "y": 755,
+        "w": 337,
+        "h": 29
+      },
+      "center": {
+        "x": 167,
+        "y": 770
+      }
+    },
+    {
+      "text": "mport PROFILE_WECHAT_MAC_1760X1280",
+      "bbox": {
+        "x": 0,
+        "y": 785,
+        "w": 549,
+        "h": 29
+      },
+      "center": {
+        "x": 274,
+        "y": 800
+      }
+    },
+    {
+      "text": "ATH\")",
+      "bbox": {
+        "x": 0,
+        "y": 873,
+        "w": 73,
+        "h": 28
+      },
+      "center": {
+        "x": 36,
+        "y": 888
+      }
+    },
+    {
+      "text": "nbda e: e. center.y):",
+      "bbox": {
+        "x": 0,
+        "y": 904,
+        "w": 321,
+        "h": 30
+      },
+      "center": {
+        "x": 159,
+        "y": 920
+      }
+    },
+    {
+      "text": ". x} y=le.bbox.y} cx=le. center.x} cy=te.center.y}\")",
+      "bbox": {
+        "x": 0,
+        "y": 932,
+        "w": 779,
+        "h": 36
+      },
+      "center": {
+        "x": 389,
+        "y": 950
+      }
+    },
+    {
+      "text": "区域直接检测，不从呢称推导 | 待修复",
+      "bbox": {
+        "x": 0,
+        "y": 1543,
+        "w": 465,
+        "h": 30
+      },
+      "center": {
+        "x": 232,
+        "y": 1558
+      }
+    }
+  ],
+  "layout_left_elements": [
+    {
+      "text": "Inwang/wechat-mac-rpa/TROUBLESHOOTING.md",
+      "x": 0,
+      "y": 63
+    },
+    {
+      "text": "芝士",
+      "x": 63,
+      "y": 143
+    },
+    {
+      "text": "L hunt",
+      "x": 149,
+      "y": 145
+    },
+    {
+      "text": "口 blog",
+      "x": 286,
+      "y": 146
+    },
+    {
+      "text": "口 PM",
+      "x": 420,
+      "y": 145
+    },
+    {
+      "text": "-_WLCINTInCLIUUNLLUU1",
+      "x": 0,
+      "y": 189
+    },
+    {
+      "text": "value = CaptureResult(image_path=str(png), window_rect=Rect(0, 0, 1760, 1280), scale_factor=1.0)",
+      "x": -2,
+      "y": 234
+    },
+    {
+      "text": "xt}\"}",
+      "x": 0,
+      "y": 447
+    },
+    {
+      "text": "dfi. unread_count}')",
+      "x": 0,
+      "y": 537
+    },
+    {
+      "text": "mport VisionOCREng ine",
+      "x": 0,
+      "y": 755
+    },
+    {
+      "text": "mport PROFILE_WECHAT_MAC_1760X1280",
+      "x": 0,
+      "y": 785
+    },
+    {
+      "text": "ATH\")",
+      "x": 0,
+      "y": 873
+    },
+    {
+      "text": "nbda e: e. center.y):",
+      "x": 0,
+      "y": 904
+    },
+    {
+      "text": ". x} y=le.bbox.y} cx=le. center.x} cy=te.center.y}\")",
+      "x": 0,
+      "y": 932
+    },
+    {
+      "text": "区域直接检测，不从呢称推导 | 待修复",
+      "x": 0,
+      "y": 1543
+    }
+  ],
+  "layout_chat_list_groups": [],
+  "layout_chat_list_nicknames": [
+    "口 blog"
+  ],
+  "layout_chat_list_unread": [
+    ""
+  ],
+  "layout_message_candidates": [
+    {
+      "text": "R口四",
+      "cx": 1679,
+      "cy": 77
+    },
+    {
+      "text": "口 work",
+      "cx": 597,
+      "cy": 157
+    },
+    {
+      "text": "口 ali",
+      "cx": 720,
+      "cy": 157
+    }
+  ],
+  "layout_self_bubbles": [],
+  "extraction_clusters": [
+    {
+      "texts": [
+        "口 work",
+        "口 ali"
+      ],
+      "gap": 0,
+      "top_x": 597,
+      "in_nick_range": true,
+      "nickname_assigned": true
+    }
+  ],
+  "extraction_messages": [
+    {
+      "text": "口 ali",
+      "sender": "口 work",
+      "sender_type": "other",
+      "chat_name": ""
+    }
+  ],
+  "bot_chat_name": "",
+  "bot_new_messages_count": 0,
+  "bot_should_reply": false,
+  "bot_reply_target": "",
+  "bot_reply_text": "",
+  "bot_switch_target": "",
+  "bot_switch_reason": "当前聊天名为空",
+  "action": "none",
+  "action_error": "聊天名为空且无未读"
+}

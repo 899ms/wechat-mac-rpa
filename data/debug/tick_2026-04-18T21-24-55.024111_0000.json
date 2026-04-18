@@ -1,0 +1,516 @@
+{
+  "tick_id": 0,
+  "timestamp": "2026-04-18T21:24:55.024111",
+  "screenshot_path": "/tmp/wechat_capture.png",
+  "ocr_elements": [
+    {
+      "text": "OIOIOI60v1HOIIOIRI3￥90119v13＄1×",
+      "bbox": {
+        "x": 0,
+        "y": 21,
+        "w": 1608,
+        "h": 40
+      },
+      "center": {
+        "x": 803,
+        "y": 41
+      }
+    },
+    {
+      "text": "六 口",
+      "bbox": {
+        "x": 1575,
+        "y": 107,
+        "w": 213,
+        "h": 35
+      },
+      "center": {
+        "x": 1682,
+        "y": 125
+      }
+    },
+    {
+      "text": "Inwang/wechat-mac-rpa/TROUBLESHOOTING.md",
+      "bbox": {
+        "x": 0,
+        "y": 110,
+        "w": 659,
+        "h": 33
+      },
+      "center": {
+        "x": 328,
+        "y": 126
+      }
+    },
+    {
+      "text": "口 芝士",
+      "bbox": {
+        "x": 18,
+        "y": 190,
+        "w": 102,
+        "h": 28
+      },
+      "center": {
+        "x": 70,
+        "y": 205
+      }
+    },
+    {
+      "text": "D hunt",
+      "bbox": {
+        "x": 150,
+        "y": 193,
+        "w": 105,
+        "h": 25
+      },
+      "center": {
+        "x": 203,
+        "y": 206
+      }
+    },
+    {
+      "text": "口 blog",
+      "bbox": {
+        "x": 285,
+        "y": 192,
+        "w": 104,
+        "h": 27
+      },
+      "center": {
+        "x": 337,
+        "y": 206
+      }
+    },
+    {
+      "text": "口 PM",
+      "bbox": {
+        "x": 419,
+        "y": 193,
+        "w": 88,
+        "h": 25
+      },
+      "center": {
+        "x": 463,
+        "y": 206
+      }
+    },
+    {
+      "text": "口 work",
+      "bbox": {
+        "x": 542,
+        "y": 193,
+        "w": 106,
+        "h": 25
+      },
+      "center": {
+        "x": 595,
+        "y": 206
+      }
+    },
+    {
+      "text": "口 ali",
+      "bbox": {
+        "x": 682,
+        "y": 193,
+        "w": 76,
+        "h": 26
+      },
+      "center": {
+        "x": 720,
+        "y": 206
+      }
+    },
+    {
+      "text": "nents if e.center.x > Left_boundary]",
+      "bbox": {
+        "x": 0,
+        "y": 257,
+        "w": 562,
+        "h": 29
+      },
+      "center": {
+        "x": 280,
+        "y": 272
+      }
+    },
+    {
+      "text": "in result. messages]",
+      "bbox": {
+        "x": 0,
+        "y": 353,
+        "w": 297,
+        "h": 30
+      },
+      "center": {
+        "x": 147,
+        "y": 369
+      }
+    },
+    {
+      "text": "if t not in extracted_texts]",
+      "bbox": {
+        "x": 0,
+        "y": 450,
+        "w": 440,
+        "h": 33
+      },
+      "center": {
+        "x": 219,
+        "y": 466
+      }
+    },
+    {
+      "text": "xts if t not in ocr_texts]",
+      "bbox": {
+        "x": 0,
+        "y": 482,
+        "w": 415,
+        "h": 29
+      },
+      "center": {
+        "x": 207,
+        "y": 497
+      }
+    },
+    {
+      "text": "s_avatar_noise° 过滤 / 被当昵称吞掉",
+      "bbox": {
+        "x": 0,
+        "y": 677,
+        "w": 514,
+        "h": 32
+      },
+      "center": {
+        "x": 256,
+        "y": 693
+      }
+    },
+    {
+      "text": "s_system_notice 误判 /聚类错误",
+      "bbox": {
+        "x": 0,
+        "y": 716,
+        "w": 480,
+        "h": 29
+      },
+      "center": {
+        "x": 239,
+        "y": 731
+      }
+    },
+    {
+      "text": "_candidate’未过滤 / 聊天列表元素混入",
+      "bbox": {
+        "x": 0,
+        "y": 752,
+        "w": 552,
+        "h": 29
+      },
+      "center": {
+        "x": 275,
+        "y": 767
+      }
+    },
+    {
+      "text": "（群聊中）呢称未识别（聚类失败）",
+      "bbox": {
+        "x": 6,
+        "y": 789,
+        "w": 453,
+        "h": 29
+      },
+      "center": {
+        "x": 232,
+        "y": 804
+      }
+    },
+    {
+      "text": "生效",
+      "bbox": {
+        "x": 0,
+        "y": 916,
+        "w": 58,
+        "h": 27
+      },
+      "center": {
+        "x": 29,
+        "y": 930
+      }
+    },
+    {
+      "text": "ges：",
+      "bbox": {
+        "x": 0,
+        "y": 1020,
+        "w": 81,
+        "h": 29
+      },
+      "center": {
+        "x": 39,
+        "y": 1035
+      }
+    },
+    {
+      "text": "name)",
+      "bbox": {
+        "x": 0,
+        "y": 1114,
+        "w": 69,
+        "h": 25
+      },
+      "center": {
+        "x": 34,
+        "y": 1127
+      }
+    },
+    {
+      "text": "\"）",
+      "bbox": {
+        "x": 0,
+        "y": 1144,
+        "w": 22,
+        "h": 24
+      },
+      "center": {
+        "x": 12,
+        "y": 1156
+      }
+    },
+    {
+      "text": "ion. seen_messages)}\")",
+      "bbox": {
+        "x": 0,
+        "y": 1173,
+        "w": 335,
+        "h": 30
+      },
+      "center": {
+        "x": 167,
+        "y": 1189
+      }
+    },
+    {
+      "text": "story)}\")",
+      "bbox": {
+        "x": 0,
+        "y": 1203,
+        "w": 143,
+        "h": 29
+      },
+      "center": {
+        "x": 71,
+        "y": 1218
+      }
+    },
+    {
+      "text": "出现多个 key |^_normalize_chat_name’不一致 /^_clean_nickname°不一致",
+      "bbox": {
+        "x": 27,
+        "y": 1400,
+        "w": 1096,
+        "h": 33
+      },
+      "center": {
+        "x": 575,
+        "y": 1416
+      }
+    },
+    {
+      "text": "波当作已读 |〝seen_messages° 匹配失败 /文本相似度阈值不当",
+      "bbox": {
+        "x": 0,
+        "y": 1437,
+        "w": 815,
+        "h": 33
+      },
+      "center": {
+        "x": 407,
+        "y": 1454
+      }
+    },
+    {
+      "text": "record_sent 未生效 / session 分裂",
+      "bbox": {
+        "x": 7,
+        "y": 1474,
+        "w": 565,
+        "h": 32
+      },
+      "center": {
+        "x": 290,
+        "y": 1491
+      }
+    }
+  ],
+  "layout_left_elements": [
+    {
+      "text": "OIOIOI60v1HOIIOIRI3￥90119v13＄1×",
+      "x": 0,
+      "y": 21
+    },
+    {
+      "text": "Inwang/wechat-mac-rpa/TROUBLESHOOTING.md",
+      "x": 0,
+      "y": 110
+    },
+    {
+      "text": "口 芝士",
+      "x": 18,
+      "y": 190
+    },
+    {
+      "text": "D hunt",
+      "x": 150,
+      "y": 193
+    },
+    {
+      "text": "口 blog",
+      "x": 285,
+      "y": 192
+    },
+    {
+      "text": "口 PM",
+      "x": 419,
+      "y": 193
+    },
+    {
+      "text": "nents if e.center.x > Left_boundary]",
+      "x": 0,
+      "y": 257
+    },
+    {
+      "text": "in result. messages]",
+      "x": 0,
+      "y": 353
+    },
+    {
+      "text": "if t not in extracted_texts]",
+      "x": 0,
+      "y": 450
+    },
+    {
+      "text": "xts if t not in ocr_texts]",
+      "x": 0,
+      "y": 482
+    },
+    {
+      "text": "s_avatar_noise° 过滤 / 被当昵称吞掉",
+      "x": 0,
+      "y": 677
+    },
+    {
+      "text": "s_system_notice 误判 /聚类错误",
+      "x": 0,
+      "y": 716
+    },
+    {
+      "text": "_candidate’未过滤 / 聊天列表元素混入",
+      "x": 0,
+      "y": 752
+    },
+    {
+      "text": "（群聊中）呢称未识别（聚类失败）",
+      "x": 6,
+      "y": 789
+    },
+    {
+      "text": "生效",
+      "x": 0,
+      "y": 916
+    },
+    {
+      "text": "ges：",
+      "x": 0,
+      "y": 1020
+    },
+    {
+      "text": "name)",
+      "x": 0,
+      "y": 1114
+    },
+    {
+      "text": "\"）",
+      "x": 0,
+      "y": 1144
+    },
+    {
+      "text": "ion. seen_messages)}\")",
+      "x": 0,
+      "y": 1173
+    },
+    {
+      "text": "story)}\")",
+      "x": 0,
+      "y": 1203
+    },
+    {
+      "text": "出现多个 key |^_normalize_chat_name’不一致 /^_clean_nickname°不一致",
+      "x": 27,
+      "y": 1400
+    },
+    {
+      "text": "波当作已读 |〝seen_messages° 匹配失败 /文本相似度阈值不当",
+      "x": 0,
+      "y": 1437
+    },
+    {
+      "text": "record_sent 未生效 / session 分裂",
+      "x": 7,
+      "y": 1474
+    }
+  ],
+  "layout_chat_list_groups": [],
+  "layout_chat_list_nicknames": [
+    "D hunt"
+  ],
+  "layout_chat_list_unread": [
+    ""
+  ],
+  "layout_message_candidates": [
+    {
+      "text": "六 口",
+      "cx": 1682,
+      "cy": 125
+    },
+    {
+      "text": "口 work",
+      "cx": 595,
+      "cy": 206
+    },
+    {
+      "text": "口 ali",
+      "cx": 720,
+      "cy": 206
+    }
+  ],
+  "layout_self_bubbles": [],
+  "extraction_clusters": [
+    {
+      "texts": [
+        "口 work",
+        "口 ali"
+      ],
+      "gap": 0,
+      "top_x": 595,
+      "in_nick_range": true,
+      "nickname_assigned": true
+    }
+  ],
+  "extraction_messages": [
+    {
+      "text": "口 ali",
+      "sender": "口 work",
+      "sender_type": "other",
+      "chat_name": ""
+    }
+  ],
+  "bot_chat_name": "",
+  "bot_new_messages_count": 0,
+  "bot_should_reply": false,
+  "bot_reply_target": "",
+  "bot_reply_text": "",
+  "bot_switch_target": "",
+  "bot_switch_reason": "当前聊天名为空",
+  "action": "none",
+  "action_error": "聊天名为空且无未读"
+}

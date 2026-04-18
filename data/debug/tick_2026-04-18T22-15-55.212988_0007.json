@@ -1,0 +1,1103 @@
+{
+  "tick_id": 7,
+  "timestamp": "2026-04-18T22:15:55.212988",
+  "screenshot_path": "/tmp/wechat_capture.png",
+  "ocr_elements": [
+    {
+      "text": "＆口。1",
+      "bbox": {
+        "x": 1553,
+        "y": 59,
+        "w": 270,
+        "h": 37
+      },
+      "center": {
+        "x": 1688,
+        "y": 77
+      }
+    },
+    {
+      "text": "Inwang/wechat-mac-rpa/data/logs/runtime_20260418.log",
+      "bbox": {
+        "x": 0,
+        "y": 62,
+        "w": 767,
+        "h": 32
+      },
+      "center": {
+        "x": 383,
+        "y": 78
+      }
+    },
+    {
+      "text": "芝士",
+      "bbox": {
+        "x": 56,
+        "y": 143,
+        "w": 61,
+        "h": 24
+      },
+      "center": {
+        "x": 87,
+        "y": 156
+      }
+    },
+    {
+      "text": "work",
+      "bbox": {
+        "x": 574,
+        "y": 145,
+        "w": 74,
+        "h": 22
+      },
+      "center": {
+        "x": 612,
+        "y": 156
+      }
+    },
+    {
+      "text": "口 PM",
+      "bbox": {
+        "x": 420,
+        "y": 145,
+        "w": 94,
+        "h": 25
+      },
+      "center": {
+        "x": 468,
+        "y": 157
+      }
+    },
+    {
+      "text": "口ali",
+      "bbox": {
+        "x": 683,
+        "y": 145,
+        "w": 74,
+        "h": 23
+      },
+      "center": {
+        "x": 720,
+        "y": 157
+      }
+    },
+    {
+      "text": "口 hunt",
+      "bbox": {
+        "x": 151,
+        "y": 146,
+        "w": 104,
+        "h": 24
+      },
+      "center": {
+        "x": 203,
+        "y": 158
+      }
+    },
+    {
+      "text": "口 blog",
+      "bbox": {
+        "x": 286,
+        "y": 145,
+        "w": 106,
+        "h": 28
+      },
+      "center": {
+        "x": 339,
+        "y": 159
+      }
+    },
+    {
+      "text": "LucvuysyoJ",
+      "bbox": {
+        "x": 0,
+        "y": 191,
+        "w": 151,
+        "h": 17
+      },
+      "center": {
+        "x": 75,
+        "y": 199
+      }
+    },
+    {
+      "text": "L口」取过火主优频明关，purd、中次小瓜心咖",
+      "bbox": {
+        "x": 236,
+        "y": 189,
+        "w": 643,
+        "h": 21
+      },
+      "center": {
+        "x": 557,
+        "y": 200
+      }
+    },
+    {
+      "text": "【自己]确实，文生视频发展太快了，感觉影视创作门 槛要大幅降低。",
+      "bbox": {
+        "x": 242,
+        "y": 216,
+        "w": 822,
+        "h": 30
+      },
+      "center": {
+        "x": 653,
+        "y": 231
+      }
+    },
+    {
+      "text": "[debug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 219,
+        "w": 156,
+        "h": 26
+      },
+      "center": {
+        "x": 77,
+        "y": 232
+      }
+    },
+    {
+      "text": "info:101] 网 决策：跳过回复| 原因=无新消息|消息=",
+      "bbox": {
+        "x": 0,
+        "y": 253,
+        "w": 740,
+        "h": 31
+      },
+      "center": {
+        "x": 369,
+        "y": 268
+      }
+    },
+    {
+      "text": "[debug:981 调试日志已保存：data/ debug/tick_2026-04-18T22-14-14.000895_0090.json",
+      "bbox": {
+        "x": 0,
+        "y": 290,
+        "w": 1202,
+        "h": 32
+      },
+      "center": {
+        "x": 600,
+        "y": 307
+      }
+    },
+    {
+      "text": "info:101] 口 已保存 3 个会话状态",
+      "bbox": {
+        "x": 0,
+        "y": 327,
+        "w": 461,
+        "h": 30
+      },
+      "center": {
+        "x": 229,
+        "y": 342
+      }
+    },
+    {
+      "text": "info:1011 @ Tick #91 开始 （interval=5.0s)",
+      "bbox": {
+        "x": 0,
+        "y": 364,
+        "w": 640,
+        "h": 32
+      },
+      "center": {
+        "x": 319,
+        "y": 380
+      }
+    },
+    {
+      "text": "[debug:98] 截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_91_20260418_221419_987.png",
+      "bbox": {
+        "x": 0,
+        "y": 400,
+        "w": 1622,
+        "h": 36
+      },
+      "center": {
+        "x": 810,
+        "y": 418
+      }
+    },
+    {
+      "text": "[warning:104〕当前聊天名为空，可能未打开任何聊天窗口，跳过回复",
+      "bbox": {
+        "x": 30,
+        "y": 438,
+        "w": 886,
+        "h": 30
+      },
+      "center": {
+        "x": 473,
+        "y": 453
+      }
+    },
+    {
+      "text": "[debug:98l调试日志已保存：data/debug/tick_2026-04-18T22-14-19.987515_0091.json",
+      "bbox": {
+        "x": 0,
+        "y": 475,
+        "w": 1202,
+        "h": 33
+      },
+      "center": {
+        "x": 600,
+        "y": 492
+      }
+    },
+    {
+      "text": "info:101] @ Tick #92 开始 （ interval=5.0s)",
+      "bbox": {
+        "x": 0,
+        "y": 512,
+        "w": 643,
+        "h": 30
+      },
+      "center": {
+        "x": 320,
+        "y": 528
+      }
+    },
+    {
+      "text": "[debug:98] 截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_92_20260418_221426_892•png",
+      "bbox": {
+        "x": 0,
+        "y": 549,
+        "w": 1619,
+        "h": 33
+      },
+      "center": {
+        "x": 809,
+        "y": 565
+      }
+    },
+    {
+      "text": "[warning:1041 当前聊天名为空，可能未打开任何聊天窗口，跳过回复",
+      "bbox": {
+        "x": 31,
+        "y": 586,
+        "w": 853,
+        "h": 30
+      },
+      "center": {
+        "x": 457,
+        "y": 602
+      }
+    },
+    {
+      "text": "[debug:98〕调试日志已保存：data/debug/tick_2026-04-18T22-14-26.892430_0092.json",
+      "bbox": {
+        "x": 0,
+        "y": 623,
+        "w": 1203,
+        "h": 34
+      },
+      "center": {
+        "x": 601,
+        "y": 640
+      }
+    },
+    {
+      "text": "info:101] @ Tick #93 开始 （interval=5.0s)",
+      "bbox": {
+        "x": 0,
+        "y": 661,
+        "w": 640,
+        "h": 28
+      },
+      "center": {
+        "x": 319,
+        "y": 675
+      }
+    },
+    {
+      "text": "[debug:98〕 截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_93_20260418_221433_134.png",
+      "bbox": {
+        "x": 0,
+        "y": 697,
+        "w": 1620,
+        "h": 31
+      },
+      "center": {
+        "x": 809,
+        "y": 713
+      }
+    },
+    {
+      "text": "[warning:104〕当前聊天名为空，可能未打开任何聊天窗口，跳过回复",
+      "bbox": {
+        "x": 31,
+        "y": 735,
+        "w": 890,
+        "h": 30
+      },
+      "center": {
+        "x": 476,
+        "y": 750
+      }
+    },
+    {
+      "text": "[debug:98〕 调试日志已保存：data/debug/tick_2026-04-18T22-14-33.134143_0093.json",
+      "bbox": {
+        "x": 0,
+        "y": 770,
+        "w": 1202,
+        "h": 35
+      },
+      "center": {
+        "x": 600,
+        "y": 787
+      }
+    },
+    {
+      "text": "info:1011 @ Tick #94 开始 （interval=5.0s)",
+      "bbox": {
+        "x": 0,
+        "y": 808,
+        "w": 640,
+        "h": 32
+      },
+      "center": {
+        "x": 319,
+        "y": 824
+      }
+    },
+    {
+      "text": "[debug:98〕截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_94_20260418_221439_186. png",
+      "bbox": {
+        "x": 0,
+        "y": 845,
+        "w": 1627,
+        "h": 35
+      },
+      "center": {
+        "x": 813,
+        "y": 863
+      }
+    },
+    {
+      "text": "Layout: chat=KiKKiODODKK, title=0， input=0, timestamps=0, self_bubb les=0, candidates=1",
+      "bbox": {
+        "x": 198,
+        "y": 879,
+        "w": 1365,
+        "h": 34
+      },
+      "center": {
+        "x": 881,
+        "y": 896
+      }
+    },
+    {
+      "text": "[debug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 883,
+        "w": 160,
+        "h": 27
+      },
+      "center": {
+        "x": 80,
+        "y": 897
+      }
+    },
+    {
+      "text": "info:101]（消息统计：共1 条，新增1 条",
+      "bbox": {
+        "x": 0,
+        "y": 918,
+        "w": 604,
+        "h": 29
+      },
+      "center": {
+        "x": 301,
+        "y": 933
+      }
+    },
+    {
+      "text": "【对方】本地文件或分：口 work Dali",
+      "bbox": {
+        "x": 244,
+        "y": 954,
+        "w": 505,
+        "h": 29
+      },
+      "center": {
+        "x": 496,
+        "y": 969
+      }
+    },
+    {
+      "text": "[debug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 955,
+        "w": 157,
+        "h": 29
+      },
+      "center": {
+        "x": 78,
+        "y": 970
+      }
+    },
+    {
+      "text": "_init__:87] BotLogger 初始化完成 | Logs_dir=/Users/yihanwang/wechat-mac-rpa/data/ Logs",
+      "bbox": {
+        "x": 4,
+        "y": 991,
+        "w": 1311,
+        "h": 30
+      },
+      "center": {
+        "x": 660,
+        "y": 1007
+      }
+    },
+    {
+      "text": "info:101]",
+      "bbox": {
+        "x": 0,
+        "y": 1029,
+        "w": 144,
+        "h": 25
+      },
+      "center": {
+        "x": 71,
+        "y": 1041
+      }
+    },
+    {
+      "text": "已加载 3 个会话状态",
+      "bbox": {
+        "x": 190,
+        "y": 1029,
+        "w": 267,
+        "h": 29
+      },
+      "center": {
+        "x": 324,
+        "y": 1044
+      }
+    },
+    {
+      "text": "info:101] @ Tick #1 开始 （interval=5.0s)",
+      "bbox": {
+        "x": 0,
+        "y": 1064,
+        "w": 623,
+        "h": 31
+      },
+      "center": {
+        "x": 310,
+        "y": 1079
+      }
+    },
+    {
+      "text": "[debug:98〕 截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_1_20260418_221453_085•png",
+      "bbox": {
+        "x": 0,
+        "y": 1102,
+        "w": 1627,
+        "h": 32
+      },
+      "center": {
+        "x": 813,
+        "y": 1118
+      }
+    },
+    {
+      "text": "Idebug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 1139,
+        "w": 157,
+        "h": 27
+      },
+      "center": {
+        "x": 78,
+        "y": 1153
+      }
+    },
+    {
+      "text": "Layout: chat=Iw De, title=0, input=0, timestamps=0, self_bubbles=0, candidates=3",
+      "bbox": {
+        "x": 195,
+        "y": 1137,
+        "w": 1281,
+        "h": 30
+      },
+      "center": {
+        "x": 836,
+        "y": 1153
+      }
+    },
+    {
+      "text": "info:101]•消息统计：共3 条，新增3条",
+      "bbox": {
+        "x": 0,
+        "y": 1173,
+        "w": 589,
+        "h": 30
+      },
+      "center": {
+        "x": 294,
+        "y": 1189
+      }
+    },
+    {
+      "text": "[debug:98]",
+      "bbox": {
+        "x": 0,
+        "y": 1212,
+        "w": 155,
+        "h": 28
+      },
+      "center": {
+        "x": 77,
+        "y": 1226
+      }
+    },
+    {
+      "text": "2[对方]口",
+      "bbox": {
+        "x": 227,
+        "y": 1211,
+        "w": 153,
+        "h": 29
+      },
+      "center": {
+        "x": 304,
+        "y": 1226
+      }
+    },
+    {
+      "text": "[对方】QAl模式",
+      "bbox": {
+        "x": 261,
+        "y": 1247,
+        "w": 212,
+        "h": 29
+      },
+      "center": {
+        "x": 367,
+        "y": 1262
+      }
+    },
+    {
+      "text": "[debug : 98]",
+      "bbox": {
+        "x": 0,
+        "y": 1250,
+        "w": 152,
+        "h": 26
+      },
+      "center": {
+        "x": 76,
+        "y": 1263
+      }
+    },
+    {
+      "text": "[对方〕口 切换到这个标签页",
+      "bbox": {
+        "x": 252,
+        "y": 1284,
+        "w": 365,
+        "h": 29
+      },
+      "center": {
+        "x": 434,
+        "y": 1299
+      }
+    },
+    {
+      "text": "[debug :98]",
+      "bbox": {
+        "x": 0,
+        "y": 1286,
+        "w": 157,
+        "h": 26
+      },
+      "center": {
+        "x": 78,
+        "y": 1300
+      }
+    },
+    {
+      "text": "info:101]",
+      "bbox": {
+        "x": 0,
+        "y": 1323,
+        "w": 140,
+        "h": 24
+      },
+      "center": {
+        "x": 70,
+        "y": 1335
+      }
+    },
+    {
+      "text": "决策：需要回复」 原因=触发回复条件（从 3 条新消息中选取）！回复=收到，已切换",
+      "bbox": {
+        "x": 190,
+        "y": 1321,
+        "w": 1040,
+        "h": 30
+      },
+      "center": {
+        "x": 710,
+        "y": 1336
+      }
+    },
+    {
+      "text": "info:101]",
+      "bbox": {
+        "x": 0,
+        "y": 1359,
+        "w": 136,
+        "h": 24
+      },
+      "center": {
+        "x": 68,
+        "y": 1371
+      }
+    },
+    {
+      "text": "发送成功（8字)：收到，已切换",
+      "bbox": {
+        "x": 185,
+        "y": 1359,
+        "w": 404,
+        "h": 27
+      },
+      "center": {
+        "x": 387,
+        "y": 1373
+      }
+    },
+    {
+      "text": "Idebug:98] 调试日志已保存：data/debug/tick_2026-04-18T22-14-53.084766_0001.json",
+      "bbox": {
+        "x": 0,
+        "y": 1394,
+        "w": 1200,
+        "h": 36
+      },
+      "center": {
+        "x": 599,
+        "y": 1412
+      }
+    },
+    {
+      "text": "info:101] @ Tick #2 开始 （interval=5.0s)",
+      "bbox": {
+        "x": 0,
+        "y": 1433,
+        "w": 631,
+        "h": 28
+      },
+      "center": {
+        "x": 314,
+        "y": 1447
+      }
+    },
+    {
+      "text": "[debug:98] 截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_2_20260418_221516_536.png",
+      "bbox": {
+        "x": 0,
+        "y": 1469,
+        "w": 1603,
+        "h": 31
+      },
+      "center": {
+        "x": 800,
+        "y": 1485
+      }
+    },
+    {
+      "text": "Iwarning:104〕当前聊天名为空，可能未打开任何聊天窗口，跳过回复",
+      "bbox": {
+        "x": 27,
+        "y": 1505,
+        "w": 896,
+        "h": 32
+      },
+      "center": {
+        "x": 475,
+        "y": 1522
+      }
+    },
+    {
+      "text": "[debug:98] 调试日志已保存：data/ debug/tick_2026-04-18T22-15-16.536251_0002.ison",
+      "bbox": {
+        "x": 0,
+        "y": 1544,
+        "w": 1202,
+        "h": 32
+      },
+      "center": {
+        "x": 600,
+        "y": 1560
+      }
+    }
+  ],
+  "layout_left_elements": [
+    {
+      "text": "Inwang/wechat-mac-rpa/data/logs/runtime_20260418.log",
+      "x": 0,
+      "y": 62
+    },
+    {
+      "text": "芝士",
+      "x": 56,
+      "y": 143
+    },
+    {
+      "text": "口 PM",
+      "x": 420,
+      "y": 145
+    },
+    {
+      "text": "口 hunt",
+      "x": 151,
+      "y": 146
+    },
+    {
+      "text": "口 blog",
+      "x": 286,
+      "y": 145
+    },
+    {
+      "text": "LucvuysyoJ",
+      "x": 0,
+      "y": 191
+    },
+    {
+      "text": "L口」取过火主优频明关，purd、中次小瓜心咖",
+      "x": 236,
+      "y": 189
+    },
+    {
+      "text": "【自己]确实，文生视频发展太快了，感觉影视创作门 槛要大幅降低。",
+      "x": 242,
+      "y": 216
+    },
+    {
+      "text": "[debug:98]",
+      "x": 0,
+      "y": 219
+    },
+    {
+      "text": "info:101] 网 决策：跳过回复| 原因=无新消息|消息=",
+      "x": 0,
+      "y": 253
+    },
+    {
+      "text": "[debug:981 调试日志已保存：data/ debug/tick_2026-04-18T22-14-14.000895_0090.json",
+      "x": 0,
+      "y": 290
+    },
+    {
+      "text": "info:101] 口 已保存 3 个会话状态",
+      "x": 0,
+      "y": 327
+    },
+    {
+      "text": "info:1011 @ Tick #91 开始 （interval=5.0s)",
+      "x": 0,
+      "y": 364
+    },
+    {
+      "text": "[debug:98] 截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_91_20260418_221419_987.png",
+      "x": 0,
+      "y": 400
+    },
+    {
+      "text": "[warning:104〕当前聊天名为空，可能未打开任何聊天窗口，跳过回复",
+      "x": 30,
+      "y": 438
+    },
+    {
+      "text": "[debug:98l调试日志已保存：data/debug/tick_2026-04-18T22-14-19.987515_0091.json",
+      "x": 0,
+      "y": 475
+    },
+    {
+      "text": "info:101] @ Tick #92 开始 （ interval=5.0s)",
+      "x": 0,
+      "y": 512
+    },
+    {
+      "text": "[debug:98] 截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_92_20260418_221426_892•png",
+      "x": 0,
+      "y": 549
+    },
+    {
+      "text": "[warning:1041 当前聊天名为空，可能未打开任何聊天窗口，跳过回复",
+      "x": 31,
+      "y": 586
+    },
+    {
+      "text": "[debug:98〕调试日志已保存：data/debug/tick_2026-04-18T22-14-26.892430_0092.json",
+      "x": 0,
+      "y": 623
+    },
+    {
+      "text": "info:101] @ Tick #93 开始 （interval=5.0s)",
+      "x": 0,
+      "y": 661
+    },
+    {
+      "text": "[debug:98〕 截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_93_20260418_221433_134.png",
+      "x": 0,
+      "y": 697
+    },
+    {
+      "text": "[warning:104〕当前聊天名为空，可能未打开任何聊天窗口，跳过回复",
+      "x": 31,
+      "y": 735
+    },
+    {
+      "text": "[debug:98〕 调试日志已保存：data/debug/tick_2026-04-18T22-14-33.134143_0093.json",
+      "x": 0,
+      "y": 770
+    },
+    {
+      "text": "info:1011 @ Tick #94 开始 （interval=5.0s)",
+      "x": 0,
+      "y": 808
+    },
+    {
+      "text": "[debug:98〕截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_94_20260418_221439_186. png",
+      "x": 0,
+      "y": 845
+    },
+    {
+      "text": "Layout: chat=KiKKiODODKK, title=0， input=0, timestamps=0, self_bubb les=0, candidates=1",
+      "x": 198,
+      "y": 879
+    },
+    {
+      "text": "[debug:98]",
+      "x": 0,
+      "y": 883
+    },
+    {
+      "text": "info:101]（消息统计：共1 条，新增1 条",
+      "x": 0,
+      "y": 918
+    },
+    {
+      "text": "【对方】本地文件或分：口 work Dali",
+      "x": 244,
+      "y": 954
+    },
+    {
+      "text": "[debug:98]",
+      "x": 0,
+      "y": 955
+    },
+    {
+      "text": "_init__:87] BotLogger 初始化完成 | Logs_dir=/Users/yihanwang/wechat-mac-rpa/data/ Logs",
+      "x": 4,
+      "y": 991
+    },
+    {
+      "text": "info:101]",
+      "x": 0,
+      "y": 1029
+    },
+    {
+      "text": "已加载 3 个会话状态",
+      "x": 190,
+      "y": 1029
+    },
+    {
+      "text": "info:101] @ Tick #1 开始 （interval=5.0s)",
+      "x": 0,
+      "y": 1064
+    },
+    {
+      "text": "[debug:98〕 截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_1_20260418_221453_085•png",
+      "x": 0,
+      "y": 1102
+    },
+    {
+      "text": "Idebug:98]",
+      "x": 0,
+      "y": 1139
+    },
+    {
+      "text": "Layout: chat=Iw De, title=0, input=0, timestamps=0, self_bubbles=0, candidates=3",
+      "x": 195,
+      "y": 1137
+    },
+    {
+      "text": "info:101]•消息统计：共3 条，新增3条",
+      "x": 0,
+      "y": 1173
+    },
+    {
+      "text": "[debug:98]",
+      "x": 0,
+      "y": 1212
+    },
+    {
+      "text": "2[对方]口",
+      "x": 227,
+      "y": 1211
+    },
+    {
+      "text": "[对方】QAl模式",
+      "x": 261,
+      "y": 1247
+    },
+    {
+      "text": "[debug : 98]",
+      "x": 0,
+      "y": 1250
+    },
+    {
+      "text": "[对方〕口 切换到这个标签页",
+      "x": 252,
+      "y": 1284
+    },
+    {
+      "text": "[debug :98]",
+      "x": 0,
+      "y": 1286
+    },
+    {
+      "text": "info:101]",
+      "x": 0,
+      "y": 1323
+    },
+    {
+      "text": "决策：需要回复」 原因=触发回复条件（从 3 条新消息中选取）！回复=收到，已切换",
+      "x": 190,
+      "y": 1321
+    },
+    {
+      "text": "info:101]",
+      "x": 0,
+      "y": 1359
+    },
+    {
+      "text": "发送成功（8字)：收到，已切换",
+      "x": 185,
+      "y": 1359
+    },
+    {
+      "text": "Idebug:98] 调试日志已保存：data/debug/tick_2026-04-18T22-14-53.084766_0001.json",
+      "x": 0,
+      "y": 1394
+    },
+    {
+      "text": "info:101] @ Tick #2 开始 （interval=5.0s)",
+      "x": 0,
+      "y": 1433
+    },
+    {
+      "text": "[debug:98] 截图已保存：/Users/yihanwang/wechat-mac-rpa/data/screenshots/wechat_2_20260418_221516_536.png",
+      "x": 0,
+      "y": 1469
+    },
+    {
+      "text": "Iwarning:104〕当前聊天名为空，可能未打开任何聊天窗口，跳过回复",
+      "x": 27,
+      "y": 1505
+    },
+    {
+      "text": "[debug:98] 调试日志已保存：data/ debug/tick_2026-04-18T22-15-16.536251_0002.ison",
+      "x": 0,
+      "y": 1544
+    }
+  ],
+  "layout_right_elements": [
+    {
+      "text": "＆口。1",
+      "x": 1553,
+      "y": 59
+    },
+    {
+      "text": "work",
+      "x": 574,
+      "y": 145
+    },
+    {
+      "text": "口ali",
+      "x": 683,
+      "y": 145
+    }
+  ],
+  "layout_title_elements": [],
+  "layout_input_elements": [],
+  "layout_timestamp_elements": [],
+  "layout_chat_list_groups": [],
+  "layout_chat_list_nicknames": [
+    "口 hunt",
+    "Layout: chat=KiKKiODODKK, title=0， input=0, timestamps=0, self_bubb les=0, candidates=1",
+    "【对方】本地文件或分：口 work Dali",
+    "已加载 3 个会话状态",
+    "Layout: chat=Iw De, title=0, input=0, timestamps=0, self_bubbles=0, candidates=3",
+    "对方]口"
+  ],
+  "layout_chat_list_unread": [
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "layout_message_candidates": [
+    {
+      "text": "＆口。1",
+      "cx": 1688,
+      "cy": 77
+    },
+    {
+      "text": "work",
+      "cx": 612,
+      "cy": 156
+    },
+    {
+      "text": "口ali",
+      "cx": 720,
+      "cy": 157
+    }
+  ],
+  "layout_self_bubbles": [],
+  "extraction_clusters": [
+    {
+      "texts": [
+        "work"
+      ],
+      "gap": null,
+      "top_x": 612,
+      "in_nick_range": true,
+      "nickname_assigned": false
+    }
+  ],
+  "extraction_messages": [
+    {
+      "text": "work",
+      "sender": "对方",
+      "sender_type": "other",
+      "chat_name": ""
+    }
+  ],
+  "bot_chat_name": "",
+  "bot_new_messages_count": 0,
+  "bot_should_reply": false,
+  "bot_reply_target": "",
+  "bot_reply_text": "",
+  "bot_switch_target": "",
+  "bot_switch_reason": "无未读项 (chat_list=6, current=)",
+  "action": "none",
+  "action_error": "聊天名为空且无未读"
+}

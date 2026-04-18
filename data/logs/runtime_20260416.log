@@ -1,0 +1,32 @@
+2026-04-16 23:15:35,914 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:16:35,979 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:16:35,982 [WARNING] [warning:104] 未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录
+2026-04-16 23:18:16,296 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:18:16,304 [WARNING] [warning:104] 未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录
+2026-04-16 23:19:31,413 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:19:33,539 [WARNING] [warning:104] 未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录
+2026-04-16 23:22:47,251 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:22:49,394 [WARNING] [warning:104] 未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录
+2026-04-16 23:22:55,585 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:22:55,593 [WARNING] [warning:104] 未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录
+2026-04-16 23:31:47,082 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:31:47,086 [WARNING] [warning:104] 未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录
+2026-04-16 23:33:19,418 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:33:19,422 [WARNING] [warning:104] 未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录
+2026-04-16 23:34:33,531 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:34:52,126 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:34:57,564 [WARNING] [warning:104] 未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录
+2026-04-16 23:36:43,865 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:36:43,873 [WARNING] [warning:104] 未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录
+2026-04-16 23:38:07,660 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:38:13,152 [WARNING] [warning:104] 未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录
+2026-04-16 23:39:18,619 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:39:18,627 [WARNING] [warning:104] 未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录
+2026-04-16 23:40:35,183 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:40:40,700 [WARNING] [warning:104] 未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录
+2026-04-16 23:49:27,727 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:49:27,735 [WARNING] [warning:104] 未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录
+2026-04-16 23:50:40,465 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:50:40,474 [WARNING] [warning:104] 未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录
+2026-04-16 23:51:55,538 [INFO] [__init__:87] BotLogger 初始化完成 | logs_dir=/Users/yihanwang/wechat-mac-rpa/data/logs
+2026-04-16 23:52:01,106 [WARNING] [warning:104] 未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录
