@@ -21,3 +21,6 @@ data/logs/
 
 # pytest
 .pytest_cache/
+# 运行时生成的数据
+data/logs/
+data/screenshots/

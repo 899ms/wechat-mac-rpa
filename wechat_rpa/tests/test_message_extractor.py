@@ -116,8 +116,15 @@ class TestOtherMessageExtraction:
 
         # nickname_x_min_ratio=0.30, nickname_x_max_ratio=0.55
         # window_width=1760 -> x 范围 528~968
-        nickname = make_element("小明", cx=700, cy=300)
-        msg_elem = make_element("在吗", cx=700, cy=340)
+        # 昵称面积需 >=1000 才能成为"有效昵称"，放宽 x_threshold 让消息聚类
+        nickname = OCRTextElement(
+            text="小明",
+            bbox=Rect(x=660, y=285, width=80, height=30),
+            center=Point(700, 300),
+            confidence=0.95,
+        )
+        # 消息气泡在昵称区域右侧（真实布局）
+        msg_elem = make_element("在吗", cx=1000, cy=340)
         layout = make_layout(message_candidates=[nickname, msg_elem])
 
         messages = extractor.extract(layout)

@@ -150,39 +150,27 @@ class MessageExtractor:
             x_min = self.profile.window_width * self.profile.nickname_x_min_ratio
             x_max = self.profile.window_width * self.profile.nickname_x_max_ratio
 
-            # 昵称判定：仅基于布局特征（x 坐标在昵称区域）
+            # 昵称判定：仅基于布局特征
+            # cluster[0] 在昵称区域 且 cluster 中有元素超出昵称区域 → 是昵称+消息
+            # cluster[0] 在昵称区域 但所有元素都在昵称区域内 → 拆分为独立短消息
             if len(cluster) > 1 and x_min <= top.center.x <= x_max:
-                nickname = top.text
-                msg_elems = cluster[1:]
+                has_outside = any(
+                    e.center.x < x_min or e.center.x > x_max
+                    for e in cluster[1:]
+                )
+                if has_outside:
+                    nickname = top.text
+                    msg_elems = cluster[1:]
+                    # 创建一条消息
+                    self._append_message(messages, msg_elems, nickname, layout.chat_name)
+                else:
+                    # 所有元素都在昵称区域内：每条都是独立消息
+                    for elem in cluster:
+                        self._append_message(messages, [elem], "对方", layout.chat_name)
             else:
                 nickname = "对方"
                 msg_elems = cluster
-
-            if not msg_elems:
-                continue
-
-            merged = " ".join(e.text for e in msg_elems)
-
-            # 检测是否为系统通知/安全提示
-            if self._is_system_notice(merged, msg_elems):
-                sender = "系统"
-                sender_type = SenderType.SYSTEM
-            else:
-                sender = nickname
-                sender_type = SenderType.OTHER
-
-            # 检测是否 @ 了 Bot（简单检测 @ 符号）
-            is_at_me = "@" in merged
-            messages.append(
-                ChatMessage(
-                    text=merged,
-                    sender=sender,
-                    sender_type=sender_type,
-                    chat_name=layout.chat_name,
-                    is_at_me=is_at_me,
-                    source_elements=msg_elems,
-                )
-            )
+                self._append_message(messages, msg_elems, nickname, layout.chat_name)
 
         self.debug_info["clusters"] = [
             {
@@ -213,6 +201,30 @@ class MessageExtractor:
         if len(text) > 30 and any(k in text for k in ["安全", "提示", "保护", "诈骗", "转账", "风险"]):
             return True
         return False
+
+    @staticmethod
+    def _append_message(messages, msg_elems, nickname, chat_name):
+        """将 msg_elems 合并为一条消息并追加到 messages 列表。"""
+        if not msg_elems:
+            return
+        merged = " ".join(e.text for e in msg_elems)
+        if MessageExtractor._is_system_notice(merged, msg_elems):
+            sender = "系统"
+            sender_type = SenderType.SYSTEM
+        else:
+            sender = nickname
+            sender_type = SenderType.OTHER
+        is_at_me = "@" in merged
+        messages.append(
+            ChatMessage(
+                text=merged,
+                sender=sender,
+                sender_type=sender_type,
+                chat_name=chat_name,
+                is_at_me=is_at_me,
+                source_elements=msg_elems,
+            )
+        )
 
     @staticmethod
     def _is_noise_candidate(elem: OCRTextElement, image_height: int = 1280) -> bool:
