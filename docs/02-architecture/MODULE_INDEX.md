@@ -15,8 +15,8 @@
 ### "消息识别错了"
 | 现象 | 可能原因 | 修改文件 |
 |------|---------|---------|
-| 聊天名识别错 | TITLE_Y_MAX / TITLE_X_MAX_RATIO 不准 | `wechat_rpa/layout/profile.py` |
-| 输入框内容混入消息 | INPUT_Y_MIN 太松 | `wechat_rpa/layout/profile.py` |
+| 聊天名识别错 | title_y_max / title_x_max_ratio 不准 | `wechat_rpa/layout/profile.py` |
+| 输入框内容混入消息 | input_y_min 太松 | `wechat_rpa/layout/profile.py` |
 | 时间戳被当成消息 | TIMESTAMP_PATTERNS 不完整 | `wechat_rpa/layout/layout_parser.py` |
 | 自己消息被当成对方 | 绿色气泡检测失败 | `wechat_rpa/layout/layout_parser.py` |
 | 消息顺序错乱 | 提取时未按 y 排序 | `wechat_rpa/message/extractor.py` |

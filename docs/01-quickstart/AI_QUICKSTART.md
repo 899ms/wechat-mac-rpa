@@ -86,7 +86,7 @@ Action发送 → 记录状态
 ✅ 正确做法：`pbcopy` + `keystroke "v" using command down`
 
 ❌ **不要把边界值写死在不同模块里**  
-原因：`INPUT_Y_MIN` 一旦改漏就会让输入框内容混入消息  
+原因：`input_y_min` 一旦改漏就会让输入框内容混入消息  
 ✅ 正确做法：全部引用 `LayoutProfile`
 
 ❌ **不要用简单字符串包含判断去重**  
