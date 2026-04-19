@@ -75,7 +75,7 @@
 | **📝 开发中** | 代码已部分实现，但尚未完成或不稳定 | `wechat_rpa/layout/` 拆分 |
 | **✅ 开发完成** | 代码已实现，但尚未通过完整测试 | 新模块刚合并到 feature branch |
 | **🧪 测试完成** | 已通过测试，但尚未合并到主分支/线上 | CI 全绿待 review |
-| **🚀 已上线** | 已在主分支/生产环境稳定运行 | `core/auto_bot_vision_ocr_v4.py` |
+| **🚀 已上线** | 已在主分支/生产环境稳定运行 | `wechat_rpa/bot/wechat_bot.py` |
 
 **适用场景**：
 - `ARCHITECTURE.md`、`API_SURFACE.md`、`MODULE_INDEX.md` 等目标架构文档 → 必须标注 "⚠️ 目标重构架构（Target Architecture），当前实际代码与此存在差异"
