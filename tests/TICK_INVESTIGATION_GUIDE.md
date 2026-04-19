@@ -108,35 +108,14 @@ no_reply_chats = {"腾讯新闻", "文件传输助手"}
 
 ### Step 5: 深度分析单个异常 tick
 
-选定一个异常 tick，完整输出其关键字段：
+如果你已经通过 Step 1-4 定位到一个具体异常 tick，**不要直接写脚本分析**，先对照 **TROUBLESHOOTING.md** 的 §2 症状速查表：
 
-```python
-import json
-d = json.load(open('data/debug/tick_<timestamp>_<id>.json'))
+1. **加载 tick JSON** 确认字段完整性
+2. **对照症状速查表**（A-F）定位问题类别
+3. **按速查表指引的 §3 深度验证方法** 确认根因
+4. 如果速查表未匹配，运行 **§4 全面数据提取脚本**
 
-# 关键检查清单
-print("=== OCR ===")
-print(f"elements: {len(d['ocr_elements'])}")
-
-print("\=== Layout ===")
-print(f"title_elements:   {len(d['layout_title_elements'])}")
-print(f"candidates:       {len(d['layout_message_candidates'])}")
-print(f"self_bubbles:     {len(d['layout_self_bubbles'])}")
-print(f"chat_list_groups: {len(d['layout_chat_list_groups'])}")
-
-print("\=== Extraction ===")
-print(f"clusters: {len(d['extraction_clusters'])}")
-print(f"messages: {len(d['extraction_messages'])}")
-for c in d['extraction_clusters']:
-    print(f"  cluster texts={c['texts']} top_x={c['top_x']} in_nick={c['in_nick_range']} assigned={c['nickname_assigned']}")
-
-print("\=== Bot Decision ===")
-print(f"chat_name:    {d['bot_chat_name']!r}")
-print(f"new_messages: {d['bot_new_messages_count']}")
-print(f"should_reply: {d['bot_should_reply']}")
-print(f"switch_reason:{d['bot_switch_reason']!r}")
-print(f"action:       {d['action']!r}")
-```
+> 完整诊断流程、症状速查表、验证脚本见 `tests/TROUBLESHOOTING.md`
 
 ---
 
