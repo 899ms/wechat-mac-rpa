@@ -95,3 +95,25 @@ class TestLayoutParserRealFixtures:
         ts_ids = {id(e) for e in layout.timestamp_elements}
         candidate_ids = {id(e) for e in layout.message_candidates}
         assert ts_ids.isdisjoint(candidate_ids)
+
+    def test_regression_title_y_max_extracts_chat_name(self, ocr_engine, parser):
+        """
+        回归测试：title_y_max=50 会过滤掉 y=90 的标题元素，导致 chat_name 为空。
+        修复后 title_y_max=120，应能正确提取标题。
+
+        Fixture: regression_title_y90_20260419.png
+        来源：2026-04-19 实际运行截图，标题 "王芊 @ai开发小分队" bbox.y=90。
+        """
+        layout = self._run_parse(ocr_engine, parser, "regression_title_y90_20260419")
+        # 标题栏必须有元素
+        assert len(layout.title_elements) >= 1, (
+            "title_elements 为空，说明 title_y_max 仍过小"
+        )
+        # chat_name 必须被提取
+        assert layout.chat_name != "", (
+            f"chat_name 为空，title_elements={ [e.text for e in layout.title_elements] }"
+        )
+        # 验证提取到的是聊天名而非噪声（如时间、搜索框）
+        assert "王芊" in layout.chat_name or "ai开发" in layout.chat_name, (
+            f"chat_name='{layout.chat_name}' 未包含预期的聊天名关键词"
+        )
