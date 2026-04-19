@@ -1,7 +1,7 @@
 # 微信 Mac RPA 项目进度
 
 ## 更新时间
-2026-04-15 10:45
+2026-04-19 18:00
 
 ## 当前状态
 - ✅ 项目架构：Vision OCR 视觉识别方案（L1-L5 模块化已完成）
@@ -58,9 +58,9 @@ python3 tests/test_integration.py
 - 支持自动登录恢复（`WeChatLoginHandler`）
 - 真实场景回归测试覆盖
 
-### Accessibility API 版
+### Accessibility API 版（已删除）
 ```bash
-./run_auto_accessibility.sh
+# 此版本已删除，功能已合并到模块化架构
 ```
 - 需要辅助功能权限
 - 更精确的界面控制
@@ -77,9 +77,7 @@ python3 tests/test_integration.py
 ### 可直接运行版本
 | 文件 | 说明 |
 |------|------|
-| `core/auto_bot_vision_ocr_v3.py` | ⭐ OCR V3 机器人（推荐） |
-| `core/auto_bot_vision_ocr_v2.py` | OCR V2 增强版 |
-| `core/wechat_layout_analyzer.py` | 布局分析器 |
+| `wechat_rpa/bot/wechat_bot.py` | ⭐ 模块化架构机器人（当前唯一版本） |
 | `scripts/view_ocr_history.py` | 查看识别历史 |
 | `utils/llm_client.py` | Kimi LLM 客户端 |
 

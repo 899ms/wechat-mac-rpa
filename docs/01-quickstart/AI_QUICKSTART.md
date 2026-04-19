@@ -12,8 +12,8 @@
 - **处理**: 解析聊天布局 → 提取最新消息 → 判断是否需要回复
 - **输出**: 调用 LLM 生成回复 → 用 AppleScript 粘贴发送
 
-**当前稳定版本**: V4（monolithic，在 `core/auto_bot_vision_ocr_v4.py`）
-**目标架构**: 模块化拆分（见 `ARCHITECTURE.md`）
+**当前稳定版本**: 模块化架构版（`wechat_rpa/bot/wechat_bot.py`）
+**架构文档**: [`../02-architecture/ARCHITECTURE.md`](../02-architecture/ARCHITECTURE.md)
 
 ---
 
@@ -22,8 +22,8 @@
 ### 1. 读三个文件
 
 按顺序读：
-1. `ARCHITECTURE.md` — 系统架构总览
-2. `LESSONS_LEARNED.md` — 踩坑记录（避免重复踩坑）
+1. [`../02-architecture/ARCHITECTURE.md`](../02-architecture/ARCHITECTURE.md) — 系统架构总览
+2. [`../04-troubleshooting/LESSONS_LEARNED.md`](../04-troubleshooting/LESSONS_LEARNED.md) — 踩坑记录（避免重复踩坑）
 3. 你负责的模块接口（见下方"模块速查"）
 
 ### 2. 修改代码前必读
@@ -98,7 +98,7 @@ Action发送 → 记录状态
 ## FAQ
 
 **Q: 为什么 V4 是 monolithic 的？**  
-A: 历史原因，为了快速迭代。现在已经验证了核心逻辑，正在按 `ARCHITECTURE.md` 拆分。
+A: 历史原因，为了快速迭代。现在已经验证核心逻辑，正在按 [`../02-architecture/ARCHITECTURE.md`](../02-architecture/ARCHITECTURE.md) 模块化拆分。
 
 **Q: 改了边界值后怎么验证？**  
 A: `tests/fixtures/errors/` 下有 23 个回归测试用例，要求：

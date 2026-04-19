@@ -2,7 +2,7 @@
 
 基于 **Vision OCR 视觉识别** 的 Mac 微信自动化方案。
 
-> ⚠️ **重要提示**: 本项目严格执行 [测试错误零容忍政策](CODE_OF_CONDUCT.md)。所有识别错误必须在 24 小时内修复。
+> ⚠️ **重要提示**: 本项目严格执行 [测试错误零容忍政策](docs/05-meta/CODE_OF_CONDUCT.md)。所有识别错误必须在 24 小时内修复。
 
 ---
 
@@ -39,38 +39,19 @@ pip install pyobjc numpy scipy pillow python-dotenv
 
 ## 🚀 快速开始
 
-### 方式 1: OCR V3 颜色气泡版（推荐）
+### 启动机器人
 
-通过检测绿色/灰色气泡区分消息，识别最精确。
-
-```bash
-cd ~/wechat-mac-rpa
-python3 core/auto_bot_vision_ocr_v3.py
-```
-
-### 方式 2: OCR V4 稳定版（当前实际运行）
-
-当前线上稳定运行的 monolithic 版本，功能与 V3 类似。
+当前唯一维护的版本，基于 L1-L5 分层架构。
 
 ```bash
 cd ~/wechat-mac-rpa
-python3 core/auto_bot_vision_ocr_v4.py
+python3 -m wechat_rpa.bot.wechat_bot
 ```
 
-### 方式 3: OCR V2 增强版
-
-支持多对话管理、上下文隔离、@检测。
+或运行集成测试：
 
 ```bash
-python3 core/auto_bot_vision_ocr_v2.py
-```
-
-### 方式 4: Accessibility API 版
-
-需要辅助功能权限，界面控制更精确。
-
-```bash
-./run_auto_accessibility.sh
+python3 tests/test_integration.py
 ```
 
 ---
@@ -98,52 +79,51 @@ KIMI_API_KEY=your_api_key_here
 
 ```
 wechat-mac-rpa/
-├── core/                            # 当前可直接运行的 monolithic 版本
-│   ├── auto_bot_vision_ocr_v4.py    ⭐ 当前线上稳定版（monolithic）
-│   ├── auto_bot_vision_ocr_v3.py    OCR V3 颜色气泡版
-│   ├── auto_bot_vision_ocr_v2.py    OCR V2 增强版
-│   ├── auto_bot_accessibility.py    ⌨️ Accessibility API 版
-│   └── wechat_layout_analyzer.py    📐 布局分析器
-├── wechat_rpa/                      # 当前模块化实现（与 ARCHITECTURE.md 目标架构存在差异）
-│   ├── capture/                     # 截图模块
-│   │   └── window_capture.py
-│   ├── ocr/                         # OCR 模块
-│   │   └── vision_ocr.py
-│   ├── parser/                      # 解析模块（当前实际：统一处理布局+消息提取）
-│   │   └── wechat_parser.py
-│   ├── action/                      # 发送与回复模块（当前实际：策略+生成+发送在同一目录）
+├── wechat_rpa/                      # 模块化架构实现（L1-L5）
+│   ├── bot/                         # L5: 主循环编排
+│   │   └── wechat_bot.py            ⭐ 唯一入口
+│   ├── perception/                  # L3.5: 视觉感知管道
+│   │   └── vision_pipeline.py
+│   ├── layout/                      # L3: 布局解析
+│   │   └── layout_parser.py
+│   ├── session/                     # L4: 会话与去重
+│   │   └── chat_session.py
+│   ├── reply/                       # L4: 回复决策与生成
+│   │   ├── policy.py
+│   │   └── generator.py
+│   ├── action/                      # L4: 消息发送
 │   │   ├── message_sender.py
-│   │   └── reply_generator.py
-│   ├── bot/                         # 主循环编排
-│   │   └── wechat_bot.py
+│   │   └── chat_list_clicker.py
 │   ├── storage/                     # 聊天记录存储
-│   │   ├── message_store.py         # 旧版存储（当前 V4 仍在使用）
-│   │   └── chat_history.py          # 新版 JSONL 存储（目标架构设计）
+│   │   └── message_store.py
 │   ├── logging/                     # 可观测性
 │   │   └── bot_logger.py
-│   ├── utils/                       # LLM 客户端
-│   │   └── llm_client.py
-│   └── tests/                       # 模块测试
-│       ├── test_modules.py
-│       └── fixtures/
-├── tests/                           # 顶层测试目录（OCR V4 回归测试）
-│   ├── test_ocr_v4.py
-│   ├── fixtures/
-│   └── ...
-├── utils/
-│   ├── llm_client.py                🧠 Kimi LLM 客户端
-│   └── accessibility.py             ⌨️ Accessibility 工具
+│   └── utils/                       # 工具类
+│       └── llm_client.py
+├── tests/                           # 测试套件
+│   ├── test_integration.py
+│   └── fixtures/
 ├── scripts/
-│   └── view_ocr_history.py          📜 查看识别历史
-├── examples/                        📚 示例代码
-├── run_simple.py                    🚀 简化版启动
-├── run_auto_accessibility.sh        🚀 Accessibility 版启动
-└── run_auto_quartz.sh               🚀 Quartz 版启动
+│   └── view_ocr_history.py          # 查看识别历史
+└── data/                            # 数据目录
+    ├── screenshots/                 # 截图存档
+    └── logs/                        # 运行日志
 ```
 
 ---
 
 ## 🔧 实用命令
+
+### 启动机器人
+```bash
+cd ~/wechat-mac-rpa
+python3 -m wechat_rpa.bot.wechat_bot
+```
+
+### 运行测试
+```bash
+python3 tests/test_integration.py
+```
 
 ### 查看 OCR 识别历史
 ```bash
@@ -155,56 +135,7 @@ python3 scripts/view_ocr_history.py
 python3 scripts/view_ocr_history.py export
 ```
 
-### 布局分析（调试）
-```bash
-python3 core/wechat_layout_analyzer.py
-```
-
----
-
-## 📊 版本对比
-
-| 功能 | V4 稳定版 | V3 颜色气泡 | V2 增强版 | Accessibility |
-|------|----------|------------|-----------|---------------|
-| 全自动监听 | ✅ | ✅ | ✅ | ✅ |
-| 多对话管理 | ✅ | ✅ | ✅ | ✅ |
-| 发言人识别 | ✅ 精确 | ✅ 精确 | ⚠️ 有限 | ✅ |
-| @检测 | ✅ | ✅ | ✅ | - |
-| 无需 SIP | ✅ | ✅ | ✅ | ✅ |
-| 无需 db_key | ✅ | ✅ | ✅ | ✅ |
-| 需要辅助功能 | ❌ | ❌ | ❌ | ✅ |
-
----
-
-## 🎨 OCR V3 颜色气泡原理
-
-```
-微信Mac版界面
-┌─────────────────────────────────────────────┐
-│ 微信Mac版界面                                │
-├────────────┬────────────────────────────────┤
-│ 左侧聊天列表 │ 右侧当前聊天内容               │
-│ (x<300)    │ (x>=300)                       │
-│            │                                │
-│ ○ 头像     │  [群名] - 顶部标题栏           │
-│   昵称     │  ──────────────────            │
-│   预览     │  [昵称]                        │
-│            │  ┌──────────────┐  ← 灰色气泡  │
-│            │  │ 消息内容      │    对方消息  │
-│            │  └──────────────┘              │
-│            │  ┌──────────────┐  ← 绿色气泡  │
-│            │  │ 消息内容      │    自己消息  │
-│            │  │ 多行文本...   │    RGB(176,  │
-│            │  └──────────────┘    240, 167) │
-└────────────┴────────────────────────────────┘
-```
-
-**颜色特征**:
-- 自己消息: `RGB(176, 240, 167)` 绿色
-- 对方消息: `RGB(238, 238, 240)` 灰色/白色
-- 背景: `RGB(250, 250, 250)` 白色
-
----
+**入口: `python3 -m wechat_rpa.bot.wechat_bot`**
 
 ## ⚠️ 注意事项
 
@@ -224,14 +155,13 @@ python3 core/wechat_layout_analyzer.py
 
 ## 📚 更多文档
 
-- [架构设计](ARCHITECTURE.md) — AI 开发者和维护者必读
-- [AI 快速上手](AI_QUICKSTART.md) — 第一次接触本项目从这里开始
-- [模块索引](MODULE_INDEX.md) — 不知道改哪个文件时先查这个
-- [日志设计](LOGGING_DESIGN.md) — 运行时日志与聊天记录持久化
-- [踩坑记录](LESSONS_LEARNED.md) — 避免重复踩坑
-- [解决方案汇总](SOLUTIONS.md)
-- [项目进度](PROJECT_STATUS.md)
-- [V2 功能说明](V2_FEATURES.md)
+- [架构设计](docs/02-architecture/ARCHITECTURE.md) — AI 开发者和维护者必读
+- [AI 快速上手](docs/01-quickstart/AI_QUICKSTART.md) — 第一次接触本项目从这里开始
+- [模块索引](docs/02-architecture/MODULE_INDEX.md) — 不知道改哪个文件时先查这个
+- [日志设计](docs/03-guides/LOGGING_DESIGN.md) — 运行时日志与聊天记录持久化
+- [踩坑记录](docs/04-troubleshooting/LESSONS_LEARNED.md) — 避免重复踩坑
+- [解决方案汇总](docs/04-troubleshooting/SOLUTIONS.md)
+- [项目进度](docs/03-guides/PROJECT_STATUS.md)
 
 ---
 
@@ -243,6 +173,14 @@ python3 core/wechat_layout_analyzer.py
 状态: 已废弃
 原因: 需要关闭 SIP + 获取 db_key
 替代: Vision OCR 视觉识别
+```
+
+### Monolithic 版本（已删除）
+```
+原方案: core/auto_bot_vision_ocr_v2/v3/v4.py
+状态: 已删除
+原因: 代码耦合，难以维护
+替代: wechat_rpa/ 模块化架构
 ```
 
 ---

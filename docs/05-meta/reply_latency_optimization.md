@@ -1,6 +1,6 @@
 # 回复时间专项优化报告
 
-> 文档路径：`docs/reply_latency_optimization.md`
+> 文档路径：`docs/05-meta/reply_latency_optimization.md`
 
 ## 当前耗时分布（优化后）
 

@@ -126,13 +126,13 @@
 - **定位**: L4 可观测性
 - **改什么**: 日志级别、execution.jsonl 事件类型、埋点位置
 - **不改什么**: 业务决策逻辑
-- **排查必读**: `LOGGING_DESIGN.md`
+- **排查必读: [../03-guides/LOGGING_DESIGN.md](../03-guides/LOGGING_DESIGN.md)`
 
 ### `wechat_rpa/storage/chat_history.py`
 - **定位**: L4 持久化
 - **改什么**: 分片策略、查询接口、HistoryRecord 字段、旧版迁移逻辑
 - **不改什么**: 去重算法（那是 Session 的事）
-- **排查必读**: `LOGGING_DESIGN.md`
+- **排查必读: [../03-guides/LOGGING_DESIGN.md](../03-guides/LOGGING_DESIGN.md)`
 
 ---
 

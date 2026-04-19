@@ -51,7 +51,7 @@ python3 tests/test_integration.py
 
 ```bash
 cd ~/wechat-mac-rpa
-./run_auto_accessibility.sh
+~~已删除~~ 原: ./run_auto_accessibility.sh
 ```
 
 ### 授予权限
@@ -70,7 +70,7 @@ cd ~/wechat-mac-rpa
 
 ```bash
 cd ~/wechat-mac-rpa
-python3 run_simple.py
+~~已删除~~ 原: python3 run_simple.py
 ```
 
 然后输入格式：`聊天名称|消息内容`
@@ -119,7 +119,7 @@ python3 scripts/view_ocr_history.py raw 100
 
 ### 布局分析器（调试）
 ```bash
-python3 core/wechat_layout_analyzer.py
+~~已删除~~ 原: python3 core/wechat_layout_analyzer.py
 ```
 
 ---

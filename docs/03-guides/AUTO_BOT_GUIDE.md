@@ -5,7 +5,7 @@
 > 当前项目已全面迁移至 **Vision OCR 视觉识别方案**，无需关闭 SIP、无需获取 db_key。
 > 
 > **推荐快速入口**：
-> - 推荐方案：`python3 core/auto_bot_vision_ocr_v3.py`
+> - 推荐方案：`~~已删除~~ 原: python3 core/auto_bot_vision_ocr_v3.py`
 > - 架构文档：`ARCHITECTURE.md`
 > - 解决方案：`SOLUTIONS.md`
 > 
@@ -45,7 +45,7 @@ csrutil status  # 应显示 disabled
 
 ## 🚀 快速开始（已废弃，请勿执行）
 
-> ⚠️ 以下步骤属于旧版数据库解密方案，已被废弃。如需使用当前推荐的 Vision OCR 方案，请直接运行 `python3 core/auto_bot_vision_ocr_v3.py`。
+> ⚠️ 以下步骤属于旧版数据库解密方案，已被废弃。如需使用当前推荐的 Vision OCR 方案，请直接运行 `~~已删除~~ 原: python3 core/auto_bot_vision_ocr_v3.py`。
 
 ### 第一步：运行配置向导
 ```bash
