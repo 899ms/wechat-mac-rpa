@@ -128,6 +128,10 @@ class WeChatBot:
                         result.screenshot_path, session_id=str(tick_id)
                     )
                     self.logger.debug(f"截图已保存: {saved_path}")
+                    # 更新 screenshot_path 为保存后的路径，debug JSON 中记录真实位置
+                    result.screenshot_path = str(saved_path)
+                    if self.debug_logger.current is not None:
+                        self.debug_logger.current.screenshot_path = str(saved_path)
                 except Exception:
                     pass
 

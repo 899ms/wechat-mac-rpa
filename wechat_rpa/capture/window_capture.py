@@ -43,11 +43,17 @@ class WindowCapture:
 
     def __init__(
         self,
-        output_path: str = "/tmp/wechat_capture.png",
+        output_path: str = None,
         min_effective_width: int = 800,
         min_effective_height: int = 600,
         login_handler: Optional[WeChatLoginHandler] = None,
     ):
+        if output_path is None:
+            import os
+            from datetime import datetime
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+            pid = os.getpid()
+            output_path = f"/tmp/wechat_capture_{ts}_{pid}.png"
         self.output_path = output_path
         self.app_names = ['WeChat', '微信']
         self.min_width = 200
