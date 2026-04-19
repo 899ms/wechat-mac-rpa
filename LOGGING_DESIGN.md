@@ -221,6 +221,8 @@ class HistoryRecord:
 - `message_hash` 包含 `bubble_y`，避免同一文字在不同位置被去重
 - `tick_id` 关联到 execution.jsonl，出问题时可双向追溯
 - `screenshot_path` 保留证据，方便人工复核
+  - **注意**：Bot 保存截图到 `data/screenshots/` 后会更新此路径为保存后的真实路径
+  - 若仍为 `/tmp/wechat_capture_*.png`，说明保存截图时抛异常，需检查 `data/screenshots/` 目录权限
 
 ### 4.4 ChatHistory 接口
 

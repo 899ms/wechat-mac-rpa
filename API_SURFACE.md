@@ -112,7 +112,7 @@ class ChatListItem:
 ### WindowCapture
 ```python
 class WindowCapture:
-    def __init__(self, output_path: str = "/tmp/wechat_capture.png",
+    def __init__(self, output_path: str = None,
                  min_effective_width: int = 800,
                  min_effective_height: int = 600): ...
     def capture(self) -> CaptureResult: ...

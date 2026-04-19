@@ -41,7 +41,8 @@ d = json.load(open('data/debug/tick_<timestamp>_<id>.json'))
 required_fields = [
     'ocr_elements', 'layout_title_elements', 'layout_message_candidates',
     'layout_self_bubbles', 'extraction_clusters', 'extraction_messages',
-    'bot_chat_name', 'bot_should_reply', 'bot_switch_reason', 'action'
+    'bot_chat_name', 'bot_should_reply', 'bot_switch_reason', 'action',
+    'screenshot_path'
 ]
 missing = [f for f in required_fields if f not in d]
 assert not missing, f"字段缺失: {missing}"
@@ -56,17 +57,18 @@ print(f"ocr: {len(d['ocr_elements'])} | "
       f"self_bubbles: {len(d['layout_self_bubbles'])} | "
       f"clusters: {len(d['extraction_clusters'])} | "
       f"messages: {len(d['extraction_messages'])} | "
-      f"action: {d['action']!r}")
+      f"action: {d['action']!r} | "
+      f"screenshot: {'data/screenshots' in d.get('screenshot_path','')}")
 ```
 
 **指标对照表：**
 
-| ocr | title | candidates | bubbles | clusters | messages | 含义 |
-|-----|-------|-----------|---------|----------|----------|------|
-| 0 | 0 | 0 | 0 | >0 | 0 | OCR 失败，clusters 是旧数据 |
-| >0 | 0 | N | 0 | M | 0 | title_y_max 过小 或 无标题元素 |
-| >0 | >0 | N | K | M | 0 | 消息提取逻辑失败 |
-| >0 | >0 | N | K | M | >0 | 基本正常，检查内容是否正确 |
+| ocr | title | candidates | bubbles | clusters | messages | screenshot | 含义 |
+|-----|-------|-----------|---------|----------|----------|------------|------|
+| 0 | 0 | 0 | 0 | >0 | 0 | /tmp/... | OCR 失败，clusters 是旧数据 |
+| >0 | 0 | N | 0 | M | 0 | /tmp/... | title_y_max 过小 或 无标题元素 |
+| >0 | >0 | N | K | M | 0 | /tmp/... | 消息提取逻辑失败 |
+| >0 | >0 | N | K | M | >0 | data/screenshots/... | 基本正常，检查内容是否正确 |
 
 ---
 
@@ -178,6 +180,36 @@ for m in d['extraction_messages']:
 **根因**：截图失败（WeChat 未就绪/最小化/需扫码），但 extractor 使用了上一 tick 的缓存数据
 
 **处理**：非代码 bug，检查 WeChat 窗口状态
+
+---
+
+### 症状 G：screenshot_path 指向 /tmp 而非 data/screenshots
+
+**识别**：`screenshot_path` 包含 `/tmp/wechat_capture` 而不是 `data/screenshots/`
+
+**根因**：
+1. **旧代码**：WindowCapture 使用固定 `/tmp/wechat_capture.png`，每次覆盖旧文件；Bot 保存后未回写路径
+2. **已修复后仍出现**：Bot 保存截图时抛异常，路径未更新
+
+**影响**：
+- 无法根据 tick JSON 直接找到对应截图
+- `/tmp` 下旧截图已被覆盖，彻底丢失
+
+**快速验证**：
+```python
+sp = d.get('screenshot_path', '')
+if '/tmp/wechat_capture' in sp:
+    print(f"旧路径未更新: {sp}")
+    # 尝试根据 tick 时间戳在 data/screenshots/ 中查找
+    import glob, os
+    tick_ts = Path(path).stem.split('_')[1]  # tick_2026-04-19T09-05-32.xxx
+    candidates = glob.glob(f"data/screenshots/*{tick_ts.replace('-','').replace(':','')}*.png")
+    print(f"可能匹配的截图: {candidates}")
+elif 'data/screenshots' in sp and os.path.exists(sp):
+    print(f"✅ 路径正确且存在: {sp}")
+else:
+    print(f"⚠️ 路径异常或文件不存在: {sp}")
+```
 
 ---
 
@@ -296,6 +328,7 @@ def analyze_tick(path: str):
     print(f"  switch_reason={d['bot_switch_reason']!r}")
     print(f"  switch_target={d['bot_switch_target']!r}")
     print(f"  action={d['action']!r}")
+    print(f"  screenshot_path={d.get('screenshot_path','')!r}")
 
 analyze_tick("data/debug/tick_<timestamp>_<id>.json")
 ```

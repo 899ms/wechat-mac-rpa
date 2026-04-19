@@ -133,7 +133,7 @@ d = json.load(open('data/debug/<tick>.json'))
 for e in d['ocr_elements']:
     if 80 <= e['center']['y'] <= 140 and e['center']['x'] > 400:
         print(f'"{e["text"]}" y={e["center"]["y"]}')
-# 若 y > title_y_max（默认 50/120），则会被过滤
+# 若 y > title_y_max（默认 95），则会被过滤
 ```
 
 **修复：** 调整 `wechat_rpa/layout/profile.py` 中的 `title_y_max`。
@@ -164,6 +164,21 @@ for e in d['ocr_elements']:
 
 **处理：** 非代码 bug，检查 WeChat 窗口状态。
 
+### 3.5 debug JSON 中 screenshot_path 指向 /tmp 而非 data/screenshots
+
+**症状：** `screenshot_path` 为 `/tmp/wechat_capture_xxxx.png`，无法直接关联到 `data/screenshots/` 下的实际截图
+
+**根因：**
+- 旧代码：WindowCapture 使用固定 `/tmp/wechat_capture.png`，每次覆盖
+- 已修复：WindowCapture 生成唯一临时文件名，Bot 保存后更新路径
+
+**排查关联截图的方法：**
+```bash
+# 根据 tick 时间戳找截图
+tick_time="2026-04-19T09-05-32"
+ls data/screenshots/*$(echo $tick_time | tr '-' '' | tr ':' '')*.png
+```
+
 ---
 
 ## 四、本次排查案例（2026-04-19）
@@ -172,7 +187,7 @@ for e in d['ocr_elements']:
 
 | # | 问题 | 根因 | 修复 |
 |---|------|------|------|
-| 1 | `chat_name` 始终为空 | `title_y_max=50` 过滤了 y=90 的标题 | `title_y_max=120` |
+| 1 | `chat_name` 始终为空 | `title_y_max=50` 过滤了 y=90 的标题 | `title_y_max=95` |
 | 2 | 最近 100 tick 无 action | 唯一未读是"腾讯新闻"（免回复列表） | 预期行为，无需修复 |
 | 3 | tick 7200-7204 OCR 为空 | WeChat 窗口未就绪 | 预期行为 |
 
@@ -183,7 +198,7 @@ for e in d['ocr_elements']:
 3. **检查 Bot 决策字段** → `chat_name=''`，`switch_reason='无未读项'`
 4. **分析聊天列表** → `unread=['','','1','','','','']`，对应 `腾讯新闻`
 5. **深度分析 tick 7213** → 发现 `layout_title_elements=[]`，但 OCR 有 `"王芊 @ai开发小分队" y=90`
-6. **定位 title_y_max=50 过小** → 修复为 120
+6. **定位 title_y_max=50 过小** → 修复为 95
 7. **验证 Bot 进程** → PID 22529 启动于 4/18 22:55，运行旧代码未重启
 
 ### 4.3 回归测试
