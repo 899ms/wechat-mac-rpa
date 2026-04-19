@@ -23,8 +23,8 @@
 
 ### 验证方法
 - [ ] 跑 `python3 scripts/doc_lint.py && python3 scripts/doc_review.py`
-- [ ] 跑 `python3 tests/test_ocr_v4.py`
-- [ ] 跑 `./tests/run_tests.sh`
+- [ ] 跑 `python3 tests/test_integration.py`
+- [ ] 跑 `python3 -m pytest tests/ wechat_rpa/tests/ -v`
 - [ ] 手动截图验证 [N] 轮
 - [ ] 其他: [说明]
 

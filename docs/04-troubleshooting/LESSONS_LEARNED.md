@@ -8,28 +8,27 @@
 
 ### 1.1 标题栏识别范围必须精确
 
-**问题**: `TITLE_Y_MAX = 60` 太宽泛，把窗口控制按钮（®、(S.）识别成聊天名称，导致 "W1han" → "®v QS."
+**问题**: `title_y_max` 太宽泛，把窗口控制按钮（®、(S.）识别成聊天名称，导致 "W1han" → "®v QS."
 
 **修复**:
 ```python
-TITLE_Y_MAX = 50          # 收紧高度
-TITLE_X_MAX_RATIO = 0.70  # 排除右侧图标区域
+title_y_max = 95          # 覆盖 y=90 的标题，排除 y≥100 的消息区
+title_x_max_ratio = 0.95  # 排除右侧图标区域
 ```
 
-**原则**: 标题栏识别宁窄勿宽，必须排除窗口装饰元素。
+**原则**: 标题栏识别宁窄勿宽，必须排除窗口装饰元素。修复后添加回归测试 `test_regression_title_y_max_extracts_chat_name` 确保 y=90 的标题能被捕获。
 
 ### 1.2 输入框和消息区可以用 y 坐标精确分割
 
-**问题**: `INPUT_Y_MIN = 1120` 设置得太宽松，把输入框内容（y≈1210）误识别为消息。
+**问题**: `input_y_min` 设置得太宽松，把输入框内容误识别为消息。
 
 **修正认知**:
-- ✅ **y 坐标完全可以区分输入框**。微信 Mac 版输入框固定在底部约 120px 区域（y ≥ 1160）
+- ✅ **y 坐标完全可以区分输入框**。微信 Mac 版输入框固定在底部区域
 - ❌ 之前说"不能用 y 坐标"是错的——不是不能，而是阈值设错了
-- 正确的阈值应该是 **1160**（而不是 1120）
 
 **修复**:
 ```python
-INPUT_Y_MIN = 1160  # 输入框顶部边界
+input_y_min = 1040  # 输入框顶部边界（按 LayoutProfile 配置）
 ```
 
 **同时注意**:
@@ -160,18 +159,18 @@ def _is_echo(self, identity, sent):
 ### 启动自动模式
 ```bash
 cd ~/wechat-mac-rpa
-python3 core/auto_bot_vision_ocr_v4.py --auto --interval 5
+python3 -m wechat_rpa.bot.wechat_bot
 ```
 
 ### 关键文件
 | 文件 | 说明 |
 |------|------|
-| `core/auto_bot_vision_ocr_v4.py` | V4 主程序（当前稳定运行的 monolithic 版本） |
+| `wechat_rpa/bot/wechat_bot.py` | 当前唯一入口（L1-L5 模块化架构） |
 | `wechat_rpa/parser/wechat_parser.py` | 当前模块化实现中的解析器 |
 | `wechat_rpa/action/reply_generator.py` | 当前模块化实现中的回复策略与生成器 |
 | `tests/fixtures/errors/` | 错误用例库 |
 | `wechat_rpa/tests/test_modules.py` | 模块化单元测试 |
-| `ARCHITECTURE.md` | 目标重构架构设计（与当前 `wechat_rpa/` 结构存在差异） |
+| `docs/02-architecture/ARCHITECTURE.md` | 目标重构架构设计（与当前 `wechat_rpa/` 结构存在差异） |
 
 ### 发送消息的正确方式
 ```python
@@ -181,5 +180,5 @@ subprocess.run(['pbcopy'], input=text.encode('utf-8'), timeout=2)
 
 ---
 
-**更新时间**: 2026-04-15
-**状态**: V4 运行稳定，已解决循环发送和乱码问题；架构文档已同步更新去重机制（时间窗口优先 + MessageIdentity）
+**更新时间**: 2026-04-19
+**状态**: 模块化架构运行稳定，已解决循环发送和乱码问题；架构文档已同步更新去重机制（时间窗口优先 + MessageIdentity）

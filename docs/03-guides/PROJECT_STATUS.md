@@ -19,12 +19,12 @@
 
 ### error_20260413_001 - 聊天名称识别错误 ✅ 已修复
 - **问题**: 聊天名称 "W1han" 被错误识别为 "®v QS."
-- **原因**: 标题栏识别范围 `TITLE_Y_MAX = 60` 太宽泛，包含窗口控制按钮区域
+- **原因**: 标题栏识别范围 `title_y_max` 太宽泛，包含窗口控制按钮区域；同时 `_is_garbage()` 过滤不足
 - **修复**: 
-  - 收紧 Y 范围: 60 → 50
-  - 添加 X 范围过滤: `TITLE_X_MAX_RATIO = 0.70`
-  - 过滤特殊字符: ®、©、™、QS
-- **验证**: 9/9 测试通过
+  - 收紧 Y 范围: `title_y_max=95`（覆盖 y=90 的标题，排除 y≥100 的消息区）
+  - 添加 X 范围过滤: `title_x_max_ratio=0.95`
+  - 增强 `_is_garbage()` 过滤特殊字符和短噪声
+- **验证**: 回归测试 `test_regression_title_y_max_extracts_chat_name` 通过
 
 ---
 
@@ -66,9 +66,9 @@ python3 tests/test_integration.py
 - 更精确的界面控制
 
 ### 历史版本（已删除）
-- `core/auto_bot_ocr_v2.py` - 已删除
-- `core/auto_bot_ocr_v3.py` - 已删除
-- `core/auto_bot_ocr_v4.py` - 已删除（由新架构完全替代）
+- `core/auto_bot_vision_ocr_v2.py` - 已删除
+- `core/auto_bot_vision_ocr_v3.py` - 已删除
+- `core/auto_bot_vision_ocr_v4.py` - 已删除（由新架构完全替代）
 
 ---
 

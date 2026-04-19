@@ -185,4 +185,4 @@ python3 scripts/view_ocr_history.py export
 
 ---
 
-**推荐使用 OCR V3 颜色气泡版！**
+

@@ -4,7 +4,7 @@
 
 ---
 
-## 红线 1：阈值必须有出处
+## 红线 1：阈值必须有出处，且变更必须同步文档
 
 **禁止在代码中直接写魔法数字。**
 
@@ -23,6 +23,13 @@ red_pixels >= profile.badge_min_pixels
 ```
 
 如果必须硬编码，注释中必须写明数据来源和校准 TODO。
+
+**额外要求**：当修改 `LayoutProfile` 中的任何阈值（如 `title_y_max`、`input_y_min`、`left_boundary` 等）时，必须同时执行：
+1. `grep -rn "old_value" docs/` 找出所有文档中的旧数值引用
+2. 同步更新 `LESSONS_LEARNED.md`、`PROJECT_STATUS.md`、`TROUBLESHOOTING.md` 等归档文档
+3. 更新相关回归测试的 fixture 和预期值
+
+**原因**：参数会经历多轮调优（如 50 → 60 → 95），如果只改代码不改历史文档，归档文档会变成"考古层"，记录的是中间态而非最终态，导致后续排查时产生误判。
 
 ---
 

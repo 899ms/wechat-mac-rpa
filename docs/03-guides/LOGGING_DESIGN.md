@@ -130,44 +130,47 @@ class BotLogger:
 ### 3.5 在 Bot 主循环中的埋点位置
 
 ```python
-# 伪代码（注：以下演示的是 V4 monolithic 旧版埋点风格。
-# 按 ARCHITECTURE.md 新架构，Bot 层应通过 VisionPipeline 获取结果，
-# Logger 埋点位置不变，但视觉细节对 Bot 隐藏。）
-def run_auto(self, interval=5.0):
-    while self.running:
-        self.tick_id += 1
-        tick_id = self.tick_id
-        logger.log_tick_start(tick_id, interval)
+# 伪代码（当前模块化架构埋点风格）
+def tick(self):
+    self.tick_id += 1
+    tick_id = self.tick_id
+    logger.log_tick_start(tick_id, self.interval)
+    
+    try:
+        # 1. Perception (Capture + OCR + Layout + Extract)
+        result = self.vision_pipeline.perceive()
+        if not result.success:
+            logger.log_capture(tick_id, False, error=result.error)
+            return
+        logger.log_capture(tick_id, True, window_info=result.window_info)
+        logger.log_ocr(tick_id, result.element_count, result.ocr_duration_ms, result.sample_texts)
+        logger.log_layout(tick_id, result.chat_name, result.title_elem_count,
+                          result.input_elem_count, result.timestamp_elem_count,
+                          result.self_bubble_count, result.message_candidate_count)
         
-        try:
-            # 1. Capture
-            win = self.capture_wechat()
-            if not win:
-                logger.log_capture(tick_id, False, error="window_not_found")
-                continue
-            logger.log_capture(tick_id, True, window_info=win)
+        # 2. Session (去重)
+        new_messages = self.chat_session.filter_new(result.messages)
+        logger.log_messages(tick_id, len(result.messages), len(new_messages),
+                           [m.to_dict() for m in new_messages])
+        
+        # 3. Decision (Policy + Generator)
+        if new_messages:
+            latest = new_messages[-1]
+            should, reason = self.reply_policy.should_reply(latest, self.chat_session)
             
-            # 2. Analyze (OCR + Layout + Extract)
-            chat_items, messages, new_messages, chat_name = self.analyze(capture_path, tick_id=tick_id)
-            
-            # 3. Decision
-            if new_messages:
-                latest = new_messages[-1]
-                should = self.policy.should_reply(latest, self.sessions[chat_name])
+            if should:
+                reply = self.reply_generator.generate(latest, self.chat_session)
+                logger.log_decision(tick_id, True, reason, latest.text, reply)
                 
-                if should:
-                    reply = self.generator.generate(latest, self.sessions[chat_name])
-                    logger.log_decision(tick_id, True, "should_reply", latest.text, reply)
-                    
-                    # 4. Action
-                    ok = self.sender.send(reply)
-                    logger.log_send(tick_id, ok, reply, error=None if ok else "applescript_failed")
-                else:
-                    logger.log_decision(tick_id, False, "cooldown_or_self", latest.text)
-        except Exception as e:
-            logger.log_exception(tick_id, "main_loop", e)
-        
-        time.sleep(interval)
+                # 4. Action
+                ok = self.message_sender.send(reply)
+                logger.log_send(tick_id, ok, reply, error=None if ok else "applescript_failed")
+            else:
+                logger.log_decision(tick_id, False, reason, latest.text)
+    except Exception as e:
+        logger.log_exception(tick_id, "main_loop", e)
+    
+    time.sleep(self.interval)
 ```
 
 ---
@@ -289,12 +292,12 @@ for m in msgs:
 
 ## 六、与现有 MessageStore 的关系
 
-**现状**：`wechat_rpa/storage/message_store.py` 是旧版实现，功能类似但设计较简单。
+**现状**：`wechat_rpa/storage/message_store.py` 和 `wechat_rpa/storage/chat_history.py` 并存。`MessageStore` 是较早的实现，`ChatHistory` 是按本设计文档的 JSON Lines 分片方案。
 
 **迁移策略**：
-1. 新代码使用 `ChatHistory` + `BotLogger`
+1. 新代码优先使用 `ChatHistory` + `BotLogger`
 2. `MessageStore` 保留作为兼容层，内部可委托给 `ChatHistory`
-3. `auto_bot_vision_ocr_v4.py` 当前继续使用 `MessageStore`，未来重构时统一替换
+3. `wechat_rpa/bot/wechat_bot.py` 已使用 `ChatHistory`，`MessageStore` 仅作历史兼容
 
 ---
 

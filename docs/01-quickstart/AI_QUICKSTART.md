@@ -97,8 +97,8 @@ Action发送 → 记录状态
 
 ## FAQ
 
-**Q: 为什么 V4 是 monolithic 的？**  
-A: 历史原因，为了快速迭代。现在已经验证核心逻辑，正在按 [`../02-architecture/ARCHITECTURE.md`](../02-architecture/ARCHITECTURE.md) 模块化拆分。
+**Q: 为什么旧版本是 monolithic 的？**  
+A: 历史原因，为了快速迭代。核心逻辑验证完成后，已按 [`../02-architecture/ARCHITECTURE.md`](../02-architecture/ARCHITECTURE.md) 完成模块化拆分。旧版本 `core/auto_bot_vision_ocr_v2/v3/v4.py` 已删除，当前唯一入口是 `wechat_rpa/bot/wechat_bot.py`。
 
 **Q: 改了边界值后怎么验证？**  
 A: `tests/fixtures/errors/` 下有 23 个回归测试用例，要求：

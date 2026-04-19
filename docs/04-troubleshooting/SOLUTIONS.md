@@ -138,7 +138,7 @@ python3 scripts/view_ocr_history.py raw 100
 | `wechat_rpa/session/chat_session.py` | 会话与去重 |
 | `wechat_rpa/action/login_recovery.py` | 登录恢复处理 |
 | `tests/test_real_scene_extraction.py` | 真实场景回归测试 |
-| `ARCHITECTURE.md` | 架构设计文档 |
+| `docs/02-architecture/ARCHITECTURE.md` | 架构设计文档 |
 
 ### 历史版本（已删除）
 | 文件 | 状态 |
@@ -181,4 +181,4 @@ python3 scripts/view_ocr_history.py raw 100
 
 ---
 
-**推荐使用 OCR V3 颜色气泡版！**
+
