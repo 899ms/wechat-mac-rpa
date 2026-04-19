@@ -10,7 +10,7 @@
 
 ### 方式1: 代码中自动捕获
 
-在 V4 OCR 代码中，当检测到识别错误时调用:
+在模块化 OCR 代码中，当检测到识别错误时调用（注意：`auto_add_error_case.py` 当前依赖已删除的 V4 代码，需适配到 `wechat_rpa/` 新架构后使用）：
 
 ```python
 from tests.auto_add_error_case import auto_add_error_case

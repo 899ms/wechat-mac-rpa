@@ -19,8 +19,26 @@ from dataclasses import dataclass
 from typing import List, Tuple, Dict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-ARCH_PATH = PROJECT_ROOT / "ARCHITECTURE.md"
-API_PATH = PROJECT_ROOT / "API_SURFACE.md"
+ARCH_CANDIDATES = [
+    PROJECT_ROOT / "docs" / "02-architecture" / "ARCHITECTURE.md",
+    PROJECT_ROOT / "ARCHITECTURE.md",
+]
+API_CANDIDATES = [
+    PROJECT_ROOT / "docs" / "02-architecture" / "API_SURFACE.md",
+    PROJECT_ROOT / "API_SURFACE.md",
+]
+
+ARCH_PATH = None
+for cand in ARCH_CANDIDATES:
+    if cand.exists():
+        ARCH_PATH = cand
+        break
+
+API_PATH = None
+for cand in API_CANDIDATES:
+    if cand.exists():
+        API_PATH = cand
+        break
 
 # 已知的“黑盒函数”黑名单：如果出现在文档中，说明文档引用了未定义的东西
 UNDEFINED_BLACKLIST = {

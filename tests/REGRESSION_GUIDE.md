@@ -91,11 +91,11 @@ python3 tests/regression_suite.py --layer docs
 
 ## 与 `run_tests.sh` 的关系
 
-- `run_tests.sh`: 以 V4 单体版本为主，包含 OCR 识别测试
+- `run_tests.sh`: ⚠️ 已失效（依赖已删除的 V4 代码）
 - `regression_suite.py`: 针对**模块化目标架构**的分层回归，随着 `wechat_rpa/` 目录的实现逐步生效
 
 **建议**:
-- 修改 `ARCHITECTURE.md` / `API_SURFACE.md` → 跑 `regression_suite.py --layer docs`
+- 修改 `docs/02-architecture/ARCHITECTURE.md` / `docs/02-architecture/API_SURFACE.md` → 跑 `regression_suite.py --layer docs`
 - 修改 `wechat_rpa/session/` → 跑 `regression_suite.py --layer session`
 - 修改 `wechat_rpa/layout/` 或 `wechat_rpa/message/` → 跑 `regression_suite.py --layer layout`
 - 发现/修复错误 → 跑 `regression_suite.py --layer errors`

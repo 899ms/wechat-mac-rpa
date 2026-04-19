@@ -14,13 +14,40 @@ from pathlib import Path
 
 # 默认在项目根目录运行；如果未找到，则尝试向上查找 wechat-mac-rpa
 ROOT = Path.cwd()
-if not (ROOT / "ARCHITECTURE.md").exists():
+ARCH_CANDIDATES = [
+    ROOT / "docs" / "02-architecture" / "ARCHITECTURE.md",
+    ROOT / "ARCHITECTURE.md",
+]
+API_CANDIDATES = [
+    ROOT / "docs" / "02-architecture" / "API_SURFACE.md",
+    ROOT / "API_SURFACE.md",
+]
+
+ARCH = None
+for cand in ARCH_CANDIDATES:
+    if cand.exists():
+        ARCH = cand
+        break
+if ARCH is None:
     for parent in Path(__file__).resolve().parents:
-        if (parent / "ARCHITECTURE.md").exists():
-            ROOT = parent
+        for cand in [
+            parent / "docs" / "02-architecture" / "ARCHITECTURE.md",
+            parent / "ARCHITECTURE.md",
+        ]:
+            if cand.exists():
+                ROOT = parent
+                ARCH = cand
+                break
+        if ARCH:
             break
-ARCH = ROOT / "ARCHITECTURE.md"
-API = ROOT / "API_SURFACE.md"
+
+API = None
+for cand in API_CANDIDATES:
+    if cand.exists():
+        API = cand
+        break
+if API is None and ARCH:
+    API = ARCH.parent / "API_SURFACE.md"
 
 errors = []
 warnings = []

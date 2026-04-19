@@ -1,8 +1,25 @@
-# 微信 OCR V4 单元测试
+# 微信 OCR 测试套件
 
 ## 测试框架
 
-基于 `unittest` 的测试框架，验证 V4 OCR 对微信截图的识别准确率。
+当前测试基于 `pytest`，覆盖 `wechat_rpa/` 模块化架构和 `tests/` 外部测试套件。
+
+## 运行测试
+
+### 运行所有内部测试
+```bash
+python3 -m pytest wechat_rpa/tests/ -v
+```
+
+### 运行所有外部测试
+```bash
+python3 -m pytest tests/ -v
+```
+
+### 运行集成测试
+```bash
+python3 tests/test_integration.py
+```
 
 ## 测试用例结构
 
@@ -10,124 +27,45 @@
 - `{name}.png` - 微信截图
 - `{name}.json` - 预期 OCR 结果
 
+Fixture 存放在 `tests/fixtures/` 和 `wechat_rpa/tests/fixtures/` 下。
+
 ## 当前测试用例
 
-| 测试用例 | 聊天列表 | 消息数 | 状态 |
-|---------|---------|--------|------|
-| current | 5 | 3 | ✅ 通过 |
-| test_01 | 5 | 3 | ✅ 通过 |
-| test_02 | 5 | 3 | ✅ 通过 |
-| test_03 | 5 | 3 | ✅ 通过 |
+| 测试套件 | 位置 | 数量 | 说明 |
+|---------|------|------|------|
+| 内部单元测试 | `wechat_rpa/tests/` | 148+ | 模块化架构各层单元测试 |
+| 外部集成测试 | `tests/` | 54+ | 端到端场景测试 |
+| 真实场景回归 | `tests/test_real_scene_extraction.py` | - | 基于真实截图的回归验证 |
 
-**总计: 4/4 通过 (100%)**
+## 添加回归测试
 
-## 运行测试
+发现新的识别错误时：
+1. 保存错误截图到 `tests/fixtures/errors/`
+2. 编写同名 `.json` 描述预期结果
+3. 在对应测试模块中添加回归测试用例
 
-### 运行所有测试
-```bash
-./tests/run_tests.sh
-```
+## 测试标准
 
-或
-
-```bash
-python3 tests/test_ocr_v4.py
-```
-
-### 添加新测试用例
-```bash
-# 方式1: 自动命名 (test_XX)
-python3 tests/add_test_case.py /path/to/screenshot.png
-
-# 方式2: 指定名称
-python3 tests/add_test_case.py /path/to/screenshot.png --name my_group_chat
-```
-
-### 生成预期结果文件
-```bash
-python3 tests/test_ocr_v4.py --generate --image /path/to/screenshot.png --output tests/fixtures/my_test.json
-```
-
-## 测试验证项
-
-### 1. 聊天名称识别
-- 验证群聊/私聊名称是否正确
-
-### 2. 聊天列表识别
-- 聊天数量
-- 昵称准确性
-- 最新消息预览
-
-### 3. 消息识别
-- 消息数量
-- **发送者 ID** (关键)
-- 消息内容准确性
-- 消息类型 (自己/对方)
-- @检测
-
-### 4. 测试标准（严格）
-- 聊天列表: 昵称包含关系即可
-- 消息内容: **相似度 > 90%**（严格要求）
-- 消息数量: **必须完全一致**（不允许误差）
-
-## 测试报告示例
-
-```
-============================================================
-🧪 测试: current
-============================================================
-
-✅ 通过
-
-============================================================
-📊 测试结果汇总
-============================================================
-✅ current: 通过
-✅ test_01: 通过
-✅ test_02: 通过
-✅ test_03: 通过
-
-总计: 4/4 通过 (100.0%)
-🎉 所有测试通过！
-```
-
-## 提高测试覆盖率
-
-建议添加以下场景的测试用例：
-
-1. **私聊场景** - 1对1聊天
-2. **群聊场景** - 多人聊天，验证不同发言者
-3. **复杂内容** - 包含图片、链接、表情等
-4. **长文本消息** - 多行文本
-5. **边缘情况** - 窗口最小化、部分遮挡等
-
-## 调试失败的测试
-
-如果测试失败，会输出详细错误信息：
-
-```
-❌ 失败 (2 个错误):
-   [test_01] MESSAGE[0].sender: 期望='wanglc', 实际='对方' 消息: 是不是忙着切号呢...
-   [test_01] MESSAGE[1].text: 期望='你好', 实际='您好' 相似度: 50.00%
-```
-
-根据错误信息：
-1. 检查截图是否清晰
-2. 检查预期结果文件是否正确
-3. 调整 OCR 参数或修复 bug
+- 聊天名称准确率 >= 95%
+- 发送者类型识别率 >= 90%
+- 消息数量必须完全一致
+- 消息内容相似度 > 90%
 
 ## 文件位置
 
 ```
 tests/
 ├── README.md              # 本文件
-├── test_ocr_v4.py         # 测试框架
-├── run_tests.sh           # 测试运行脚本
-├── add_test_case.py       # 添加测试用例工具
-└── fixtures/              # 测试用例目录
-    ├── current.png
-    ├── current.json
-    ├── test_01.png
-    ├── test_01.json
-    └── ...
+├── test_integration.py    # 集成测试入口
+├── test_real_scene_extraction.py  # 真实场景回归测试
+├── run_tests.sh           # ⚠️ 已失效（依赖已删除的 V4 代码）
+├── regression_suite.py    # 模块化回归测试（部分可用）
+├── fixtures/              # 测试用例目录
+│   ├── errors/            # 错误回归用例
+│   └── regression/        # 回归测试截图
+└── ...
 ```
+
+---
+
+**历史说明**: 旧版 `test_ocr_v4.py`、`add_test_case.py` 及 `core/auto_bot_vision_ocr_v4.py` 已删除，由 `wechat_rpa/` 模块化架构 + pytest 完全替代。
