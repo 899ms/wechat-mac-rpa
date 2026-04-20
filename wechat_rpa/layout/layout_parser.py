@@ -234,11 +234,12 @@ class LayoutParser:
         unread_for_group: List[str] = [""] * len(groups)
         
         # 1) OCR 数字候选：只接受在头像右上角精确区域（center.x >= 200）的小元素
-        # 未读数字/badge 通常是面积极小的元素（< 400），位于头像右上角。
+        # 未读数字/badge 通常是面积极小的元素（< 1000），位于头像右上角。
+        # 两位数字如 "39" 面积可达 560，故阈值放宽到 1000。
         # 排除头像内部的小程序数字/步数噪声（通常在 center.x < 200）
         unread_candidates = [
             e for e in elems
-            if e.center.x >= 200 and (e.bbox.width * e.bbox.height) < 400
+            if e.center.x >= 200 and (e.bbox.width * e.bbox.height) < 1000
             and e.bbox.width < 35 and e.bbox.height < 30
         ]
         for uc in unread_candidates:
@@ -305,7 +306,14 @@ class LayoutParser:
         items: List[ChatListItem] = []
         for idx, group in enumerate(groups):
             group.sort(key=lambda e: e.center.y)
-            nickname = _clean_nickname(group[0].text)
+            # 跳过纯数字元素（未读角标如 "39"），取第一个非数字作为昵称
+            nickname = ""
+            for e in group:
+                if not e.text.isdigit():
+                    nickname = _clean_nickname(e.text)
+                    break
+            if not nickname:
+                nickname = _clean_nickname(group[0].text)
             last_message_preview = ""
             if len(group) > 1:
                 last_message_preview = group[-1].text
