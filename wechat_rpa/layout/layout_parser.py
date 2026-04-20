@@ -109,7 +109,7 @@ class LayoutParser:
         message_candidates = [e for e in right_elements if id(e) not in excluded]
 
         # 提取 chat_name
-        chat_name = self._extract_chat_name(title_elements)
+        chat_name = self._extract_chat_name(title_elements, width)
 
         self.debug_info = {
             "left_elements": [{"text": e.text, "x": e.bbox.x, "y": e.bbox.y} for e in left_elements],
@@ -355,19 +355,19 @@ class LayoutParser:
 
         return items
 
-    def _extract_chat_name(self, title_elements: List[OCRTextElement]) -> str:
+    def _extract_chat_name(self, title_elements: List[OCRTextElement], width: int) -> str:
         """从标题元素中提取聊天名称。"""
         if not title_elements:
             return ""
 
-        def _is_garbage(text: str) -> bool:
-            if any(c in text for c in ["®", "©", "™", "QS", "①"]):
-                return True
-            if any(re.match(p, text) for p in TIMESTAMP_PATTERNS):
-                return True
-            return False
-
-        filtered = [e for e in title_elements if not _is_garbage(e.text)]
+        # 标题噪声过滤：基于布局特征（位置在窗口右上角），不依赖文本内容
+        # 窗口控制按钮（关闭/最小化/最大化）通常在右上角 x > width * 0.85
+        right_edge_threshold = width * 0.85
+        filtered = [
+            e for e in title_elements
+            if e.center.x < right_edge_threshold
+            and not any(re.match(p, e.text) for p in TIMESTAMP_PATTERNS)
+        ]
         candidates = filtered if filtered else title_elements
         best = max(candidates, key=lambda e: len(e.text))
         return self.clean_chat_name(best.text)
