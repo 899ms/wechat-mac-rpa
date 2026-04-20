@@ -60,20 +60,29 @@ class LayoutParser:
         arr = np.array(img)
         width, height = img.size
 
+        # 动态调整绝对坐标，适配窗口尺寸变化
+        scale_x = width / self.profile.window_width
+        scale_y = height / self.profile.window_height
+        self._scaled_left_boundary = int(self.profile.left_boundary * scale_x)
+        self._scaled_chat_list_x_max = int(self.profile.chat_list_x_max * scale_x)
+        self._scaled_title_y_max = int(self.profile.title_y_max * scale_y)
+        bottom_margin = self.profile.window_height - self.profile.input_y_min
+        self._scaled_input_y_min = int(height - bottom_margin) if bottom_margin > 0 else self.profile.input_y_min
+
         # 1. 左右分割
-        left_elements = [e for e in elements if e.bbox.x < self.profile.left_boundary]
-        right_elements = [e for e in elements if e.bbox.x >= self.profile.left_boundary]
+        left_elements = [e for e in elements if e.bbox.x < self._scaled_left_boundary]
+        right_elements = [e for e in elements if e.bbox.x >= self._scaled_left_boundary]
 
         # 2. 标题栏（右侧上部）
         title_x_max = int(width * self.profile.title_x_max_ratio)
         title_elements = [
             e for e in right_elements
-            if e.bbox.y < self.profile.title_y_max and e.bbox.x < title_x_max
+            if e.bbox.y < self._scaled_title_y_max and e.bbox.x < title_x_max
         ]
 
         # 3. 输入框（右侧底部）
         input_elements = [
-            e for e in right_elements if e.bbox.y >= self.profile.input_y_min
+            e for e in right_elements if e.bbox.y >= self._scaled_input_y_min
         ]
 
         # 4. 时间戳（右侧消息区中央，匹配正则）
@@ -81,7 +90,7 @@ class LayoutParser:
         for e in right_elements:
             if not any(re.match(p, e.text) for p in TIMESTAMP_PATTERNS):
                 continue
-            if e.bbox.y < self.profile.title_y_max or e.bbox.y >= self.profile.input_y_min:
+            if e.bbox.y < self._scaled_title_y_max or e.bbox.y >= self._scaled_input_y_min:
                 continue
             # 位于消息区中央
             left_central = int(width * 0.25)
@@ -130,11 +139,14 @@ class LayoutParser:
         2. 先粗筛（容差 15）再找连通区域，最后精筛（容差 35）
         """
         h, w = arr.shape[:2]
-        # 裁剪到右侧消息区
-        x1 = max(0, self.profile.left_boundary)
-        y1 = max(0, self.profile.title_y_max)
+        # 裁剪到右侧消息区（使用动态坐标）
+        left = getattr(self, '_scaled_left_boundary', self.profile.left_boundary)
+        title_y = getattr(self, '_scaled_title_y_max', self.profile.title_y_max)
+        input_y = getattr(self, '_scaled_input_y_min', self.profile.input_y_min)
+        x1 = max(0, left)
+        y1 = max(0, title_y)
         x2 = min(w, w)
-        y2 = min(h, self.profile.input_y_min)
+        y2 = min(h, input_y)
         if x1 >= x2 or y1 >= y2:
             return []
 
@@ -174,9 +186,10 @@ class LayoutParser:
         """解析左侧聊天列表。"""
         # 过滤出列表区内的元素（排除分割线/顶部搜索栏等）
         # 搜索栏在 y<80，聊天列表项从 y>80 开始
+        chat_list_x_max = getattr(self, '_scaled_chat_list_x_max', self.profile.chat_list_x_max)
         elems = [
             e for e in left_elements
-            if e.bbox.x <= self.profile.chat_list_x_max and e.center.y > 80
+            if e.bbox.x <= chat_list_x_max and e.center.y > 80
         ]
         elems.sort(key=lambda e: e.center.y)
         if not elems:
@@ -184,7 +197,7 @@ class LayoutParser:
 
         # 昵称列：x >= 150 覆盖昵称（昵称可能在 x=150~230 范围内，如 "王芊 @ai"）
         nick_min = 150
-        nick_max = int(self.profile.chat_list_x_max * 0.95)
+        nick_max = int(chat_list_x_max * 0.95)
         nick_col = [e for e in elems if nick_min <= e.bbox.x <= nick_max]
         # 过滤头像区域噪声：排除面积极小的元素。
         # 头像上的未读数字 badge / 微信运动步数字体很小，
@@ -308,7 +321,7 @@ class LayoutParser:
             for e in elems:
                 if not (y_min - 20 <= e.center.y <= y_max + 20):
                     continue
-                if e.bbox.x > self.profile.chat_list_x_max * 0.70:
+                if e.bbox.x > chat_list_x_max * 0.70:
                     if re.match(r"^\d{1,2}:\d{2}$", e.text):
                         timestamp = e.text
 

@@ -103,6 +103,7 @@ for e in d['ocr_elements']:
 2. `_is_avatar_noise` 过滤了昵称区域元素
 3. `used_self` 消耗了所有 candidates（self_bubble 检测误报）
 4. 旧代码 bug：cluster[0] 被无条件当昵称后 msg_elems 为空
+5. **`input_y_min` 绝对坐标失效**：窗口尺寸变化后，消息区底部内容被误判为输入框（见 §3.4）
 
 **快速验证**：
 ```python
@@ -257,6 +258,32 @@ for i, c in enumerate(d['extraction_clusters']):
         print(f"    → message: sender={msgs[0]['sender']!r} text={msgs[0]['text']!r}")
     else:
         print(f"    → 无对应消息 (BUG)")
+```
+
+### 3.4 验证 input_y_min（窗口尺寸适配）
+
+```python
+# 检查消息区底部是否有内容被误判为输入框
+print("=== input_elements（被过滤为输入框的内容）===")
+for e in d['layout_input_elements']:
+    print(f'"{e["text"]}" y={e["y"]}')
+
+print("\n=== message_candidates（消息候选）===")
+for c in d['layout_message_candidates']:
+    print(f'"{c["text"]}" y={c["cy"]}')
+
+# 检查：截图高度 vs Profile 窗口高度
+from pathlib import Path
+from PIL import Image
+img = Image.open(Path(d['screenshot_path']))
+print(f"\n截图高度: {img.height}")
+from wechat_rpa.layout.profile import PROFILE_WECHAT_MAC_1760X1280
+print(f"Profile 窗口高度: {PROFILE_WECHAT_MAC_1760X1280.window_height}")
+print(f"Profile input_y_min: {PROFILE_WECHAT_MAC_1760X1280.input_y_min}")
+print(f"按高度比例应调整至: {int(PROFILE_WECHAT_MAC_1760X1280.input_y_min * img.height / PROFILE_WECHAT_MAC_1760X1280.window_height)}")
+
+# 若截图高度显著大于 Profile 窗口高度，且 input_elements 中包含明显是消息的内容
+# → input_y_min 绝对坐标失效，需要改为动态计算
 ```
 
 ### 3.3 验证 Bot 决策逻辑

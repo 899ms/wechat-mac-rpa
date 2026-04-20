@@ -145,6 +145,7 @@ class WindowCapture:
             cmd = [
                 'screencapture',
                 '-l', str(window_id),
+                '-o',  # 排除窗口阴影，只截取内容区域
                 '-x', self.output_path
             ]
         else:

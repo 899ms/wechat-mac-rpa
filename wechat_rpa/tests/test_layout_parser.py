@@ -117,3 +117,33 @@ class TestLayoutParserRealFixtures:
         assert "王芊" in layout.chat_name or "ai开发" in layout.chat_name, (
             f"chat_name='{layout.chat_name}' 未包含预期的聊天名关键词"
         )
+
+    def test_regression_input_y_min_adaptive_tall_window(self, ocr_engine, parser):
+        """
+        回归测试：窗口高度 1602px 时，input_y_min=1040 会把消息区底部内容误判为输入框，
+        导致 "所有方面"、"你帮我看下" 等消息丢失。
+
+        修复后按实际截图高度动态计算 input_y_min，消息应保留在 candidates 中。
+
+        Fixture: regression_input_y_min_1602_20260420.png
+        来源：2026-04-20 实际运行截图，高度 1602px（含阴影排除后的尺寸）。
+        """
+        layout = self._run_parse(ocr_engine, parser, "regression_input_y_min_1602_20260420")
+        candidate_texts = [e.text for e in layout.message_candidates]
+        input_texts = [e.text for e in layout.input_elements]
+
+        # 关键消息必须在 candidates 中，不能在 input_elements 中
+        assert "所有方面" in candidate_texts, (
+            f"\"所有方面\" 未在 message_candidates 中，可能被 input_y_min 误过滤。"
+            f"candidates={candidate_texts}, input={input_texts}"
+        )
+        assert "你帮我看下" in candidate_texts, (
+            f"\"你帮我看下\" 未在 message_candidates 中，可能被 input_y_min 误过滤。"
+            f"candidates={candidate_texts}, input={input_texts}"
+        )
+        assert "所有方面" not in input_texts, (
+            f"\"所有方面\" 不应在 input_elements 中"
+        )
+        assert "你帮我看下" not in input_texts, (
+            f"\"你帮我看下\" 不应在 input_elements 中"
+        )

@@ -119,6 +119,63 @@ no_reply_chats = {"腾讯新闻", "文件传输助手"}
 
 ---
 
+### Step 6: 发散检查 —— 这是不是一个类问题？
+
+> **关键原则：修复一个具体 bug 后，必须检查 codebase 中是否存在同类问题。**
+
+排查完单个 tick 后，按以下清单发散：
+
+#### 6.1 检查 Profile 绝对坐标
+
+如果根因是 **Profile 绝对坐标在窗口尺寸变化时失效**，检查所有使用绝对坐标的字段：
+
+```python
+from wechat_rpa.layout.profile import PROFILE_WECHAT_MAC_1760X1280
+p = PROFILE_WECHAT_MAC_1760X1280
+
+# 截图实际尺寸
+from PIL import Image
+img = Image.open('data/debug/<tick>.json 对应的截图')
+actual_w, actual_h = img.size
+
+fields = [
+    ('left_boundary', p.left_boundary, actual_w, p.window_width),
+    ('chat_list_x_max', p.chat_list_x_max, actual_w, p.window_width),
+    ('title_y_max', p.title_y_max, actual_h, p.window_height),
+    ('input_y_min', p.input_y_min, actual_h, p.window_height),
+]
+for name, value, actual, profile in fields:
+    ratio = value / profile
+    expected = int(actual * ratio)
+    print(f'{name}: profile={value}, 按比例应={expected}, actual_size={actual}')
+```
+
+**判断标准：**
+- 若 `actual_size` 与 `profile_size` 差异 > 10%，该字段**可能失效**
+- `input_y_min` / `title_y_max` / `left_boundary` / `chat_list_x_max` **已全部修复为动态计算**
+- 若仍有异常，检查是否遗漏了新的绝对坐标字段
+
+#### 6.2 检查 debug_logger 记录一致性
+
+如果根因是 **debug JSON 中某字段与真实逻辑不符**（如 `bot_chat_name=''` 但 `switch_reason` 显示有当前聊天），检查所有 `log_bot_decision` 调用是否传齐了参数：
+
+```bash
+grep -n "log_bot_decision" wechat_rpa/bot/wechat_bot.py
+```
+
+**判断标准：**
+- 若某调用未传 `chat_name` / `new_messages_count` 等关键参数 → 同类记录 bug
+
+#### 6.3 检查 session 持久化
+
+如果根因是 **session 消息未持久化**（`data/sessions.json` 中 `messages=0`），检查 `save_sessions` / `load_sessions` 是否遗漏了 `seen_messages`：
+
+```bash
+grep -n "seen_messages\|seen_window_hashes" wechat_rpa/session/chat_session.py
+```
+
+---
+
 ## 三、常见问题速查表
 
 ### 3.1 chat_name 始终为空
