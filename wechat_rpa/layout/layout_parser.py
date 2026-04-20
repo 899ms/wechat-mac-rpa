@@ -199,16 +199,13 @@ class LayoutParser:
         nick_min = 150
         nick_max = int(chat_list_x_max * 0.95)
         nick_col = [e for e in elems if nick_min <= e.bbox.x <= nick_max]
-        # 1) 过滤头像区域噪声：排除面积极小的元素。
-        #    头像上的未读数字 badge / 微信运动步数字体很小，
-        #    bbox 面积通常 < 400；而昵称/预览文字面积通常 > 1500。
-        # 2) 过滤纯数字：未读角标（如 "39"）是纯数字，不应进入昵称列。
-        #    合法昵称如 "1号群" 含非数字字符，不会被误过滤。
-        min_nickname_area = 400
+        # 过滤头像区域噪声：未读角标/微信运动步数字体很小，
+        # bbox 面积通常 200-700；而昵称/预览文字面积通常 > 1500。
+        # 用面积阈值 1000 自然分割，比 isdigit() 更本质（不依赖文本内容）。
+        min_nickname_area = 1000
         nick_col = [
             e for e in nick_col
             if (e.bbox.width * e.bbox.height) >= min_nickname_area
-            and not e.text.isdigit()
         ]
         nick_col.sort(key=lambda e: e.center.y)
         if not nick_col:

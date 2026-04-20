@@ -147,3 +147,35 @@ class TestLayoutParserRealFixtures:
         assert "你帮我看下" not in input_texts, (
             f"\"你帮我看下\" 不应在 input_elements 中"
         )
+
+        # 验证动态坐标已生效（1602 > 1280，坐标应被放大）
+        profile = parser.profile
+        assert parser._scaled_input_y_min > profile.input_y_min, (
+            f"input_y_min 未缩放: {parser._scaled_input_y_min} <= {profile.input_y_min}"
+        )
+        assert parser._scaled_title_y_max > profile.title_y_max, (
+            f"title_y_max 未缩放: {parser._scaled_title_y_max} <= {profile.title_y_max}"
+        )
+
+    def test_scaled_coordinates_on_small_window(self, ocr_engine, parser):
+        """
+        验证窗口尺寸显著小于 Profile 时，坐标被正确缩小。
+        small_scene 尺寸 560x760，scale_x=0.318, scale_y=0.594。
+        """
+        layout = self._run_parse(ocr_engine, parser, "small_scene")
+        assert layout is not None
+
+        # 验证动态坐标已生效（560 < 1760，坐标应被缩小）
+        profile = parser.profile
+        assert parser._scaled_left_boundary < profile.left_boundary, (
+            f"left_boundary 未缩小: {parser._scaled_left_boundary} >= {profile.left_boundary}"
+        )
+        assert parser._scaled_chat_list_x_max < profile.chat_list_x_max, (
+            f"chat_list_x_max 未缩小: {parser._scaled_chat_list_x_max} >= {profile.chat_list_x_max}"
+        )
+        assert parser._scaled_title_y_max < profile.title_y_max, (
+            f"title_y_max 未缩小: {parser._scaled_title_y_max} >= {profile.title_y_max}"
+        )
+        assert parser._scaled_input_y_min < profile.input_y_min, (
+            f"input_y_min 未缩小: {parser._scaled_input_y_min} >= {profile.input_y_min}"
+        )
