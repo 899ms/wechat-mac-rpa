@@ -199,14 +199,16 @@ class LayoutParser:
         nick_min = 150
         nick_max = int(chat_list_x_max * 0.95)
         nick_col = [e for e in elems if nick_min <= e.bbox.x <= nick_max]
-        # 过滤头像区域噪声：排除面积极小的元素。
-        # 头像上的未读数字 badge / 微信运动步数字体很小，
-        # bbox 面积通常 < 400；而昵称/预览文字面积通常 > 1500。
-        # 这是纯布局特征（面积），不依赖文本内容。
+        # 1) 过滤头像区域噪声：排除面积极小的元素。
+        #    头像上的未读数字 badge / 微信运动步数字体很小，
+        #    bbox 面积通常 < 400；而昵称/预览文字面积通常 > 1500。
+        # 2) 过滤纯数字：未读角标（如 "39"）是纯数字，不应进入昵称列。
+        #    合法昵称如 "1号群" 含非数字字符，不会被误过滤。
         min_nickname_area = 400
         nick_col = [
             e for e in nick_col
             if (e.bbox.width * e.bbox.height) >= min_nickname_area
+            and not e.text.isdigit()
         ]
         nick_col.sort(key=lambda e: e.center.y)
         if not nick_col:
@@ -306,14 +308,7 @@ class LayoutParser:
         items: List[ChatListItem] = []
         for idx, group in enumerate(groups):
             group.sort(key=lambda e: e.center.y)
-            # 跳过纯数字元素（未读角标如 "39"），取第一个非数字作为昵称
-            nickname = ""
-            for e in group:
-                if not e.text.isdigit():
-                    nickname = _clean_nickname(e.text)
-                    break
-            if not nickname:
-                nickname = _clean_nickname(group[0].text)
+            nickname = _clean_nickname(group[0].text)
             last_message_preview = ""
             if len(group) > 1:
                 last_message_preview = group[-1].text
