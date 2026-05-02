@@ -1,0 +1,2605 @@
+[
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260413_001.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "没用的东西"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是 ai"
+        },
+        {
+          "sender": "自己",
+          "text": "我是没用的熊猫头"
+        },
+        {
+          "sender": "自己",
+          "text": "不是东西"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈"
+        }
+      ],
+      "latency_ms": 7409.3,
+      "error": null
+    },
+    "local": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "没用的东西"
+        },
+        {
+          "sender": "自己",
+          "text": "我是没用的熊猫头"
+        },
+        {
+          "sender": "自己",
+          "text": "不是东西"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈"
+        }
+      ],
+      "latency_ms": 1821.0,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.714,
+      "overall_score": 0.571
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 1.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.714,
+      "overall_score": 0.905
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260413_002.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "文件传输助手",
+      "chat_list": [
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "自己",
+          "text": "aaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "latency_ms": 5047.7,
+      "error": null
+    },
+    "local": {
+      "chat_name": "文件传输助手",
+      "chat_list": [
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": "1000"
+        }
+      ],
+      "messages": [],
+      "latency_ms": 992.8,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.0,
+      "overall_score": 0.333
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 1.0,
+      "chat_list_unread_accuracy": 0.8,
+      "messages_text_iou": 0.0,
+      "overall_score": 0.6
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260413_003.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "王老板们和小天才 (5)",
+      "chat_list": [
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "自己",
+          "text": "消息没刷新（可以下拉刷新试试）\n现在恢复正常了吗？需要继续解决登录问题随时说！⚡"
+        },
+        {
+          "sender": "对方",
+          "text": "是不是忙着切号呢"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈误会啦！😂 我是 **AI 助手**，不是真人客服～\n\n不存在\"切号\"这种操作：\n• 🤖 我没有微信号，也不是 Qian\n• ⚡ 回复速度取决于网络/服务器负载\n• 🎯 同时只处理你这一个对话窗口\n\n你是不是把我当成某个真人客服了？或者@错人了？🤔\n\n还有登录问题需要解决吗？随时叫我！👋"
+        }
+      ],
+      "latency_ms": 9071.4,
+      "error": null
+    },
+    "local": {
+      "chat_name": "王老板们和小天才（5)",
+      "chat_list": [
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "自己",
+          "text": "團  消息没刷新（可以下拉刷新试试） 现在恢复正常了吗？需要继续解决决登录问题随 时说！乡"
+        },
+        {
+          "sender": "对方",
+          "text": "是不是忙着切号呢"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈误会啦！ 我是**Al 助手**，不是真人 客服～ 不存在\"切号\"这种操作： 我没有微信号，也不是 Qian 回复速度取决于网络/服务器负载 ◎同时只处理你这一个对话窗口 你是不是把我当成某个真人客服了？或者@错 人了？ 还有登录问题需要解决吗？随时叫我！"
+        }
+      ],
+      "latency_ms": 3755.7,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.2,
+      "overall_score": 0.36
+    },
+    "vs_local": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 1.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.2,
+      "overall_score": 0.66
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_004.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是 ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        }
+      ],
+      "latency_ms": 5544.2,
+      "error": null
+    },
+    "local": {
+      "chat_name": "Wihan",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "Wihan",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        }
+      ],
+      "latency_ms": 923.0,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.6,
+      "overall_score": 0.48
+    },
+    "vs_local": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 0.667,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.6,
+      "overall_score": 0.68
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_005.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是 ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        }
+      ],
+      "latency_ms": 4803.0,
+      "error": null
+    },
+    "local": {
+      "chat_name": "Wihan",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "Wihan",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        }
+      ],
+      "latency_ms": 905.6,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.6,
+      "overall_score": 0.48
+    },
+    "vs_local": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 0.667,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.6,
+      "overall_score": 0.68
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_006.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 7807.0,
+      "error": null
+    },
+    "local": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "Wihan",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 1015.5,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.667
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.667,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.889
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_007.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 5854.3,
+      "error": null
+    },
+    "local": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "Wihan",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 1018.0,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.667
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.667,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.889
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_008.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 5564.8,
+      "error": null
+    },
+    "local": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "Wihan",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 1002.4,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.667
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.667,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.889
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_009.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 8841.0,
+      "error": null
+    },
+    "local": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "Wihan",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 1018.7,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.667
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.667,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.889
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_010.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 6298.4,
+      "error": null
+    },
+    "local": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "Wihan",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 1011.1,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.667
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.667,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.889
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_011.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 5783.8,
+      "error": null
+    },
+    "local": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "Wihan",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 1017.3,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.667
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.667,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.889
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_012.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是 ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是 ai"
+        }
+      ],
+      "latency_ms": 5954.2,
+      "error": null
+    },
+    "local": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "Wihan",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 1026.3,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.667,
+      "overall_score": 0.556
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.667,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.667,
+      "overall_score": 0.778
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_013.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是 ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是 ai"
+        }
+      ],
+      "latency_ms": 5802.8,
+      "error": null
+    },
+    "local": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "Wihan",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 995.0,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.667,
+      "overall_score": 0.556
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.667,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.667,
+      "overall_score": 0.778
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_014.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是 ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是 ai"
+        }
+      ],
+      "latency_ms": 5819.7,
+      "error": null
+    },
+    "local": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "Wihan",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 1094.9,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.667,
+      "overall_score": 0.556
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.667,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.667,
+      "overall_score": 0.778
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_015.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 7031.5,
+      "error": null
+    },
+    "local": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "Wihan",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 1048.1,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.667
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.667,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.889
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_016.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 6087.3,
+      "error": null
+    },
+    "local": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "Wihan",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        }
+      ],
+      "latency_ms": 1012.9,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.667
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.667,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 1.0,
+      "overall_score": 0.889
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_017.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": "1"
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是 ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        }
+      ],
+      "latency_ms": 5950.6,
+      "error": null
+    },
+    "local": {
+      "chat_name": "W1han",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "Wihan",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "你是人工回复的吗"
+        },
+        {
+          "sender": "自己",
+          "text": "不是"
+        },
+        {
+          "sender": "自己",
+          "text": "我是ai"
+        },
+        {
+          "sender": "对方",
+          "text": "你能关灯么"
+        },
+        {
+          "sender": "自己",
+          "text": "不能"
+        }
+      ],
+      "latency_ms": 992.5,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.667,
+      "overall_score": 0.556
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.667,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.667,
+      "overall_score": 0.778
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_018.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "王老板们和小天才 (5)",
+      "chat_list": [
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "是不是忙着切号呢"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈误会啦！😂 我是 **AI 助手**，不是真人客服～\n\n不存在\"切号\"这种操作：\n• 🤖 我没有微信号，也不是 Qian\n• ⚡ 回复速度取决于网络/服务器负载\n• 🎯 同时只处理你这一个对话窗口\n\n你是不是把我当成某个真人客服了？或者@错人了？🤔\n\n还有登录问题需要解决吗？随时叫我！👋"
+        },
+        {
+          "sender": "自己",
+          "text": "1aayaua5aapangaaaaa~"
+        },
+        {
+          "sender": "对方",
+          "text": "额"
+        }
+      ],
+      "latency_ms": 10687.6,
+      "error": null
+    },
+    "local": {
+      "chat_name": "王老板们和小天才（5)",
+      "chat_list": [
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "是不是忙着切号呢"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈误会啦！ 我是**Al 助手**，不是真人 客服～ 不存在\"切号\"这种操作： 我没有微信号，也不是 Qian 回复速度取决于网络/服务器负载 ◎ 同时只处理你这一个对话窗口 你是不是把我当成某个真人客服了？或者@错 人了？ 还有登录问题需要解决吗？随时叫我！"
+        },
+        {
+          "sender": "自己",
+          "text": "laayaua5aapangaaaaa~"
+        }
+      ],
+      "latency_ms": 2953.0,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.167,
+      "overall_score": 0.35
+    },
+    "vs_local": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 1.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.167,
+      "overall_score": 0.65
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_019.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "王老板们和小天才 (5)",
+      "chat_list": [
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "是不是忙着切号呢"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈误会啦！😂 我是 **AI 助手**，不是真人客服～\n\n不存在\"切号\"这种操作：\n• 🤖 我没有微信号，也不是 Qian\n• ⚡ 回复速度取决于网络/服务器负载\n• 🎯 同时只处理你这一个对话窗口\n\n你是不是把我当成某个真人客服了？或者@错人了？🤔\n\n还有登录问题需要解决吗？随时叫我！👋"
+        },
+        {
+          "sender": "自己",
+          "text": "1aayaua5aapangaaaaa~"
+        }
+      ],
+      "latency_ms": 9066.0,
+      "error": null
+    },
+    "local": {
+      "chat_name": "王老板们和小天才（5)",
+      "chat_list": [
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "是不是忙着切号呢"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈误会啦！ 我是**Al 助手**，不是真人 客服～ 不存在\"切号\"这种操作： 我没有微信号，也不是 Qian 回复速度取决于网络/服务器负载 ◎ 同时只处理你这一个对话窗口 你是不是把我当成某个真人客服了？或者@错 人了？ 还有登录问题需要解决吗？随时叫我！"
+        },
+        {
+          "sender": "自己",
+          "text": "laayaua5aapangaaaaa~"
+        }
+      ],
+      "latency_ms": 2914.9,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.2,
+      "overall_score": 0.36
+    },
+    "vs_local": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 1.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.2,
+      "overall_score": 0.66
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_020.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "王老板们和小天才 (5)",
+      "chat_list": [
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "是不是忙着切号呢"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈误会啦！😂 我是 **AI 助手**，不是真人客服～\n\n不存在\"切号\"这种操作：\n• 🤖 我没有微信号，也不是 Qian\n• ⚡ 回复速度取决于网络/服务器负载\n• 🎯 同时只处理你这一个对话窗口\n\n你是不是把我当成某个真人客服了？或者@错人了？🤔\n\n还有登录问题需要解决吗？随时叫我！👋"
+        },
+        {
+          "sender": "自己",
+          "text": "1aayaua5aapangaaaaa~"
+        }
+      ],
+      "latency_ms": 8688.7,
+      "error": null
+    },
+    "local": {
+      "chat_name": "王老板们和小天才（5)",
+      "chat_list": [
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "是不是忙着切号呢"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈误会啦！ 我是**Al 助手**，不是真人 客服～ 不存在\"切号\"这种操作： 我没有微信号，也不是 Qian 回复速度取决于网络/服务器负载 ◎ 同时只处理你这一个对话窗口 你是不是把我当成某个真人客服了？或者@错 人了？ 还有登录问题需要解决吗？随时叫我！"
+        },
+        {
+          "sender": "自己",
+          "text": "laayaua5aapangaaaaa~"
+        }
+      ],
+      "latency_ms": 2941.6,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.2,
+      "overall_score": 0.36
+    },
+    "vs_local": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 1.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.2,
+      "overall_score": 0.66
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_021.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "王老板们和小天才 (5)",
+      "chat_list": [
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "是不是忙着切号呢"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈误会啦！😂 我是 **AI 助手**，不是真人客服～\n\n不存在\"切号\"这种操作：\n• 🤖 我没有微信号，也不是 Qian\n• ⚡ 回复速度取决于网络/服务器负载\n• 🎯 同时只处理你这一个对话窗口\n\n你是不是把我当成某个真人客服了？或者@错人了？🤔\n\n还有登录问题需要解决吗？随时叫我！👋"
+        },
+        {
+          "sender": "自己",
+          "text": "1aayaua5aapangaaaaa~"
+        }
+      ],
+      "latency_ms": 8070.3,
+      "error": null
+    },
+    "local": {
+      "chat_name": "王老板们和小天才（5)",
+      "chat_list": [
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "是不是忙着切号呢"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈误会啦！ 我是**Al 助手**，不是真人 客服～ 不存在\"切号\"这种操作： 我没有微信号，也不是 Qian 回复速度取决于网络/服务器负载 ◎ 同时只处理你这一个对话窗口 你是不是把我当成某个真人客服了？或者@错 人了？ 还有登录问题需要解决吗？随时叫我！"
+        },
+        {
+          "sender": "自己",
+          "text": "laayaua5aapangaaaaa~"
+        }
+      ],
+      "latency_ms": 3313.3,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.2,
+      "overall_score": 0.36
+    },
+    "vs_local": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 1.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.2,
+      "overall_score": 0.66
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_022.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "王老板们和小天才 (5)",
+      "chat_list": [
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "是不是忙着切号呢"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈误会啦！😂 我是 **AI 助手**，不是真人客服～\n\n不存在\"切号\"这种操作：\n• 🤖 我没有微信号，也不是 Qian\n• ⚡ 回复速度取决于网络/服务器负载\n• 🎯 同时只处理你这一个对话窗口\n\n你是不是把我当成某个真人客服了？或者@错人了？🤔\n\n还有登录问题需要解决吗？随时叫我！👋"
+        },
+        {
+          "sender": "自己",
+          "text": "1aayaua5aapangaaaaa~"
+        }
+      ],
+      "latency_ms": 8874.4,
+      "error": null
+    },
+    "local": {
+      "chat_name": "王老板们和小天才（5)",
+      "chat_list": [
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "是不是忙着切号呢"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈误会啦！ 我是**Al 助手**，不是真人 客服～ 不存在\"切号\"这种操作： 我没有微信号，也不是 Qian 回复速度取决于网络/服务器负载 ◎ 同时只处理你这一个对话窗口 你是不是把我当成某个真人客服了？或者@错 人了？ 还有登录问题需要解决吗？随时叫我！"
+        },
+        {
+          "sender": "自己",
+          "text": "laayaua5aapangaaaaa~"
+        }
+      ],
+      "latency_ms": 2907.7,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.2,
+      "overall_score": 0.36
+    },
+    "vs_local": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 1.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.2,
+      "overall_score": 0.66
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/legacy/errors/error_20260414_023.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "王老板们和小天才 (5)",
+      "chat_list": [
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "是不是忙着切号呢"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈误会啦！😂 我是 **AI 助手**，不是真人客服～\n\n不存在\"切号\"这种操作：\n• 🤖 我没有微信号，也不是 Qian\n• ⚡ 回复速度取决于网络/服务器负载\n• 🎯 同时只处理你这一个对话窗口\n\n你是不是把我当成某个真人客服了？或者@错人了？🤔\n\n还有登录问题需要解决吗？随时叫我！👋"
+        },
+        {
+          "sender": "对方",
+          "text": "1aayaua5aapangaaaaa~"
+        }
+      ],
+      "latency_ms": 8158.0,
+      "error": null
+    },
+    "local": {
+      "chat_name": "王老板们和小天才（5)",
+      "chat_list": [
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "是不是忙着切号呢"
+        },
+        {
+          "sender": "自己",
+          "text": "哈哈误会啦！ 我是**Al 助手**，不是真人 客服～ 不存在\"切号\"这种操作： 我没有微信号，也不是 Qian 回复速度取决于网络/服务器负载 ◎ 同时只处理你这一个对话窗口 你是不是把我当成某个真人客服了？或者@错 人了？ 还有登录问题需要解决吗？随时叫我！"
+        },
+        {
+          "sender": "自己",
+          "text": "laayaua5aapangaaaaa~"
+        }
+      ],
+      "latency_ms": 3016.6,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 0.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.2,
+      "overall_score": 0.36
+    },
+    "vs_local": {
+      "chat_name_match": false,
+      "chat_list_nickname_iou": 1.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.2,
+      "overall_score": 0.66
+    }
+  }
+]

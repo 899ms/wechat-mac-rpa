@@ -15,16 +15,24 @@ from typing import Any, Dict, List, Optional
 
 @dataclass
 class TickDebugInfo:
-    """单个 tick 的完整调试信息。"""
+    """单个 tick 的完整调试信息 —— 每个模块的输入输出都要记录。"""
 
     tick_id: int = 0
     timestamp: str = ""
     screenshot_path: str = ""
 
-    # Layer 0: OCR
+    # ===== Layer 0: Perception 输入输出 =====
+    # 输入
+    perception_screenshot_path: str = ""
+    # 输出
+    perception_chat_name: str = ""
+    perception_messages_count: int = 0
+    perception_chat_list_count: int = 0
+
+    # Layer 0.1: OCR（本地路径时填充）
     ocr_elements: List[Dict[str, Any]] = field(default_factory=list)
 
-    # Layer 1: Layout
+    # Layer 0.2: Layout（本地路径时填充）
     layout_left_elements: List[Dict[str, Any]] = field(default_factory=list)
     layout_right_elements: List[Dict[str, Any]] = field(default_factory=list)
     layout_title_elements: List[Dict[str, Any]] = field(default_factory=list)
@@ -36,11 +44,27 @@ class TickDebugInfo:
     layout_message_candidates: List[Dict[str, Any]] = field(default_factory=list)
     layout_self_bubbles: List[Dict[str, Any]] = field(default_factory=list)
 
-    # Layer 2: Extraction
+    # Layer 0.3: Extraction
     extraction_clusters: List[Dict[str, Any]] = field(default_factory=list)
     extraction_messages: List[Dict[str, Any]] = field(default_factory=list)
 
-    # Layer 3: Bot Decision
+    # Layer 0.4: API（API 路径时填充）
+    api_prompt: str = ""
+    api_response: str = ""
+    api_chat_list: List[Dict[str, Any]] = field(default_factory=list)
+
+    # Layer 0.5: Reply Generator（LLM 回复生成）
+    reply_system_prompt: str = ""
+    reply_user_prompt: str = ""
+    reply_raw_response: str = ""
+
+    # ===== Layer 1: Session 输入输出 =====
+    session_input_chat_name: str = ""
+    session_input_messages: List[Dict[str, Any]] = field(default_factory=list)
+    session_output_unreplied: List[Dict[str, Any]] = field(default_factory=list)
+    session_total_stored: int = 0
+
+    # ===== Layer 2: Bot Decision 输入输出 =====
     bot_chat_name: str = ""
     bot_new_messages_count: int = 0
     bot_should_reply: bool = False
@@ -49,9 +73,11 @@ class TickDebugInfo:
     bot_switch_target: str = ""
     bot_switch_reason: str = ""
 
-    # Layer 4: Action
-    action: str = ""  # "send:<text>" / "switch:<chat>" / "none"
-    action_error: str = ""
+    # ===== Layer 3: Action 输入输出 =====
+    action: str = ""  # "send" / "switch" / "none"
+    action_input: str = ""  # 发送的文本 / 切换的目标
+    action_result_success: bool = False
+    action_result_error: str = ""
 
 
 class DebugLogger:
@@ -187,8 +213,45 @@ class DebugLogger:
         self.current.bot_switch_target = switch_target
         self.current.bot_switch_reason = switch_reason
 
-    def log_action(self, action: str, error: str = "") -> None:
+    def log_action(
+        self,
+        action: str = "",
+        action_input: str = "",
+        success: bool = False,
+        error: str = "",
+    ) -> None:
+        """记录 Action 层的完整输入输出。"""
         if self.current is None:
             return
         self.current.action = action
-        self.current.action_error = error
+        self.current.action_input = action_input
+        self.current.action_result_success = success
+        self.current.action_result_error = error
+
+    def log_session(
+        self,
+        input_chat_name: str = "",
+        input_messages: list = None,
+        output_unreplied: list = None,
+        total_stored: int = 0,
+    ) -> None:
+        """记录 Session 层的输入输出。"""
+        if self.current is None:
+            return
+        self.current.session_input_chat_name = input_chat_name
+        self.current.session_input_messages = input_messages or []
+        self.current.session_output_unreplied = output_unreplied or []
+        self.current.session_total_stored = total_stored
+
+    def log_perception_output(
+        self,
+        chat_name: str = "",
+        messages_count: int = 0,
+        chat_list_count: int = 0,
+    ) -> None:
+        """记录 Perception 层的输出。"""
+        if self.current is None:
+            return
+        self.current.perception_chat_name = chat_name
+        self.current.perception_messages_count = messages_count
+        self.current.perception_chat_list_count = chat_list_count

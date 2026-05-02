@@ -306,6 +306,89 @@ class TestVisionPipelineRealScreenshots:
                 f"消息[{i}] 不匹配: 期望 {exp['text']!r}, 实际 {actual.text!r}"
             )
 
+    def test_regression_unread_badge_39_not_misclassified_as_nickname(self):
+        """回归测试：两位数未读角标 '39' 不应被误判为昵称。
+
+        背景：面积阈值分割（<1000 为角标，>=1000 为昵称）对两位数未读
+        可能产生误判（两位数角标面积接近阈值）。此测试确保 '39' 被正确
+        识别为未读角标，且不会混入昵称列表。
+        """
+        result = run_fixture("regression_unread_badge_39_20260421")
+        assert result is not None
+
+        # 断言 1：'39' 被正确识别为未读角标
+        unread_items = {
+            item.nickname: item.unread_count for item in result.chat_list_items
+        }
+        assert unread_items.get("王老板们和小天才") == "39", (
+            f"'王老板们和小天才' 未读应为 '39', 实际: {unread_items!r}"
+        )
+
+        # 断言 2：'39' 没有被误判为昵称
+        nicknames = [item.nickname for item in result.chat_list_items]
+        assert "39" not in nicknames, (
+            f"'39' 被误判为昵称之一: {nicknames!r}"
+        )
+
+        # 断言 3：其他聊天不应有未读
+        assert unread_items.get("王芊 @ai开发小分..") == "", (
+            f"当前聊天不应有未读: {unread_items!r}"
+        )
+
+    @pytest.mark.xfail(reason="聊天列表昵称被头像数字/符号污染，需修复 OCR 合并问题", strict=False)
+    def test_regression_chat_list_nickname_not_polluted_by_avatar_digits(self):
+        """回归测试：聊天列表昵称不应被头像数字/符号污染。
+
+        tick_14 真实案例：左侧聊天列表中，
+        - 头像区域有数字/符号被 OCR 识别并合并进昵称
+        - 实际昵称 '王芊 @ai开发小分队' 被污染为 'b io 王芊 @ai开发小分队'
+        - 实际昵称 '王芊' 被污染为 '品 王芊'
+
+        当前行为：昵称被污染（测试会失败，修复后通过）
+        期望行为：昵称正确提取，不受头像数字干扰
+        """
+        result = run_fixture("regression_chat_list_pollution_20260421")
+        assert result is not None
+        assert result.chat_name == "王芊 @ai开发小分队"
+
+        nicknames = [item.nickname for item in result.chat_list_items]
+
+        # 核心断言 1：头像数字污染不应混入昵称
+        # 'b io' 是头像区域的 OCR 噪声，不应出现在昵称中
+        assert "b io 王芊 @ai开发小分队" not in nicknames, (
+            f"头像数字污染 'b io' 被合并进昵称: {nicknames!r}"
+        )
+        # '品' 也是头像区域的 OCR 噪声
+        assert "品 王芊" not in nicknames, (
+            f"头像符号污染 '品' 被合并进昵称: {nicknames!r}"
+        )
+
+        # 核心断言 2：正确的昵称必须被识别
+        assert any(
+            "王芊 @ai开发小分队" in nick for nick in nicknames
+        ), f"未找到正确昵称 '王芊 @ai开发小分队': {nicknames!r}"
+        assert any(
+            "王芊" == nick or nick.endswith("王芊") for nick in nicknames
+        ), f"未找到正确昵称 '王芊': {nicknames!r}"
+
+        # 核心断言 3：未读角标正确检测
+        unread_items = {
+            item.nickname: item.unread_count for item in result.chat_list_items
+        }
+        # 腾讯新闻有未读 1
+        assert unread_items.get("腾讯新闻") == "1", (
+            f"腾讯新闻 未读检测失败: {unread_items!r}"
+        )
+
+        # 核心断言 4：消息提取完整且 sender_type 正确
+        assert len(result.messages) == 8, (
+            f"消息数量应为 8, 实际: {len(result.messages)}"
+        )
+        self_msgs = [m for m in result.messages if m.sender_type == SenderType.SELF]
+        other_msgs = [m for m in result.messages if m.sender_type == SenderType.OTHER]
+        assert len(self_msgs) == 3, f"自己消息应为 3 条, 实际: {len(self_msgs)}"
+        assert len(other_msgs) == 5, f"对方消息应为 5 条, 实际: {len(other_msgs)}"
+
     def test_real_chat_current_group_at_mentions(self):
         """当前群聊截图：验证 @提及 识别、多轮对话、绿色气泡正确性"""
         result = run_fixture("real_chat_current")

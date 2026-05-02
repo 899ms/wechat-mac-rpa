@@ -102,6 +102,24 @@
 {"ts":"2026-04-15T09:12:38.567890","event":"exception","tick_id":42,"phase":"ocr","exception_type":"VisionError","exception_msg":"...","traceback":"..."}
 ```
 
+#### `smart_pipeline_skip`
+```json
+{"ts":"2026-04-15T09:12:34.567890","event":"smart_pipeline_skip","tick_id":42,"reason":"pixel_diff","diff_ratio":0.0012,"threshold":0.005,"skip_count":86,"api_count":7}
+```
+触发条件：像素差异 < 阈值，跳过 API 调用。
+
+#### `smart_pipeline_api_call`
+```json
+{"ts":"2026-04-15T09:12:35.567890","event":"smart_pipeline_api_call","tick_id":42,"model":"qwen3.5-flash","latency_ms":3250,"success":true,"messages_count":3,"chat_list_count":5}
+```
+触发条件：像素差异 >= 阈值，调用 qwen3.5-flash API。
+
+#### `smart_pipeline_fallback`
+```json
+{"ts":"2026-04-15T09:12:37.567890","event":"smart_pipeline_fallback","tick_id":42,"reason":"api_empty_response","fallback_count":1,"local_messages_count":2}
+```
+触发条件：API 返回空或失败，回退到本地消息提取。
+
 ### 3.4 BotLogger 接口
 
 ```python

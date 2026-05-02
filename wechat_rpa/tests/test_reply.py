@@ -31,19 +31,6 @@ class TestReplyPolicy:
         )
         assert policy.should_reply(msg, session) is False
 
-    def test_other_message_in_cooldown_returns_false(self):
-        import time
-        policy = ReplyPolicy()
-        session = ChatSession(chat_id="c1", chat_name="Friend")
-        session.last_reply_time = time.time()  # now => cooldown active
-        msg = ChatMessage(
-            text="hello",
-            sender="friend",
-            sender_type=SenderType.OTHER,
-            chat_name="Friend",
-        )
-        assert policy.should_reply(msg, session) is False
-
     def test_group_chat_without_at_returns_false(self):
         policy = ReplyPolicy(require_at_in_group=True)
         session = ChatSession(chat_id="c1", chat_name="Group (3)")
@@ -83,27 +70,25 @@ class TestReplyPolicy:
 class TestReplyGenerator:
     def test_returns_non_empty_string(self):
         gen = ReplyGenerator(llm_client=None)
-        session = ChatSession(chat_id="c1", chat_name="Alice")
         msg = ChatMessage(
             text="hello",
             sender="Alice",
             sender_type=SenderType.OTHER,
             chat_name="Alice",
         )
-        reply = gen.generate(msg, session)
+        reply = gen.generate(msg, [msg])
         assert isinstance(reply, str)
         assert len(reply) > 0
 
     def test_handles_none_llm_client_gracefully(self):
         gen = ReplyGenerator(llm_client=None)
-        session = ChatSession(chat_id="c1", chat_name="Alice")
         msg = ChatMessage(
             text="hello",
             sender="Alice",
             sender_type=SenderType.OTHER,
             chat_name="Alice",
         )
-        reply = gen.generate(msg, session)
+        reply = gen.generate(msg, [msg])
         assert isinstance(reply, str)
         assert len(reply) <= 50
 
@@ -113,12 +98,11 @@ class TestReplyGenerator:
                 raise RuntimeError("LLM down")
 
         gen = ReplyGenerator(llm_client=FailingLLM())
-        session = ChatSession(chat_id="c1", chat_name="Alice")
         msg = ChatMessage(
             text="hello",
             sender="Alice",
             sender_type=SenderType.OTHER,
             chat_name="Alice",
         )
-        reply = gen.generate(msg, session)
+        reply = gen.generate(msg, [msg])
         assert reply == "收到"

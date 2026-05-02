@@ -44,19 +44,26 @@ class WeChatMessageSender(MessageSender):
         """
         try:
             # 1. 确保微信窗口在前台，防止消息发到其他应用
-            subprocess.run(
+            r1 = subprocess.run(
                 ["osascript", "-e", 'tell application "WeChat" to activate'],
                 timeout=3,
                 capture_output=True,
             )
+            if r1.returncode != 0:
+                err = r1.stderr.decode("utf-8", errors="replace") if r1.stderr else "unknown"
+                return ActionResult(success=False, error=f"激活微信失败: {err}")
             time.sleep(0.1)
 
             # 2. 复制消息到剪贴板
-            subprocess.run(
+            r2 = subprocess.run(
                 ["pbcopy"],
                 input=text.encode("utf-8"),
                 timeout=2,
+                capture_output=True,
             )
+            if r2.returncode != 0:
+                err = r2.stderr.decode("utf-8", errors="replace") if r2.stderr else "unknown"
+                return ActionResult(success=False, error=f"复制剪贴板失败: {err}")
             time.sleep(0.15)
 
             # 3. 粘贴并发送
@@ -70,11 +77,14 @@ class WeChatMessageSender(MessageSender):
                     end tell
                 end tell
             """
-            subprocess.run(
+            r3 = subprocess.run(
                 ["osascript", "-e", script],
                 timeout=5,
                 capture_output=True,
             )
+            if r3.returncode != 0:
+                err = r3.stderr.decode("utf-8", errors="replace") if r3.stderr else "unknown"
+                return ActionResult(success=False, error=f"粘贴发送失败: {err}")
 
             return ActionResult(success=True, sent_text=text)
         except Exception as e:

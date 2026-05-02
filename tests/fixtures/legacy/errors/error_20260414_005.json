@@ -7,6 +7,12 @@
   ],
   "messages": [
     {
+      "sender": "自己",
+      "sender_type": "self",
+      "text": "1",
+      "check": "exact"
+    },
+    {
       "sender": "对方",
       "sender_type": "other",
       "text": "你是人工回复的吗",

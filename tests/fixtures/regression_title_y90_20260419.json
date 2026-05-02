@@ -1,0 +1,19 @@
+{
+  "chat_name": "王芊 @ai开发小分队",
+  "chat_list": [
+    {"nickname": "文件传输助手", "unread_count": ""},
+    {"nickname": "腾讯新闻", "unread_count": "1"},
+    {"nickname": "王芊", "unread_count": ""},
+    {"nickname": "W1han", "unread_count": ""},
+    {"nickname": "王芊 @ai开发小...", "unread_count": ""},
+    {"nickname": "王老板们和小天才", "unread_count": ""}
+  ],
+  "messages": [
+    {"sender": "自己", "text": "已经修好了，你试试看，还有问题随时说。"},
+    {"sender": "对方", "text": "OK"},
+    {"sender": "自己", "text": "收到👌有需要随时喊我"},
+    {"sender": "对方", "text": "什么需要的时候可以叫你"},
+    {"sender": "自己", "text": "收到，L000 已收到。有什么需要我处理的吗？"},
+    {"sender": "自己", "text": "有问必答，随时待命。遇到问题、想聊天或需要帮忙时@我就行。"}
+  ]
+}

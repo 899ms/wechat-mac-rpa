@@ -156,6 +156,56 @@ if confidence > 0.9:
 
 ---
 
+## 红线 9：关键路径必须留痕（日志即证据）
+
+**每个可能导致"为什么跳过/为什么执行"的决策点，必须留下结构化日志。**
+
+❌ 错误：
+```python
+if diff < threshold:
+    return None   # 静默跳过，无从排查
+
+result = api_call(image)   # 成功/失败都不记录
+messages = convert(result)  # 转换前后数量对不上，不知道在哪丢的
+```
+
+✅ 正确：
+```python
+_logger.info(
+    f"[SmartPipeline] 像素差异: {diff:.6f} "
+    f"(阈值={threshold}), 决策={'跳过API' if skip else '调用API'}"
+)
+if skip:
+    _logger.info(f"[SmartPipeline] 本地跳过统计: skip={skip_count}, api={api_count}")
+    return None
+
+t0 = time.time()
+try:
+    result = api_call(image)
+    _logger.info(f"[SmartPipeline] API成功: latency={(time.time()-t0)*1000:.0f}ms, msgs={len(result)}")
+except Exception as e:
+    _logger.error(f"[SmartPipeline] API失败({(time.time()-t0)*1000:.0f}ms): {e}")
+    return fallback(image)
+
+messages = convert(result)
+_logger.info(f"[SmartPipeline] 消息转换: input={len(result)} → output={len(messages)}")
+for i, m in enumerate(messages):
+    _logger.debug(f"  msg[{i}] sender={m.sender} text='{m.text[:40]}...'")
+```
+
+**日志规范 checklist：**
+1. **决策点必记录**：任何 if/else 分支，特别是"跳过"路径
+2. **外部调用必记录**：API 调用前后（开始时间、结束时间、latency、成功/失败）
+3. **数据转换必记录**：输入数量 vs 输出数量（方便定位丢数据的位置）
+4. **统计信息定期记录**：累计 skip 率、API 调用次数、fallback 次数
+5. **使用结构化前缀**：`[模块名] ` 前缀，方便 grep 过滤
+6. **关键数据脱敏预览**：文本内容记录前 40 字预览，不要记录完整消息（隐私）
+7. **异常必须带上下文**：不只是 `logger.error(e)`，要包含当时的决策参数
+
+**为什么重要**：当线上出现"为什么这条消息没有触发回复"或"为什么多回复了一次"时，没有日志只能猜，有日志 30 秒内定位。
+
+---
+
 ## 历史教训
 
 ### 教训 1：`_is_likely_nickname` 误杀短消息

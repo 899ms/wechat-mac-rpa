@@ -1,0 +1,347 @@
+{
+  "wechat_20260417_001404": {
+    "filename": "wechat_20260417_001404_20260417_001404_416.png",
+    "need_api": true,
+    "reason": "new_message_or_window_switch"
+  },
+  "wechat_20260417_001411": {
+    "filename": "wechat_20260417_001411_20260417_001411_359.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001418": {
+    "filename": "wechat_20260417_001418_20260417_001418_216.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001425": {
+    "filename": "wechat_20260417_001425_20260417_001425_104.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001431": {
+    "filename": "wechat_20260417_001431_20260417_001431_987.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001438": {
+    "filename": "wechat_20260417_001438_20260417_001438_857.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001445": {
+    "filename": "wechat_20260417_001445_20260417_001445_725.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001452": {
+    "filename": "wechat_20260417_001452_20260417_001452_584.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001459": {
+    "filename": "wechat_20260417_001459_20260417_001459_449.png",
+    "need_api": true,
+    "reason": "new_message_or_window_switch"
+  },
+  "wechat_20260417_001508": {
+    "filename": "wechat_20260417_001508_20260417_001508_517.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001517": {
+    "filename": "wechat_20260417_001517_20260417_001517_591.png",
+    "need_api": true,
+    "reason": "new_message_or_window_switch"
+  },
+  "wechat_20260417_001526": {
+    "filename": "wechat_20260417_001526_20260417_001526_796.png",
+    "need_api": true,
+    "reason": "new_message_or_window_switch"
+  },
+  "wechat_20260417_001541": {
+    "filename": "wechat_20260417_001541_20260417_001541_582.png",
+    "need_api": true,
+    "reason": "new_message_or_window_switch"
+  },
+  "wechat_20260417_001551": {
+    "filename": "wechat_20260417_001551_20260417_001551_597.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001601": {
+    "filename": "wechat_20260417_001601_20260417_001601_620.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001611": {
+    "filename": "wechat_20260417_001611_20260417_001611_651.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001621": {
+    "filename": "wechat_20260417_001621_20260417_001621_678.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001631": {
+    "filename": "wechat_20260417_001631_20260417_001631_712.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001641": {
+    "filename": "wechat_20260417_001641_20260417_001641_745.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001651": {
+    "filename": "wechat_20260417_001651_20260417_001651_804.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001701": {
+    "filename": "wechat_20260417_001701_20260417_001701_852.png",
+    "need_api": true,
+    "reason": "new_message_or_window_switch"
+  },
+  "wechat_20260417_001712": {
+    "filename": "wechat_20260417_001712_20260417_001712_147.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001725": {
+    "filename": "wechat_20260417_001725_20260417_001725_592.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001735": {
+    "filename": "wechat_20260417_001735_20260417_001735_935.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001746": {
+    "filename": "wechat_20260417_001746_20260417_001746_258.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001756": {
+    "filename": "wechat_20260417_001756_20260417_001756_797.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001807": {
+    "filename": "wechat_20260417_001807_20260417_001807_408.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001818": {
+    "filename": "wechat_20260417_001818_20260417_001818_043.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001828": {
+    "filename": "wechat_20260417_001828_20260417_001828_702.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001839": {
+    "filename": "wechat_20260417_001839_20260417_001839_356.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001850": {
+    "filename": "wechat_20260417_001850_20260417_001850_024.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001900": {
+    "filename": "wechat_20260417_001900_20260417_001900_571.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001911": {
+    "filename": "wechat_20260417_001911_20260417_001911_040.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001921": {
+    "filename": "wechat_20260417_001921_20260417_001921_449.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001931": {
+    "filename": "wechat_20260417_001931_20260417_001931_977.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001942": {
+    "filename": "wechat_20260417_001942_20260417_001942_552.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_001953": {
+    "filename": "wechat_20260417_001953_20260417_001953_138.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002003": {
+    "filename": "wechat_20260417_002003_20260417_002003_712.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002014": {
+    "filename": "wechat_20260417_002014_20260417_002014_325.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002028": {
+    "filename": "wechat_20260417_002028_20260417_002028_330.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002038": {
+    "filename": "wechat_20260417_002038_20260417_002038_968.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002052": {
+    "filename": "wechat_20260417_002052_20260417_002052_943.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002103": {
+    "filename": "wechat_20260417_002103_20260417_002103_570.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002114": {
+    "filename": "wechat_20260417_002114_20260417_002114_527.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002125": {
+    "filename": "wechat_20260417_002125_20260417_002125_260.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002136": {
+    "filename": "wechat_20260417_002136_20260417_002136_494.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002147": {
+    "filename": "wechat_20260417_002147_20260417_002147_403.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002158": {
+    "filename": "wechat_20260417_002158_20260417_002158_610.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002209": {
+    "filename": "wechat_20260417_002209_20260417_002209_408.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002220": {
+    "filename": "wechat_20260417_002220_20260417_002220_719.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002231": {
+    "filename": "wechat_20260417_002231_20260417_002231_698.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002242": {
+    "filename": "wechat_20260417_002242_20260417_002242_663.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002253": {
+    "filename": "wechat_20260417_002253_20260417_002253_575.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002304": {
+    "filename": "wechat_20260417_002304_20260417_002304_484.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002315": {
+    "filename": "wechat_20260417_002315_20260417_002315_369.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002326": {
+    "filename": "wechat_20260417_002326_20260417_002326_263.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002337": {
+    "filename": "wechat_20260417_002337_20260417_002337_150.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002347": {
+    "filename": "wechat_20260417_002347_20260417_002347_990.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002358": {
+    "filename": "wechat_20260417_002358_20260417_002358_859.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002409": {
+    "filename": "wechat_20260417_002409_20260417_002409_735.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002420": {
+    "filename": "wechat_20260417_002420_20260417_002420_599.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002431": {
+    "filename": "wechat_20260417_002431_20260417_002431_388.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002442": {
+    "filename": "wechat_20260417_002442_20260417_002442_111.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002453": {
+    "filename": "wechat_20260417_002453_20260417_002453_154.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002504": {
+    "filename": "wechat_20260417_002504_20260417_002504_039.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002514": {
+    "filename": "wechat_20260417_002514_20260417_002514_943.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002525": {
+    "filename": "wechat_20260417_002525_20260417_002525_649.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002536": {
+    "filename": "wechat_20260417_002536_20260417_002536_628.png",
+    "need_api": false,
+    "reason": "no_change"
+  },
+  "wechat_20260417_002547": {
+    "filename": "wechat_20260417_002547_20260417_002547_285.png",
+    "need_api": false,
+    "reason": "no_change"
+  }
+}

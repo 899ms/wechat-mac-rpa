@@ -24,3 +24,8 @@ data/logs/
 # 运行时生成的数据
 data/logs/
 data/screenshots/
+
+# 敏感配置
+.env
+*.env
+!.env.example

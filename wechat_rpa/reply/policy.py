@@ -18,15 +18,12 @@ class ReplyPolicy:
         决策逻辑：
         1. 自己消息 → False
         2. 系统消息 → False
-        3. 冷却期内同一聊天 → False
-        4. 群聊且未@我 → False（仅在 require_at_in_group=True 时生效）
-        5. 其他 → True
+        3. 群聊且未@我 → False（仅在 require_at_in_group=True 时生效）
+        4. 其他 → True
         """
         if msg.sender_type == SenderType.SELF:
             return False
         if msg.sender_type == SenderType.SYSTEM:
-            return False
-        if session.is_in_cooldown():
             return False
         if self.require_at_in_group and self._is_group_chat(msg.chat_name) and not msg.is_at_me:
             return False

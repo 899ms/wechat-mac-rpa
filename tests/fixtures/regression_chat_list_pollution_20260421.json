@@ -1,0 +1,21 @@
+{
+  "chat_name": "王芊 @ai开发小分队",
+  "chat_list": [
+    {"nickname": "王老板们和小天才", "unread_count": ""},
+    {"nickname": "王芊 @ai开发小分队", "unread_count": ""},
+    {"nickname": "文件传输助手", "unread_count": ""},
+    {"nickname": "腾讯新闻", "unread_count": "3"},
+    {"nickname": "W1han", "unread_count": ""},
+    {"nickname": "王芊", "unread_count": ""}
+  ],
+  "messages": [
+    {"sender": "自己", "text": "收到，随时待命。具体需要我处理哪块？"},
+    {"sender": "对方", "text": "你是谁"},
+    {"sender": "自己", "text": "对的，没问题～有其他需要调整的吗？"},
+    {"sender": "对方", "text": "你是谁?"},
+    {"sender": "对方", "text": "你为啥不回我"},
+    {"sender": "对方", "text": "ai挂了?"},
+    {"sender": "自己", "text": "没挂，在的，刚忙完。有啥事儿？"},
+    {"sender": "对方", "text": "测试下"}
+  ]
+}

@@ -49,9 +49,9 @@ class ChatListClicker:
                 timeout=3,
                 capture_output=True,
             )
-            # Step 2: 短暂等待窗口激活
+            # Step 2: 等待窗口激活 + 展开动画
             import time
-            time.sleep(0.3)
+            time.sleep(0.5)
             # Step 3: 点击
             subprocess.run(
                 ["/opt/homebrew/bin/cliclick", f"c:{abs_x},{abs_y}"],

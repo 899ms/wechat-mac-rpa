@@ -1,0 +1,578 @@
+[
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/regression_chat_list_pollution_20260421.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "王芊 @ai开发小分队",
+      "chat_list": [
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": "3"
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "自己",
+          "text": "收到，随时待命。具体需要我处理哪块？"
+        },
+        {
+          "sender": "对方",
+          "text": "你是谁"
+        },
+        {
+          "sender": "自己",
+          "text": "对的，没问题～有其他需要调整的吗？"
+        },
+        {
+          "sender": "对方",
+          "text": "你是谁?"
+        },
+        {
+          "sender": "对方",
+          "text": "你为啥不回我"
+        },
+        {
+          "sender": "自己",
+          "text": "ai挂了？"
+        },
+        {
+          "sender": "对方",
+          "text": "没挂，在的，刚忙完。有啥事儿？"
+        },
+        {
+          "sender": "自己",
+          "text": "测试下"
+        }
+      ],
+      "latency_ms": 4610.0,
+      "error": null
+    },
+    "local": {
+      "chat_name": "王芊 @ai开发小分队",
+      "chat_list": [
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "b io 王芊 @ai开发小分队",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": "1"
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "品 王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "自己",
+          "text": "收到，随时待命。具体需要我处理哪块？"
+        },
+        {
+          "sender": "对方",
+          "text": "你是谁"
+        },
+        {
+          "sender": "自己",
+          "text": "对的，没问题～有其他需要调整的吗？"
+        },
+        {
+          "sender": "对方",
+          "text": "你是谁？"
+        },
+        {
+          "sender": "对方",
+          "text": "你为啥不回我"
+        },
+        {
+          "sender": "对方",
+          "text": "ai挂了？"
+        },
+        {
+          "sender": "自己",
+          "text": "没挂，在的，刚忙完。有啥事儿？"
+        },
+        {
+          "sender": "对方",
+          "text": "测试下"
+        }
+      ],
+      "latency_ms": 2078.9,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.833,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.778,
+      "overall_score": 0.87
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.571,
+      "chat_list_unread_accuracy": 0.75,
+      "messages_text_iou": 0.778,
+      "overall_score": 0.7
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/regression_input_y_min_1602_20260420.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "王芊 @ai开发小分队",
+      "chat_list": [
+        {
+          "nickname": "王芊 @ai开发小分队",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "测试下"
+        },
+        {
+          "sender": "对方",
+          "text": "正常吗"
+        },
+        {
+          "sender": "自己",
+          "text": "得看具体场景～是指token数、调用次数还是价格？"
+        },
+        {
+          "sender": "对方",
+          "text": "收到"
+        },
+        {
+          "sender": "对方",
+          "text": "好了吗"
+        },
+        {
+          "sender": "自己",
+          "text": "正常，具体哪方面？"
+        },
+        {
+          "sender": "对方",
+          "text": "所有方面"
+        },
+        {
+          "sender": "对方",
+          "text": "你帮我看看"
+        }
+      ],
+      "latency_ms": 6028.2,
+      "error": null
+    },
+    "local": {
+      "chat_name": "王芊 @ai开发小分队",
+      "chat_list": [
+        {
+          "nickname": "王芊 @ai开发小分队",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "测试下"
+        },
+        {
+          "sender": "对方",
+          "text": "正常吗"
+        },
+        {
+          "sender": "自己",
+          "text": "得看具体场景～是指 token数、调用次数还是 价格？"
+        },
+        {
+          "sender": "自己",
+          "text": "收到"
+        },
+        {
+          "sender": "对方",
+          "text": "好了吗"
+        },
+        {
+          "sender": "自己",
+          "text": "】正常，具体哪方面？"
+        },
+        {
+          "sender": "对方",
+          "text": "所有方面"
+        },
+        {
+          "sender": "对方",
+          "text": "你帮我看下"
+        }
+      ],
+      "latency_ms": 1384.1,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 1.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.778,
+      "overall_score": 0.926
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 1.0,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.455,
+      "overall_score": 0.818
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/regression_title_y90_20260419.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "王芊 @ai开发小分队",
+      "chat_list": [
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊 @ai开发小...",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "已经修好了，你试试看，还有问题随时说。"
+        },
+        {
+          "sender": "自己",
+          "text": "OK"
+        },
+        {
+          "sender": "对方",
+          "text": "收到 🤞 有需要随时喊我"
+        },
+        {
+          "sender": "自己",
+          "text": "什么需要的时候可以叫你"
+        },
+        {
+          "sender": "对方",
+          "text": "收到，L000 已收到。有什么需要我处理的吗？"
+        },
+        {
+          "sender": "自己",
+          "text": "有问必答，随时待命。遇到问题、想聊天或需要帮忙时@我就行。"
+        }
+      ],
+      "latency_ms": 5861.3,
+      "error": null
+    },
+    "local": {
+      "chat_name": "王芊 @ai开发小分队",
+      "chat_list": [
+        {
+          "nickname": "Q 搜索",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": "1"
+        },
+        {
+          "nickname": "石五 王芊",
+          "unread_count": "1000"
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊 @ai开发小.",
+          "unread_count": "1000"
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "自己",
+          "text": "已经修好了，你试试看，还有问题随时说。"
+        },
+        {
+          "sender": "对方",
+          "text": "OK"
+        },
+        {
+          "sender": "自己",
+          "text": "收到。有需要随时喊我"
+        },
+        {
+          "sender": "对方",
+          "text": "什么需要的时候可以叫你 明天还…"
+        },
+        {
+          "sender": "自己",
+          "text": "收到，L000 已收到。有什么需要我处理的 吗？"
+        },
+        {
+          "sender": "自己",
+          "text": "有问必答，随时待命。遇到问题、想聊天或需 要帮忙时@我就行。"
+        }
+      ],
+      "latency_ms": 1823.6,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 1.0,
+      "chat_list_unread_accuracy": 0.833,
+      "messages_text_iou": 0.714,
+      "overall_score": 0.849
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.444,
+      "chat_list_unread_accuracy": 0.75,
+      "messages_text_iou": 0.2,
+      "overall_score": 0.465
+    }
+  },
+  {
+    "image": "/Users/yihanwang/wechat-mac-rpa/tests/fixtures/regression_unread_badge_39_20260421.png",
+    "has_expected": true,
+    "qwen": {
+      "chat_name": "王芊 @ai开发小分队",
+      "chat_list": [
+        {
+          "nickname": "王芊 @ai开发小分队",
+          "unread_count": "42"
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": "3"
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": "39"
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "现在对了吗"
+        },
+        {
+          "sender": "自己",
+          "text": "收到，随时待命。具体需要我处理哪块？"
+        },
+        {
+          "sender": "对方",
+          "text": "你是谁"
+        },
+        {
+          "sender": "自己",
+          "text": "对的，没问题～有其他需要调整的吗？"
+        },
+        {
+          "sender": "对方",
+          "text": "你是谁?"
+        },
+        {
+          "sender": "自己",
+          "text": "你为啥不回我"
+        },
+        {
+          "sender": "对方",
+          "text": "ai挂了？"
+        },
+        {
+          "sender": "自己",
+          "text": "没挂，在的，刚忙完。有啥事儿？"
+        }
+      ],
+      "latency_ms": 6307.1,
+      "error": null
+    },
+    "local": {
+      "chat_name": "王芊 @ai开发小分队",
+      "chat_list": [
+        {
+          "nickname": "王芊 @ai开发小分..",
+          "unread_count": ""
+        },
+        {
+          "nickname": "文件传输助手",
+          "unread_count": ""
+        },
+        {
+          "nickname": "腾讯新闻",
+          "unread_count": ""
+        },
+        {
+          "nickname": "王老板们和小天才",
+          "unread_count": "39"
+        },
+        {
+          "nickname": "W1han",
+          "unread_count": ""
+        },
+        {
+          "nickname": "而品王芊",
+          "unread_count": ""
+        }
+      ],
+      "messages": [
+        {
+          "sender": "对方",
+          "text": "现在对了吗"
+        },
+        {
+          "sender": "自己",
+          "text": "收到，随时待命。具体需要我处理哪块？"
+        },
+        {
+          "sender": "对方",
+          "text": "你是谁"
+        },
+        {
+          "sender": "自己",
+          "text": "对的， 没问题～有其他需要调整的吗？"
+        },
+        {
+          "sender": "对方",
+          "text": "你是谁？"
+        },
+        {
+          "sender": "对方",
+          "text": "你为啥不回我"
+        },
+        {
+          "sender": "对方",
+          "text": "ai挂了？"
+        },
+        {
+          "sender": "自己",
+          "text": "没挂，在的，刚忙完。有啥事儿？"
+        }
+      ],
+      "latency_ms": 1621.3,
+      "error": null
+    },
+    "vs_expected": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.714,
+      "chat_list_unread_accuracy": 1.0,
+      "messages_text_iou": 0.778,
+      "overall_score": 0.831
+    },
+    "vs_local": {
+      "chat_name_match": true,
+      "chat_list_nickname_iou": 0.5,
+      "chat_list_unread_accuracy": 0.75,
+      "messages_text_iou": 0.6,
+      "overall_score": 0.617
+    }
+  }
+]

@@ -27,6 +27,12 @@
     {
       "sender": "对方",
       "sender_type": "other",
+      "text": "[图片]",
+      "check": "exact"
+    },
+    {
+      "sender": "对方",
+      "sender_type": "other",
       "text": "你能关灯么",
       "check": "exact"
     },
