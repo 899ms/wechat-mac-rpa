@@ -347,13 +347,11 @@ class ReplyGenerator:
 
                     # 空回复处理（LLM 返回空字符串或无效内容）
                     if force_no_tools:
-                        # 已经禁用了 tools，再 retry 也无法获取新信息，直接不回复
-                        print(f"[Hermes] force_no_tools 空回复 → 不回复")
+                        # 禁用 tools 后返回空，可能是 LLM 还在尝试调用工具
+                        # 继续外层 retry，给 LLM 一次基于已有信息直接回复的机会
+                        print(f"[Hermes] force_no_tools 空回复，继续 retry")
                         self.last_raw_response = f"[空回复且已禁用tools，attempt={attempt+1}]"
-                        self.last_llm_calls = llm_calls
-                        self.last_tool_calls = tool_calls
-                        self.last_generation_trace.extend(trace)
-                        return []
+                        break  # 跳出 while，进入下一次 retry
 
                     self.last_raw_response = f"[空回复，attempt={attempt+1}]"
                     break  # 跳出 while，进入下一次 retry
