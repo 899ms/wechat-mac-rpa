@@ -34,3 +34,6 @@ bot.pid
 .env
 *.env
 !.env.example
+
+# 运行时数据目录
+data/
