@@ -201,6 +201,14 @@ class WindowCapture:
             WeChatNotReadyError: 窗口尺寸异常，可能需要扫码登录
             CaptureValidationError: 截图内容验证失败
         """
+        # 每次调用生成新的输出路径，避免覆盖旧截图
+        # 这是 SmartPerceptionPipeline 像素 diff 正确工作的前提
+        import os
+        from datetime import datetime
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        pid = os.getpid()
+        self.output_path = f"/tmp/wechat_capture_{ts}_{pid}.png"
+
         result = self._find_window()
         if result is None:
             raise WindowNotFoundError("WeChat window not found")

@@ -192,6 +192,6 @@ class TestCleanReplyBehavior:
         raw = "让我想想，用户可能是在问天气，我应该直接回答。明天晴。"
         assert ReplyGenerator()._clean_reply(raw) == raw
 
-    def test_empty_returns_fallback(self):
-        assert ReplyGenerator()._clean_reply("") == "收到"
-        assert ReplyGenerator()._clean_reply("   ") == "收到"
+    def test_empty_returns_empty(self):
+        assert ReplyGenerator()._clean_reply("") == ""
+        assert ReplyGenerator()._clean_reply("   ") == ""

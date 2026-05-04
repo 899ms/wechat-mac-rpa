@@ -46,7 +46,8 @@ def _normalize_chat_name(name: str) -> str:
 
 class WeChatBot:
     def __init__(self, profile: LayoutProfile, on_message: Optional[Callable] = None, llm_client=None,
-                 complex_llm_client=None, debug_mode: bool = False, use_openclaw: bool = True, perception=None):
+                 complex_llm_client=None, debug_mode: bool = False, use_openclaw: bool = True, perception=None,
+                 enable_chat_switch: bool = True):
         if perception is not None:
             self.perception = perception
         else:
@@ -394,6 +395,8 @@ class WeChatBot:
 
         防抖：10 秒内不重复切换同一个目标，防止反复点击导致右侧折叠。
         """
+        if not getattr(self, 'enable_chat_switch', True):
+            return ""
         chat_list_items = result.chat_list_items
         if not chat_list_items:
             return ""

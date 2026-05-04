@@ -108,7 +108,7 @@ class TestBotIntegration:
         bot.perception.perceive.return_value = mock_result
 
         bot.generator = Mock()
-        bot.generator.generate.return_value = "在的"
+        bot.generator.generate.return_value = ["在的"]
 
         bot.sender = Mock()
         bot.sender.send.return_value = Mock(success=True)

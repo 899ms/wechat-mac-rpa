@@ -450,7 +450,7 @@ class TestBotFullPipeline:
         bot.perception.perceive.return_value = perception
 
         bot.generator = Mock()
-        bot.generator.generate.return_value = "测试群聊回复"
+        bot.generator.generate.return_value = ["测试群聊回复"]
 
         bot.sender = Mock()
         bot.sender.send.return_value = Mock(success=True)
@@ -461,7 +461,7 @@ class TestBotFullPipeline:
         # 但 Bot 应倒序找到最后一条可回复的 OTHER
         bot.generator.generate.assert_called_once()
         bot.sender.send.assert_called_once_with("测试群聊回复")
-        assert "王老板们和小天才（5）" in bot.sessions
+        assert "王老板们和小天才（5）" in bot.global_store.chats
 
     def test_bot_replies_to_private_last_other_message(self):
         """Bot 对私聊中最后一条对方消息产生回复"""
@@ -478,7 +478,7 @@ class TestBotFullPipeline:
         bot.perception.perceive.return_value = perception
 
         bot.generator = Mock()
-        bot.generator.generate.return_value = "测试私聊回复"
+        bot.generator.generate.return_value = ["测试私聊回复"]
 
         bot.sender = Mock()
         bot.sender.send.return_value = Mock(success=True)
@@ -500,7 +500,7 @@ class TestBotFullPipeline:
         bot.perception.perceive.return_value = perception
 
         bot.generator = Mock()
-        bot.generator.generate.return_value = "我可以帮你关灯"
+        bot.generator.generate.return_value = ["我可以帮你关灯"]
 
         bot.sender = Mock()
         bot.sender.send.return_value = Mock(success=True)
@@ -639,9 +639,9 @@ class TestBotFullPipeline:
             with patch("wechat_rpa.bot.wechat_bot.time.sleep"):
                 bot.tick()
 
-            # 应被调用两次：一次 tick 感知，一次 debug 验证感知
-            assert bot.perception.perceive.call_count == 2, (
-                f"debug 模式应执行两次感知，实际 {bot.perception.perceive.call_count} 次"
+            # tick 中调用一次 perceive（切换后不再二次验证，避免递归复杂化）
+            assert bot.perception.perceive.call_count == 1, (
+                f"tick 应执行一次感知，实际 {bot.perception.perceive.call_count} 次"
             )
 
     def test_bot_does_not_switch_when_current_has_reply(self):
@@ -658,7 +658,7 @@ class TestBotFullPipeline:
         bot.perception.perceive.return_value = perception
 
         bot.generator = Mock()
-        bot.generator.generate.return_value = "测试回复"
+        bot.generator.generate.return_value = ["测试回复"]
         bot.sender = Mock()
         bot.sender.send.return_value = Mock(success=True)
 

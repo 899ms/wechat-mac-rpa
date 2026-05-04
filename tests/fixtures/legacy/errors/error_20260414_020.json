@@ -17,12 +17,12 @@
       "sender": "自己",
       "sender_type": "self",
       "text": "哈哈误会啦！ 我是**AI 助手**，不是真人 客服～ 不存在\"切号\"这种操作： 我没有微信号，也不是 Qian 回复速度取决于网络/服务器负载 ◎ 同时只处理你这一个对话窗口 你是不是把我当成某个真人客服了？或者@错 人了？ 还有登录问题需要解决吗？随时叫我！",
-      "check": "similarity"
+      "check": "exact"
     },
     {
       "sender": "自己",
       "sender_type": "self",
-      "text": "1laayaua5aapangaaaaa~",
+      "text": "laayaua5aapangaaaaa~",
       "check": "exact"
     }
   ]

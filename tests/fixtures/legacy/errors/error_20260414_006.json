@@ -26,10 +26,6 @@
     },
     {
       "sender": "对方",
-      "text": "[表情包]"
-    },
-    {
-      "sender": "对方",
       "sender_type": "other",
       "text": "你能关灯么",
       "check": "exact"
