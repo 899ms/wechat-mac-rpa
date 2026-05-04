@@ -93,7 +93,9 @@ class ReplyGenerator:
         user_prompt = self._build_user_prompt(unreplied, all_messages)
 
         # 模型辅助路由：按需加载匹配的 skill 正文到 user prompt
-        matched_skills = self._route_skills(unreplied[-1].text)
+        last_msg = unreplied[-1]
+        route_text = last_msg.text or last_msg.image_description or ""
+        matched_skills = self._route_skills(route_text)
         self.last_loaded_skills = matched_skills
 
         # 模型选择：加载了 skill 的复杂任务优先走 complex_llm_client（hermes）
@@ -615,6 +617,7 @@ class ReplyGenerator:
             "- get_current_time：获取当前日期和时间",
             "- get_weather(city, date)：查询天气",
             "- web_search(query)：搜索网页获取实时信息",
+            "- browse_url(url)：打开链接提取网页正文。用户分享链接时使用。",
             "- stock_query(stock_code)：查询股票。支持A股sh600519、港股hk00700、美股AAPL",
             "- search_memory(query)：搜索本地长期记忆。涉及任何人名/称呼/关系时必须调用。",
             "",
@@ -630,6 +633,8 @@ class ReplyGenerator:
             "3. 群聊没被@时不回复",
             "4. 禁止敷衍词：收到、好的、嗯、OK、1",
             "5. 不要重复之前的内容",
+            "6. 对方发图片/表情包时，可以针对图片内容调侃或评价",
+            "7. 对方发重复图片/表情包时，不要重复之前的评价",
         ]
         if skill_hint:
             lines_local.append("")
@@ -670,7 +675,44 @@ class ReplyGenerator:
             "2. 不懂、不确定的话题，输出空 replies []\n"
             "3. 禁止敷衍词：收到、好的、嗯、OK、1\n"
             "4. 参照对方语气回复，不要延续自己的风格\n"
+            "5. 对方发图片/表情包时，可以针对图片内容调侃或评价\n"
+            "6. 对方发重复图片/表情包时，不要重复之前的评价\n"
         )
+    @staticmethod
+    def _format_message_line(m: ChatMessage) -> str:
+        """将单条消息渲染为 prompt 中的一行文本。"""
+        sender_name = "我" if m.sender_type == SenderType.SELF else m.sender
+        msg_type = m.message_type or "text"
+
+        if msg_type == "image":
+            desc = m.image_description or "图片"
+            text_part = m.image_text or m.text or ""
+            if text_part:
+                return f"{sender_name}：[图片] {desc}（图上文字：{text_part}）"
+            return f"{sender_name}：[图片] {desc}"
+
+        elif msg_type == "sticker":
+            desc = m.image_description or "表情包"
+            text_part = m.image_text or m.text or ""
+            if text_part:
+                return f"{sender_name}：[表情包] {desc}（配字：{text_part}）"
+            return f"{sender_name}：[表情包] {desc}"
+
+        elif msg_type == "mixed":
+            desc = m.image_description or ""
+            text_part = m.text or ""
+            if desc:
+                return f"{sender_name}：[图片+文字] {text_part} | 图片描述：{desc}"
+            return f"{sender_name}：[图片+文字] {text_part}"
+
+        elif msg_type == "link_card":
+            desc = m.image_description or "链接卡片"
+            return f"{sender_name}：[链接卡片] {desc}"
+
+        else:
+            # text 或默认
+            return f"{sender_name}：{m.text}"
+
     def _build_user_prompt(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage]) -> str:
         """构建结构化 user prompt：会话信息 + 记忆 + 历史 + 未读。"""
         from datetime import datetime
@@ -710,10 +752,9 @@ class ReplyGenerator:
             skipped_self_count = len(self_messages) - len(kept_self)
 
             for m in all_messages:
-                sender_name = "我" if m.sender_type == SenderType.SELF else m.sender
                 if m.sender_type == SenderType.SELF and m not in kept_self:
                     continue
-                lines_local.append(f"{sender_name}：{m.text}")
+                lines_local.append(self._format_message_line(m))
 
             if skipped_self_count > 0:
                 lines_local.append(f"（省略了之前自己发的 {skipped_self_count} 条）")
@@ -722,8 +763,7 @@ class ReplyGenerator:
         # 未读消息
         lines_local.append("[未读消息]（重点回复）")
         for i, m in enumerate(unreplied, 1):
-            sender_name = "我" if m.sender_type == SenderType.SELF else m.sender
-            lines_local.append(f"{i}. {sender_name}：{m.text}")
+            lines_local.append(f"{i}. {self._format_message_line(m)}")
         lines_local.append("")
         lines_local.append("提示：回复重点放在[未读消息]，历史只是背景。不确定时空 replies []。")
 

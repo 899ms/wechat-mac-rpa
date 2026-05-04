@@ -1,0 +1,372 @@
+{
+  "users": {
+    "王芊": {
+      "facts": [
+        {
+          "relation": "备注",
+          "value": "真名王芊，男性，又称G神、小g、芊总",
+          "note": ""
+        },
+        {
+          "relation": "是王艺涵（W1han）的老公（王芊",
+          "value": "男方",
+          "note": "W1han是女方，不要搞反）"
+        },
+        {
+          "relation": "表哥",
+          "value": "王海",
+          "note": "昵称小海哥，大舅家的表哥，喜欢现场看球"
+        },
+        {
+          "relation": "备注",
+          "value": "做AI视频生成相关工作",
+          "note": ""
+        }
+      ]
+    },
+    "王海": {
+      "facts": [
+        {
+          "relation": "备注",
+          "value": "王芊大舅家的表哥",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "喜欢现场看球，支持泰州队",
+          "note": ""
+        }
+      ]
+    },
+    "W1han": {
+      "facts": [
+        {
+          "relation": "真名",
+          "value": "王艺涵",
+          "note": "小名王璇"
+        },
+        {
+          "relation": "备注",
+          "value": "29岁，上海",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "手机号18301875336，邮箱847808989@qq.com",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "搜推策略产品经理，现在在阿里巴巴1688事业部做推荐策略",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "之前在携程做推荐产品经理，再之前在虎博科技做AI产品经理",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "硕士毕业于福德汉姆大学商业分析专业，本科上海财经大学财务管理",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "主导过1688推荐多样性优化项目，GMV提升14%",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "做过LLM+Agent协同机制的推荐策略",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "喜欢调侃别人，和王芊关系很好",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "是王芊的老婆",
+          "note": ""
+        }
+      ]
+    },
+    "秋水文章": {
+      "facts": [
+        {
+          "relation": "真名",
+          "value": "王秋文",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "是王芊的妈妈",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "泰州二中的物理老师",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "毕业于苏州大学",
+          "note": ""
+        }
+      ]
+    },
+    "一叶知秋": {
+      "facts": [
+        {
+          "relation": "真名",
+          "value": "王桂秋",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "是王秋文的大姐（王芊的大姨妈）",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "现在酒店的财务副总",
+          "note": ""
+        },
+        {
+          "relation": "老公",
+          "value": "居念祖",
+          "note": ""
+        },
+        {
+          "relation": "女儿",
+          "value": "居宬",
+          "note": "小名小昆，mit毕业"
+        },
+        {
+          "relation": "居宬的老公",
+          "value": "郭明刚",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "居宬和郭明刚现在在美国，有一儿一女",
+          "note": ""
+        }
+      ]
+    },
+    "wanglc": {
+      "facts": [
+        {
+          "relation": "真名",
+          "value": "王立超",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "是王芊的本科同学",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "俗称往里操（谐音梗）",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "在兴业银行当产品经理",
+          "note": ""
+        },
+        {
+          "relation": "老婆",
+          "value": "马香香（ohhh）",
+          "note": ""
+        }
+      ]
+    },
+    "ohhh": {
+      "facts": [
+        {
+          "relation": "真名",
+          "value": "马香香",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "是wanglc（王立超）的老婆",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "00后",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "现在在拼多多当运营",
+          "note": ""
+        }
+      ]
+    },
+    "居念祖": {
+      "facts": [
+        {
+          "relation": "备注",
+          "value": "是王桂秋（一叶知秋）的老公",
+          "note": ""
+        },
+        {
+          "relation": "女儿",
+          "value": "居宬",
+          "note": "小名小昆"
+        }
+      ]
+    },
+    "居宬": {
+      "facts": [
+        {
+          "relation": "备注",
+          "value": "小名小昆",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "是王桂秋和居念祖的女儿",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "mit毕业",
+          "note": ""
+        },
+        {
+          "relation": "老公",
+          "value": "郭明刚",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "现在在美国，有一儿一女",
+          "note": ""
+        }
+      ]
+    },
+    "王夏兰": {
+      "facts": [
+        {
+          "relation": "备注",
+          "value": "是王秋文的二姐",
+          "note": ""
+        },
+        {
+          "relation": "老公",
+          "value": "陈九江",
+          "note": ""
+        },
+        {
+          "relation": "女儿",
+          "value": "陈玥",
+          "note": ""
+        }
+      ]
+    },
+    "陈九江": {
+      "facts": [
+        {
+          "relation": "备注",
+          "value": "是王夏兰的老公",
+          "note": ""
+        },
+        {
+          "relation": "女儿",
+          "value": "陈玥",
+          "note": ""
+        }
+      ]
+    },
+    "陈玥": {
+      "facts": [
+        {
+          "relation": "备注",
+          "value": "是陈九江和王夏兰的女儿",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "老公姓戚",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "女儿叫戚依辰",
+          "note": ""
+        }
+      ]
+    },
+    "戚依辰": {
+      "facts": [
+        {
+          "relation": "备注",
+          "value": "是陈玥的女儿",
+          "note": ""
+        }
+      ]
+    },
+    "王乔生": {
+      "facts": [
+        {
+          "relation": "备注",
+          "value": "是王秋文的大哥",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "是王海的爸爸",
+          "note": ""
+        }
+      ]
+    },
+    "王乔元": {
+      "facts": [
+        {
+          "relation": "备注",
+          "value": "是王秋文的二哥",
+          "note": ""
+        },
+        {
+          "relation": "女儿",
+          "value": "王燕（燕子）",
+          "note": ""
+        }
+      ]
+    },
+    "燕子": {
+      "facts": [
+        {
+          "relation": "备注",
+          "value": "真名王燕，又称小燕姐",
+          "note": ""
+        },
+        {
+          "relation": "备注",
+          "value": "是王乔元的女儿",
+          "note": ""
+        },
+        {
+          "relation": "老公",
+          "value": "凌恕",
+          "note": ""
+        }
+      ]
+    },
+    "凌恕": {
+      "facts": [
+        {
+          "relation": "备注",
+          "value": "是王燕（燕子）的老公",
+          "note": ""
+        }
+      ]
+    }
+  }
+}

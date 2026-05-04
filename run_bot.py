@@ -24,7 +24,29 @@ if env_file.exists():
 from wechat_rpa.bot.wechat_bot import WeChatBot
 from wechat_rpa.layout.profile import PROFILE_WECHAT_MAC_1760X1280
 from wechat_rpa.perception.smart_pipeline import SmartPerceptionPipeline
-from utils.qwen_client import QwenClient
+
+
+def _create_llm_client():
+    """创建默认 LLM 客户端（deepseek）。"""
+    from utils.qwen_client import QwenClient
+    print("  • LLM:  Qwen (deepseek-v4-flash via dashscope)")
+    return QwenClient()
+
+
+def _create_hermes_client():
+    """创建 hermes 客户端，用于复杂任务 fallback。
+    默认连 8642 端口（Hermes Agent API Server），可通过 HERMES_BASE_URL 环境变量自定义。
+    如果 Hermes 未启动，返回 None，系统退化为单模型模式。"""
+    base_url = os.environ.get("HERMES_BASE_URL", "http://127.0.0.1:8642")
+    try:
+        from wechat_rpa.llm.openclaw_client import OpenClawClient
+        # Hermes API Server 的模型名是 hermes-agent，max_tokens 给大一点
+        client = OpenClawClient(base_url=base_url, model="hermes-agent", max_tokens=2000)
+        print(f"  • Hermes: {base_url} (model=hermes-agent) 已就绪，复杂任务自动切换")
+        return client
+    except Exception as e:
+        print(f"  • Hermes: {base_url} 未连接（{e}），复杂任务继续使用 deepseek")
+        return None
 
 
 def _create_perception(profile):
@@ -110,18 +132,20 @@ def main():
         print("=" * 60)
         print("配置:")
         print("  • 布局: wechat_mac_4.1.8_1760x1280")
-        print("  • LLM:  Qwen (qwen3.6-flash)")
+        print("  • LLM:  Qwen (deepseek-v4-flash via dashscope)")
         print("  • 策略: 群聊直接回复（无需 @）")
         interval = 10.0 if os.environ.get("ALWAYS_USE_API", "false").lower() in ("1", "true", "yes") else 5.0
         print(f"  • 轮询: 每 {interval:.0f} 秒感知一次")
         print("=" * 60)
         print("按 Ctrl+C 停止\n")
 
-        llm = QwenClient()
+        llm = _create_llm_client()
+        hermes = _create_hermes_client()
         perception = _create_perception(PROFILE_WECHAT_MAC_1760X1280)
         bot = WeChatBot(
             profile=PROFILE_WECHAT_MAC_1760X1280,
             llm_client=llm,
+            complex_llm_client=hermes,
             perception=perception,
         )
 
@@ -130,6 +154,8 @@ def main():
         except KeyboardInterrupt:
             print("\n👋 收到中断信号，正在保存状态并停止...")
             bot.save_sessions()
+            if hasattr(bot, 'memory_engine') and bot.memory_engine:
+                bot.memory_engine.shutdown()
             bot.running = False
             sys.exit(0)
 

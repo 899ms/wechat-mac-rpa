@@ -69,9 +69,11 @@ QWEN_SYSTEM_PROMPT = """你是一位专精 UI 截图文字识别的 OCR 引擎�
     {"nickname": "昵称2", "unread_count": "3"}
   ],
   "messages": [
-    {"sender": "自己", "text": "消息内容"},
-    {"sender": "对方", "text": "私聊中对方的消息（私聊只有两个人，对方消息上方不显示昵称）"},
-    {"sender": "群成员昵称", "text": "群聊中对方的消息（群聊消息上方会显示发送者昵称，sender必须填这个昵称）"}
+    {"sender": "自己", "text": "消息内容", "type": "text"},
+    {"sender": "对方", "text": "私聊中对方的消息", "type": "text"},
+    {"sender": "群成员昵称", "text": "群聊中对方的消息", "type": "text"},
+    {"sender": "对方", "text": "", "type": "image", "image_description": "一只橘猫趴在键盘上", "image_text": "不想上班"},
+    {"sender": "对方", "text": "", "type": "sticker", "image_description": "熊猫头流泪的表情包", "image_text": ""}
   ]
 }
 
@@ -99,19 +101,39 @@ QWEN_SYSTEM_PROMPT = """你是一位专精 UI 截图文字识别的 OCR 引擎�
    - 绝对不能把私聊中的对方消息填成群成员昵称或具体人名
    - 辅助判断（颜色看不清时用）：右侧对齐的气泡是自己，左侧对齐的气泡是对方
    - 时间戳（如"昨天 21:58"、"11:34"、"00:22"）不是消息，不要输出
-   - 【图片/表情包过滤】图片、表情包、链接卡片上的文字不要当作聊天消息输出，只输出消息气泡里的实际对话内容
    - 【常见错误】不要把白色气泡的对方消息错标为 "自己"，也不要把短消息默认当成自己发的
 
-4. 消息（messages）：
-   - 只包含实际对话内容，排除所有时间戳
+4. 消息 type 分类（重要新增）：
+   - "text"：纯文字消息（含 emoji 符号）
+   - "image"：图片、照片、截图等非表情类的图像内容
+   - "sticker"：表情包、动图、微信自带表情、表情商店下载的表情
+   - "mixed"：图文混排（消息同时包含图片和文字）
+   - "link_card"：链接卡片、文章分享、小程序卡片
+   - 判断标准：看消息气泡里的主要内容。如果气泡内主要是图像且几乎没有文字 → image/sticker；如果主要是文字 → text
+   - 区分 image 和 sticker：表情包通常尺寸较小、风格卡通、配简短文字；照片/截图通常尺寸较大、内容写实
+
+5. 图片/表情识别（重要新增）：
+   - 如果消息是图片或表情包，text 字段放图片上的文字（如有），没有则空字符串
+   - image_description：详细描述图片/表情包的内容。例如：
+     - 照片："夕阳下的海滩，天空呈现橙红色，有几只海鸥"
+     - 表情包："一只熊猫头流泪，配文'我太难了'"
+     - 截图："手机截图，显示微信聊天界面"
+   - image_text：图片上叠加的文字（如表情包配字、截图中的文字、照片上的水印文字）
+   - 【隐私保护】如果图片包含身份证、银行卡、地址、电话号码等隐私信息，image_description 简化为"[图片-包含隐私信息]"
+   - 【隐私保护】如果图片包含裸露、暴力等不适宜内容，image_description 简化为"[图片]"
+   - 链接卡片（link_card）的 image_description 描述卡片外观（如"分享了一篇公众号文章，标题为xxx"），image_text 提取卡片上的标题和摘要
+
+6. 消息（messages）：
+   - 包含所有消息：文字、图片、表情包、链接卡片
+   - 排除所有时间戳
    - 按截图中从上到下顺序排列
 
-5. 输入框过滤（重要）：
+7. 输入框过滤（重要）：
    - 截图最底部是输入框区域（有表情😊、文件📎、截图✂️、语音🎤按钮）
    - 输入框中的文字是未发送的草稿，不是已发送的消息，必须排除
    - 不要输出输入框中的任何内容
 
-6. 只输出 JSON，不要任何解释文字。
+8. 只输出 JSON，不要任何解释文字。
 """
 
 
@@ -178,6 +200,60 @@ class _QwenAPIClient:
 
 
 # ---------------------------------------------------------------------------
+# Image Description Dedup Tracker - 基于描述相似度的图片去重
+# ---------------------------------------------------------------------------
+
+from collections import deque
+from difflib import SequenceMatcher
+
+
+class ImageDedupTracker:
+    """基于描述文本相似度的图片去重器。
+
+    策略：同一聊天、同一发送者在时间窗口内，如果图片描述相似度超过阈值，
+    视为重复图片/表情包，避免 Bot 对同一张图反复反应。
+    """
+
+    def __init__(self, window_seconds: float = 60.0, similarity_threshold: float = 0.2):
+        self._entries: deque = deque()  # (chat_name, sender, description, timestamp)
+        self.window_seconds = window_seconds
+        self.similarity_threshold = similarity_threshold
+
+    def is_duplicate(self, chat_name: str, sender: str, description: str) -> bool:
+        """检查是否为重复图片。"""
+        if not description or description.startswith("["):
+            # 隐私保护标记或空描述，不参与去重判断
+            return False
+
+        now = time.time()
+        # 清理过期条目
+        while self._entries and now - self._entries[0][3] > self.window_seconds:
+            self._entries.popleft()
+
+        for cn, s, desc, _ in self._entries:
+            if cn == chat_name and s == sender:
+                sim = self._similarity(desc, description)
+                if sim >= self.similarity_threshold:
+                    return True
+        return False
+
+    def add(self, chat_name: str, sender: str, description: str):
+        """记录一张图片的描述。"""
+        if not description or description.startswith("["):
+            return
+        self._entries.append((chat_name, sender, description, time.time()))
+
+    @staticmethod
+    def _similarity(a: str, b: str) -> float:
+        """计算两段描述文本的相似度，0.0~1.0。"""
+        if not a or not b:
+            return 0.0
+        if a == b:
+            return 1.0
+        return SequenceMatcher(None, a, b).ratio()
+
+
+# ---------------------------------------------------------------------------
 # SmartPerceptionPipeline
 # ---------------------------------------------------------------------------
 
@@ -224,6 +300,9 @@ class SmartPerceptionPipeline:
         self.api_call_count = 0
         self.skip_count = 0
         self.local_fallback_count = 0
+
+        # 图片去重跟踪器
+        self.image_dedup = ImageDedupTracker(window_seconds=60.0, similarity_threshold=0.2)
 
     # -----------------------------------------------------------------------
     # 公共接口（与 VisionPipeline.perceive 签名一致）
@@ -367,6 +446,9 @@ class SmartPerceptionPipeline:
                     "sender": m.sender,
                     "sender_type": m.sender_type.value if hasattr(m.sender_type, "value") else m.sender_type,
                     "chat_name": m.chat_name,
+                    "type": m.message_type,
+                    "image_description": m.image_description,
+                    "image_text": m.image_text,
                 }
                 for m in extraction_messages
             ]
@@ -677,23 +759,39 @@ class SmartPerceptionPipeline:
     # 结果转换
     # -----------------------------------------------------------------------
 
-    @staticmethod
-    def _convert_api_messages(raw_messages: list, chat_name: str) -> list[ChatMessage]:
-        """将 API 返回的 messages 转换为 ChatMessage 列表。"""
+    def _convert_api_messages(self, raw_messages: list, chat_name: str) -> list[ChatMessage]:
+        """将 API 返回的 messages 转换为 ChatMessage 列表。
+
+        支持图片/表情包识别和去重。
+        """
         messages = []
         for m in raw_messages:
             sender = m.get("sender", "")
             text = m.get("text", "")
-            if not text:
-                continue
+            msg_type = m.get("type", "text") or "text"
+            image_description = m.get("image_description", "") or ""
+            image_text = m.get("image_text", "") or ""
 
             if sender == "自己":
                 sender_type = SenderType.SELF
             elif sender in ("对方", ""):
                 sender_type = SenderType.OTHER
+                sender = "对方"
             else:
                 # 群聊昵称或其他 sender
                 sender_type = SenderType.OTHER
+
+            # 图片/表情/链接卡片：允许 text 为空
+            is_media = msg_type in ("image", "sticker", "mixed", "link_card")
+            if not text and not is_media:
+                continue
+
+            # 图片去重：同一聊天同一 sender 在短时间内发送相似图片
+            if msg_type in ("image", "sticker") and image_description:
+                if self.image_dedup.is_duplicate(chat_name, sender, image_description):
+                    image_description = "[重复图片/表情包]"
+                else:
+                    self.image_dedup.add(chat_name, sender, image_description)
 
             messages.append(
                 ChatMessage(
@@ -701,6 +799,9 @@ class SmartPerceptionPipeline:
                     sender=sender,
                     sender_type=sender_type,
                     chat_name=chat_name,
+                    message_type=msg_type,
+                    image_description=image_description,
+                    image_text=image_text,
                 )
             )
         return messages

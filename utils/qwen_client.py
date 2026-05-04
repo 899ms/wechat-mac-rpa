@@ -25,26 +25,26 @@ class QwenClient:
         )
         self.model = model
 
-    def chat(self, messages=None, user_id=None, message=None, system_prompt=None, tools=None) -> str:
+    def chat(self, messages=None, user_id=None, message=None, system_prompt=None, tools=None, temperature=None, max_tokens=None, timeout=None) -> str:
         """生成回复，支持 tools（function calling）
 
         支持两种调用方式：
-        1. 新接口: chat(messages=[...], tools=[...])
+        1. 新接口: chat(messages=[...], tools=[...], temperature=0.3, max_tokens=2000)
         2. 旧接口: chat(user_id="xxx", message="...", system_prompt="...")
         """
         if messages is not None:
-            return self._chat_with_messages(messages, tools=tools)
+            return self._chat_with_messages(messages, tools=tools, temperature=temperature, max_tokens=max_tokens, timeout=timeout)
         return self._chat_with_user_id(user_id, message, system_prompt)
 
-    def _chat_with_messages(self, messages: List[dict], tools=None) -> str:
-        """直接透传 messages 列表调用大模型，支持 tools"""
+    def _chat_with_messages(self, messages: List[dict], tools=None, temperature=None, max_tokens=None, timeout=None) -> str:
+        """直接透传 messages 列表调用大模型，支持 tools 和自定义参数"""
         try:
             kwargs = {
                 "model": self.model,
                 "messages": messages,
-                "temperature": 0.7,
-                "max_tokens": 1000,
-                "timeout": 30,
+                "temperature": temperature if temperature is not None else 0.7,
+                "max_tokens": max_tokens if max_tokens is not None else 1000,
+                "timeout": timeout if timeout is not None else 30,
             }
             if tools:
                 kwargs["tools"] = tools

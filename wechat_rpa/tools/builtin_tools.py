@@ -58,13 +58,21 @@ def _web_search(query: str = "") -> str:
         for block in re.finditer(r'<li[^>]*class=["\']res-list["\'][^>]*>(.*?)</li>', text, re.DOTALL | re.IGNORECASE):
             block_html = block.group(1)
 
-            # 标题
+            # 标题和链接
             title = ""
+            link = ""
             hm = re.search(r'<h3[^>]*>(.*?)</h3>', block_html, re.DOTALL | re.IGNORECASE)
             if hm:
-                am = re.search(r'<a[^>]*>(.*?)</a>', hm.group(1), re.DOTALL | re.IGNORECASE)
+                am = re.search(r'<a[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', hm.group(1), re.DOTALL | re.IGNORECASE)
                 if am:
-                    title = re.sub(r'<[^>]+>', '', am.group(1)).strip()
+                    link = html.unescape(am.group(1)).strip()
+                    title = re.sub(r'<[^>]+>', '', am.group(2)).strip()
+                    # 360 跳转链接解码
+                    if link.startswith("https://www.so.com/link?"):
+                        m = re.search(r'[?&]url=([^&]+)', link)
+                        if m:
+                            from urllib.parse import unquote
+                            link = unquote(m.group(1))
             if not title or len(title) <= 3 or '360' in title.lower():
                 continue
 
@@ -81,10 +89,12 @@ def _web_search(query: str = "") -> str:
             if len(snippet) > 200:
                 snippet = snippet[:200] + "..."
 
+            line = title
+            if link:
+                line += f"\n   链接：{link}"
             if snippet:
-                results.append(f"{title}\n   {snippet}")
-            else:
-                results.append(title)
+                line += f"\n   摘要：{snippet}"
+            results.append(line)
 
             if len(results) >= 20:
                 break
@@ -94,6 +104,74 @@ def _web_search(query: str = "") -> str:
         return f"未找到关于'{query}'的搜索结果"
     except Exception as e:
         return f"搜索失败: {e}"
+
+
+def _browse_url(url: str = "") -> str:
+    """打开指定链接，提取网页正文内容。"""
+    if not url:
+        return "请提供要浏览的链接"
+    # 补全协议头
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    try:
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        }
+        resp = requests.get(url, headers=headers, timeout=15, allow_redirects=True)
+        resp.encoding = resp.apparent_encoding or "utf-8"
+        html_text = resp.text
+
+        # 1. 尝试提取 <title>
+        title = ""
+        tm = re.search(r"<title[^>]*>(.*?)</title>", html_text, re.DOTALL | re.IGNORECASE)
+        if tm:
+            title = re.sub(r"<[^>]+>", "", tm.group(1)).strip()
+
+        # 2. 尝试提取正文（优先 article/main/content 区域）
+        body = ""
+        # 微信公众号文章
+        if "mp.weixin.qq.com" in url:
+            m = re.search(r'<div[^>]*id=["\']js_content["\'][^>]*>(.*?)</div>\s*</div>\s*<script', html_text, re.DOTALL | re.IGNORECASE)
+            if m:
+                body = m.group(1)
+        # 通用：article / main / [role=main]
+        if not body:
+            for tag in ["article", "main", 'div[^>]*role=["\']main["\']', 'div[^>]*class=["\']content["\']']:
+                pat = rf'<{tag}[^>]*>(.*?)</{tag.split("[")[0].strip()}>'
+                m = re.search(pat, html_text, re.DOTALL | re.IGNORECASE)
+                if m and len(m.group(1)) > 200:
+                    body = m.group(1)
+                    break
+        # 兜底：body 标签
+        if not body:
+            bm = re.search(r"<body[^>]*>(.*?)</body>", html_text, re.DOTALL | re.IGNORECASE)
+            if bm:
+                body = bm.group(1)
+
+        # 3. 清理 HTML 标签和脚本/style
+        body = re.sub(r"<script[^>]*>.*?</script>", "", body, flags=re.DOTALL | re.IGNORECASE)
+        body = re.sub(r"<style[^>]*>.*?</style>", "", body, flags=re.DOTALL | re.IGNORECASE)
+        body = re.sub(r"<[^>]+>", "", body)
+        body = html.unescape(body)
+        body = re.sub(r"\s+", " ", body).strip()
+
+        # 4. 截断到 3000 字
+        max_len = 3000
+        result = body[:max_len]
+        if len(body) > max_len:
+            result += "..."
+
+        preview = f"标题：{title}\n" if title else ""
+        preview += f"链接：{url}\n"
+        preview += f"正文：{result}"
+        return preview
+    except Exception as e:
+        return f"浏览链接失败: {e}"
 
 
 def register_builtin_tools():
@@ -128,6 +206,22 @@ def register_builtin_tools():
             "required": ["city"],
         },
         func=_get_weather,
+    )
+
+    registry.register(
+        name="browse_url",
+        description="打开指定链接，提取网页正文内容。用户分享链接或提到 URL 时使用。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "要浏览的链接地址，如 https://example.com/article",
+                },
+            },
+            "required": ["url"],
+        },
+        func=_browse_url,
     )
 
     registry.register(

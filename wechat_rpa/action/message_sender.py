@@ -66,13 +66,32 @@ class WeChatMessageSender(MessageSender):
                 return ActionResult(success=False, error=f"复制剪贴板失败: {err}")
             time.sleep(0.15)
 
-            # 3. 粘贴并发送
-            # 禁忌：不能用 keystroke "a" using command down（中文 IME 会产生产拼音碎片）
+            # 3. 确保焦点在输入框：先点一下窗口中心偏下区域（输入框大致位置）
+            focus_script = """
+                tell application "System Events"
+                    tell process "WeChat"
+                        set frontmost to true
+                        delay 0.2
+                        -- 获取窗口大小，点击底部中央（输入框区域）
+                        tell window 1
+                            set winPos to position
+                            set winSize to size
+                            set clickX to (item 1 of winPos) + (item 1 of winSize) / 2
+                            set clickY to (item 2 of winPos) + (item 2 of winSize) - 40
+                        end tell
+                        click at {clickX, clickY}
+                        delay 0.2
+                    end tell
+                end tell
+            """
+            subprocess.run(["osascript", "-e", focus_script], timeout=5, capture_output=True)
+
+            # 4. 粘贴并发送
             script = """
                 tell application "System Events"
                     tell process "WeChat"
                         keystroke "v" using command down
-                        delay 0.15
+                        delay 0.3
                         keystroke return
                     end tell
                 end tell

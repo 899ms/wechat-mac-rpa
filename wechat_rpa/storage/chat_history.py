@@ -40,6 +40,9 @@ class HistoryRecord:
     source: str = "ocr"          # 来源：ocr / manual / api
     tick_id: int = 0             # 所属 tick 编号
     screenshot_path: str = ""    # 关联截图路径
+    message_type: str = "text"   # text / image / sticker / mixed / link_card
+    image_description: str = ""  # 图片描述
+    image_text: str = ""         # 图片上的文字
 
     def __post_init__(self):
         if not self.timestamp:
@@ -48,7 +51,7 @@ class HistoryRecord:
             self.message_hash = self._compute_hash()
 
     def _compute_hash(self) -> str:
-        content = f"{self.chat_name}:{self.sender}:{self.text}:{self.bubble_y}"
+        content = f"{self.chat_name}:{self.sender}:{self.text}:{self.bubble_y}:{self.message_type}:{self.image_description}"
         return hashlib.md5(content.encode("utf-8")).hexdigest()
 
     def to_dict(self) -> Dict[str, Any]:
@@ -195,6 +198,9 @@ class ChatHistory:
                     source="ocr",
                     tick_id=tick_id,
                     screenshot_path=screenshot_path,
+                    message_type=msg.message_type,
+                    image_description=msg.image_description,
+                    image_text=msg.image_text,
                 )
             elif isinstance(msg, dict):
                 record = HistoryRecord(
@@ -209,6 +215,9 @@ class ChatHistory:
                     source=msg.get("source", "ocr"),
                     tick_id=tick_id,
                     screenshot_path=screenshot_path,
+                    message_type=msg.get("message_type", "text"),
+                    image_description=msg.get("image_description", ""),
+                    image_text=msg.get("image_text", ""),
                 )
             else:
                 raise TypeError(f"Unsupported message type: {type(msg)}")

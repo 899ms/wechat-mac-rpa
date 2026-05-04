@@ -47,11 +47,16 @@ class ChatMessage:
     is_at_me: bool = False
     timestamp: Optional[str] = None
     source_elements: Optional[List[OCRTextElement]] = None
-    
+
     # === 消息级回复状态 ===
     replied: bool = False              # 是否已回复
     reply_text: str = ""              # 回复内容
     reply_time: Optional[float] = None # 回复时间戳
+
+    # === 图片/表情相关 ===
+    message_type: str = "text"         # "text" / "image" / "sticker" / "mixed" / "link_card"
+    image_description: str = ""        # 视觉模型对图片内容的描述
+    image_text: str = ""               # 图片上的文字（如有）
 
 
 @dataclass

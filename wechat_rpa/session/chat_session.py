@@ -53,9 +53,20 @@ class ChatSession:
         self.last_reply_time = None
         self.reply_count = 0
 
+    def _message_fingerprint(self, msg: ChatMessage) -> str:
+        """生成消息的去重指纹。
+
+        文字消息：用 text 内容。
+        图片/表情/混合消息：用 message_type + image_description 组合，避免
+        不同图片因 text 都为空而被误判为相同。
+        """
+        if msg.message_type in ("image", "sticker", "mixed"):
+            return f"[{msg.message_type}]{msg.image_description}"
+        return msg.text
+
     def _find_similar_seen(self, msg: ChatMessage) -> bool:
         """检查 msg 是否与历史消息相似（LCS >= 80%）。"""
-        norm = _normalize_for_compare(msg.text)
+        norm = _normalize_for_compare(self._message_fingerprint(msg))
         for chat, sender, hist_norm in self.seen_messages:
             if chat == msg.chat_name and sender == msg.sender:
                 sim = _text_similarity(norm, hist_norm)
@@ -66,7 +77,7 @@ class ChatSession:
     def _add_seen(self, msg: ChatMessage) -> None:
         """将消息加入 seen_messages，保持 maxlen。"""
         self.seen_messages.append(
-            (msg.chat_name, msg.sender, _normalize_for_compare(msg.text))
+            (msg.chat_name, msg.sender, _normalize_for_compare(self._message_fingerprint(msg)))
         )
         if len(self.seen_messages) > self._seen_maxlen:
             self.seen_messages = self.seen_messages[-self._seen_maxlen:]

@@ -190,11 +190,23 @@ class WeChatBot:
 
             # 记录 Session 层输入输出
             msg_dicts = [
-                {"sender": m.sender, "sender_type": m.sender_type.value, "text": m.text}
+                {
+                    "sender": m.sender,
+                    "sender_type": m.sender_type.value,
+                    "text": m.text,
+                    "type": m.message_type,
+                    "image_desc": m.image_description,
+                }
                 for m in messages
             ]
             unreplied_dicts = [
-                {"sender": m.sender, "sender_type": m.sender_type.value, "text": m.text}
+                {
+                    "sender": m.sender,
+                    "sender_type": m.sender_type.value,
+                    "text": m.text,
+                    "type": m.message_type,
+                    "image_desc": m.image_description,
+                }
                 for m in unreplied
             ]
             try:
