@@ -29,7 +29,7 @@ from wechat_rpa.layout.layout_parser import LayoutParser
 from wechat_rpa.layout.profile import LayoutProfile
 from wechat_rpa.action.login_recovery import WeChatLoginHandler
 
-_logger = logging.getLogger("wechat_rpa.smart_pipeline")
+_logger = logging.getLogger("wechat_rpa.runtime.smart_pipeline")
 
 # ---------------------------------------------------------------------------
 # Qwen3.6-flash API 客户端（轻量封装，避免循环导入 benchmark 脚本）

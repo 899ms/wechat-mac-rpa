@@ -112,6 +112,56 @@ def _is_fuzzy_duplicate(state, msg: ChatMessage, lookback: int = 10) -> bool:
     return False
 
 
+def _match_single(a: ChatMessage, b: ChatMessage, chat_name: str) -> bool:
+    """直接比较两条消息是否匹配（用于对齐）。
+
+    文字：SequenceMatcher >= 0.80
+    图片：2-gram Jaccard >= 0.001（容错极大，应对 qwen 描述不稳定）
+    """
+    # 精确匹配
+    if _msg_id(chat_name, a) == _msg_id(chat_name, b):
+        return True
+    # 类型不同直接不匹配
+    if a.message_type != b.message_type:
+        return False
+    # 文字消息
+    if a.message_type == "text":
+        text_a = " ".join(a.text.split())
+        text_b = " ".join(b.text.split())
+        if not text_a or not text_b:
+            return False
+        return difflib.SequenceMatcher(None, text_a, text_b).ratio() >= 0.80
+    # 图片/表情/混合：极低阈值 Jaccard
+    desc_a = a.image_description
+    desc_b = b.image_description
+    if not desc_a or not desc_b:
+        return False
+    ba = set(desc_a[i:i + 2] for i in range(len(desc_a) - 1))
+    bb = set(desc_b[i:i + 2] for i in range(len(desc_b) - 1))
+    inter = len(ba & bb)
+    union = len(ba | bb)
+    sim = inter / union if union else 0.0
+    return sim >= 0.001
+
+
+def _is_truncated(msg: ChatMessage, history_window: List[ChatMessage]) -> bool:
+    """检查 msg 是否是历史中某条文字消息的截断版本（子串包含关系）。"""
+    if msg.message_type != "text":
+        return False
+    text = msg.text.strip()
+    if not text:
+        return False
+    for hist_msg in history_window:
+        if hist_msg.message_type != "text":
+            continue
+        hist_text = hist_msg.text.strip()
+        if not hist_text:
+            continue
+        if text in hist_text or hist_text in text:
+            return True
+    return False
+
+
 class GlobalStore:
     """全局存储：管理所有聊天的状态，统一去重、持久化."""
 
@@ -125,10 +175,10 @@ class GlobalStore:
     def merge_tick(self, chat_name: str, messages: List[ChatMessage]) -> Tuple[ChatState, List[ChatMessage]]:
         """
         合并 tick 检测到的消息，返回 (state, 未回复的消息列表).
-        
-        未回复消息包括：
-        - 本次 tick 新检测到的未回复消息
-        - 之前 tick 检测到但还没回复的遗留消息
+
+        去重策略：从后往前对齐匹配 + 截断检查。
+        - 从后往前对齐：利用聊天记录的顺序稳定性
+        - 截断检查：最顶部消息可能被上滑截断一半，用子串包含关系兜底
         """
         if chat_name not in self.chats:
             self.chats[chat_name] = ChatState(
@@ -138,38 +188,50 @@ class GlobalStore:
 
         state = self.chats[chat_name]
 
-        def _in_history(msg):
-            return _msg_id(chat_name, msg) in state._msg_ids or _is_fuzzy_duplicate(state, msg)
+        # 对齐窗口：历史最近 len(messages)+10 条
+        history_window = state.messages[-(len(messages) + 10):]
+        matched_new_indices: set = set()
+        hist_ptr = len(history_window) - 1
+        new_ptr = len(messages) - 1
 
-        # 1. 从后往前找分界点：连续两条都在历史中，才确定后面都是旧消息
-        new_start = 0
-        for i in range(len(messages) - 2, -1, -1):
-            if _in_history(messages[i]) and _in_history(messages[i + 1]):
-                new_start = i + 2
-                break
+        # 从后往前对齐匹配
+        while hist_ptr >= 0 and new_ptr >= 0:
+            if _match_single(history_window[hist_ptr], messages[new_ptr], chat_name):
+                matched_new_indices.add(new_ptr)
+                hist_ptr -= 1
+                new_ptr -= 1
+            else:
+                # 尝试跳过历史消息（可能被上滑截断了）
+                if hist_ptr > 0 and _match_single(
+                    history_window[hist_ptr - 1], messages[new_ptr], chat_name
+                ):
+                    hist_ptr -= 1
+                else:
+                    new_ptr -= 1
 
-        # 2. 处理分界点之后的消息（确定是新消息）
-        for msg in messages[new_start:]:
-            if not _in_history(msg):
-                msg.chat_name = chat_name
-                state.messages.append(msg)
-                state._msg_ids.add(_msg_id(chat_name, msg))
+        # 截断检查：第一条未匹配消息可能是顶部截断消息
+        unmatched = [i for i in range(len(messages)) if i not in matched_new_indices]
+        if unmatched:
+            first_unmatched = min(unmatched)
+            if _is_truncated(messages[first_unmatched], history_window):
+                matched_new_indices.add(first_unmatched)
 
-        # 3. 额外检查：分界点前面最多 5 条，防止边界漏掉新消息
-        for msg in messages[max(0, new_start - 5):new_start]:
-            if not _in_history(msg):
-                msg.chat_name = chat_name
-                state.messages.append(msg)
-                state._msg_ids.add(_msg_id(chat_name, msg))
+        # 添加真正的新消息
+        for i, msg in enumerate(messages):
+            if i not in matched_new_indices:
+                if _msg_id(chat_name, msg) not in state._msg_ids:
+                    msg.chat_name = chat_name
+                    state.messages.append(msg)
+                    state._msg_ids.add(_msg_id(chat_name, msg))
 
-        # 2. 裁剪旧消息
+        # 裁剪旧消息
         if len(state.messages) > self.max_messages:
             removed = state.messages[:-self.max_messages]
             state.messages = state.messages[-self.max_messages:]
             for msg in removed:
                 state._msg_ids.discard(_msg_id(chat_name, msg))
 
-        # 3. 收集所有未回复的消息（按时间顺序）
+        # 收集所有未回复的消息（按时间顺序）
         unreplied = [
             msg for msg in state.messages
             if not msg.replied and msg.sender_type != SenderType.SELF
