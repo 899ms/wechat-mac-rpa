@@ -5,14 +5,16 @@ from wechat_rpa.models.base import ChatMessage, SenderType
 from typing import Any
 
 
+import re
+
+
 def _is_group_chat(chat_name: str) -> bool:
-    """通过聊天名称启发式判断是否为群聊."""
-    return (
-        ("(" in chat_name and ")" in chat_name)
-        or ("（" in chat_name and "）" in chat_name)
-        or chat_name.endswith("群")
-        or "群聊" in chat_name
-    )
+    """通过聊天名称判断是否为群聊.
+    
+    群聊名以 群人数 结尾，如 'ai开发小分队（128）'。
+    括号前的部分才是稳定的群聊标识，括号内的数字可能变化。
+    """
+    return bool(re.search(r'（\d+）$', chat_name))
 
 
 class ReplyPolicy:

@@ -31,7 +31,11 @@ def _try_create_openclaw_client():
 
 
 def _normalize_chat_name(name: str) -> str:
-    """对聊天名称进行 Unicode 归一化，防止 OCR 差异导致 session 分裂."""
+    """对聊天名称进行 Unicode 归一化，防止 OCR 差异导致 session 分裂.
+    
+    群聊名通常以 群人数 结尾（如 'ai开发小分队（128）'），
+    去掉后缀得到稳定的群聊标识。
+    """
     if not name:
         return ""
     name = name.replace("(", "（").replace(")", "）")
@@ -41,6 +45,8 @@ def _normalize_chat_name(name: str) -> str:
     name = name.replace(" ", "").replace("\u00a0", "").replace("\t", "")
     name = re.sub(r'^[a-zA-Z]+\d+', '', name)
     name = re.sub(r'^\d+[\.\、\s]*', '', name)
+    # 去掉群人数后缀（如 'ai开发小分队（128）' → 'ai开发小分队'）
+    name = re.sub(r'（\d+）$', '', name)
     return name.strip()
 
 
@@ -151,17 +157,6 @@ class WeChatBot:
 
             messages = result.messages
             chat_name = _normalize_chat_name(result.chat_name)
-
-            # sender 规范化：私聊统一用聊天框名称作为对方昵称
-            is_group = _is_group_chat(chat_name)
-            for msg in messages:
-                if msg.sender_type == SenderType.OTHER:
-                    if not is_group:
-                        # 私聊：不管 API 返回什么 sender，统一设为聊天框名称
-                        msg.sender = chat_name
-                    elif msg.sender in ("对方", "") or msg.sender == chat_name:
-                        # 群聊：sender 缺失或等于群名时，标记为未知
-                        msg.sender = "[未知]"
 
             if not chat_name:
                 if messages:
@@ -368,8 +363,7 @@ class WeChatBot:
                 except Exception:
                     pass
                 self.debug_logger.current = None
-            if self._tick_id % 10 == 0:
-                self.save_sessions()
+            self.save_sessions()
 
     def save_sessions(self) -> None:
         """保存全局状态到磁盘."""

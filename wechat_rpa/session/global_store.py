@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -31,19 +32,26 @@ def _text_hash(text: str) -> str:
     return hashlib.md5(normalized.encode()).hexdigest()[:16]
 
 
+def _is_group_chat_name(chat_name: str) -> bool:
+    """判断聊天名称是否为群聊（以 群人数 结尾，如 'ai开发小分队（128）'）。"""
+    return bool(re.search(r'（\d+）$', chat_name))
+
+
 def _normalize_sender(chat_name: str, msg: ChatMessage) -> str:
     """标准化 sender 用于去重匹配。
 
     规则：
     - 自己发的消息 → "自己"
-    - 对方消息：如果 sender 是"对方"或空，用 chat_name 替代（私聊时 chat_name
-      就是对方昵称；群聊时 chat_name 是群名，至少比"对方"好）
-    - 否则保留原始 sender（群聊中 API 返回的具体昵称）
+    - 私聊对方：sender 是"对方"/空/"[未知]" → 用 chat_name（对方昵称）替代
+    - 群聊对方：保留原始 sender（具体昵称或"对方"）
     """
     if msg.sender_type == SenderType.SELF:
         return "自己"
-    if msg.sender in ("对方", ""):
-        return chat_name
+    if not _is_group_chat_name(chat_name):
+        # 私聊：sender 缺失时用 chat_name 替代
+        if msg.sender in ("对方", "", "[未知]"):
+            return chat_name
+    # 群聊：保留原始 sender（具体昵称或"对方"）
     return msg.sender
 
 

@@ -35,10 +35,11 @@
     - 完全无匹配 → 回退到逐条 `_in_history` 检查
   - **Sender 标准化**：`_normalize_sender()` 统一处理昵称差异
     - `self` → "自己"
-    - `other` 且 sender="对方"/空 → 用 `chat_name` 替代（私聊时即为对方昵称）
-    - 其余保留原始 sender（群聊中提取到的具体昵称）
+    - 私聊且 sender="对方"/空/"[未知]" → 用 `chat_name`（对方昵称）替代
+    - 群聊保留原始 sender（具体昵称或"对方"），避免所有成员被归到群名下
   - **模糊去重**：`difflib.SequenceMatcher` + 动态阈值（短消息更严格，0.90→0.80）
   - **图片去重**：2-gram Jaccard，阈值 0.001（极低，容错 qwen 描述不稳定）
+  - **持久化时机**：`save()` 在每次 tick 的 `finally` 中调用，避免 `mark_replied` 后因重启丢状态
 - **状态**: ✅ 已完成
 
 ---
