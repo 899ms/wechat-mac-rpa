@@ -1,7 +1,7 @@
 # 微信 Mac RPA 项目进度
 
 ## 更新时间
-2026-05-03 18:00
+2026-05-04
 
 ## 当前状态
 - ✅ 项目架构：双感知管道（SmartPerceptionPipeline 主力 + VisionPipeline 备用）
@@ -11,12 +11,17 @@
 - ✅ 消息发送正常
 - ✅ 登录恢复：支持自动点击登录按钮并恢复主窗口
 - ✅ 模块化实现（`wechat_rpa/`）全部完成
-- ✅ 真实场景回归测试已建立（`tests/test_real_scene_extraction.py`）
+- ✅ 真实场景回归测试已建立
 - ✅ 智能感知管道已上线（`SmartPerceptionPipeline`：本地预判 + API 兜底，92.6% tick 无需调用 API）
 - ✅ Memory 引擎集成完成
 - ✅ Tool calling / Skill 匹配机制完成
+- ✅ **结构化 Prompt + SessionMemory**（跨 tick 工具缓存，避免重复搜索）
+- ✅ **browse_url 工具**（用户分享链接时自动提取正文）
+- ✅ **web_search 结果带链接**（支持 browse_url 二次打开）
+- ✅ **Hermes 深度分析路径**（skill 匹配时走 Hermes，支持 300 字/5 条回复）
 - ⏳ 昵称识别准确率仍需优化
 - ⏳ 多显示器场景支持
+- ⏳ GitHub 推送（网络超时，待手动 push）
 
 ## 最近修复
 
@@ -28,6 +33,31 @@
   - 添加 X 范围过滤: `title_x_max_ratio=0.95`
   - 增强 `_is_garbage()` 过滤特殊字符和短噪声
 - **验证**: 回归测试 `test_regression_title_y_max_extracts_chat_name` 通过
+
+### 2026-05-04 批量更新 ✅ 已上线
+- **结构化 Prompt 重构**
+  - System prompt 精简为核心人设 + 工具 + 规则
+  - User prompt 改为 `[会话]` / `[对方信息]` / `[历史消息]` / `[未读消息]` 结构化格式
+  - 新增 `[已缓存数据]` 段落，注入 SessionMemory 工具缓存
+- **SessionMemory 跨 tick 缓存**
+  - `wechat_rpa/reply/session_memory.py`
+  - web_search 5min / stock_query 1min / get_weather 30min / search_memory 10min
+- **新增 browse_url 工具**
+  - 支持提取网页正文（含微信公众号文章特殊处理）
+  - 正文截断到 3000 字
+- **web_search 结果带链接**
+  - 提取 360 搜索结果的 URL（解码跳转链接）
+  - LLM 可用 browse_url 二次打开感兴趣的结果
+- **Hermes 调优**
+  - 字数 50 → 300 字
+  - 回复条数 0-3 → 0-5 条
+- **风格调整**
+  - 不用"您"，用"你" casual
+  - 口头禅：羡慕你们这些有钱人 / 被你装到了 / 等我有钱了...
+- **Bug 修复**
+  - debug JSON 中 Hermes 字段残留问题（generate() 开头未重置）
+  - 标题栏 OCR 失败时盲目切换导致误点单聊框
+  - 聊天列表点击位置偏左，改为正中心 + 更长等待时间
 
 ---
 
