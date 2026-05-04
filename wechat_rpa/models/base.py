@@ -57,6 +57,7 @@ class ChatMessage:
     message_type: str = "text"         # "text" / "image" / "sticker" / "mixed" / "link_card"
     image_description: str = ""        # 视觉模型对图片内容的描述
     image_text: str = ""               # 图片上的文字（如有）
+    is_image_duplicate: bool = False   # 是否被去重标记（原始描述仍保留在 image_description 中）
 
 
 @dataclass

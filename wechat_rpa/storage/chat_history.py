@@ -43,6 +43,7 @@ class HistoryRecord:
     message_type: str = "text"   # text / image / sticker / mixed / link_card
     image_description: str = ""  # 图片描述
     image_text: str = ""         # 图片上的文字
+    is_image_duplicate: bool = False  # 是否被去重标记
 
     def __post_init__(self):
         if not self.timestamp:
@@ -201,6 +202,7 @@ class ChatHistory:
                     message_type=msg.message_type,
                     image_description=msg.image_description,
                     image_text=msg.image_text,
+                    is_image_duplicate=msg.is_image_duplicate,
                 )
             elif isinstance(msg, dict):
                 record = HistoryRecord(
@@ -218,6 +220,7 @@ class ChatHistory:
                     message_type=msg.get("message_type", "text"),
                     image_description=msg.get("image_description", ""),
                     image_text=msg.get("image_text", ""),
+                    is_image_duplicate=msg.get("is_image_duplicate", False),
                 )
             else:
                 raise TypeError(f"Unsupported message type: {type(msg)}")

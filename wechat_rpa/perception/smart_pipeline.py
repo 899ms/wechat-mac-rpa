@@ -245,12 +245,22 @@ class ImageDedupTracker:
 
     @staticmethod
     def _similarity(a: str, b: str) -> float:
-        """计算两段描述文本的相似度，0.0~1.0。"""
+        """计算两段描述文本的相似度，0.0~1.0。
+
+        使用 2-gram Jaccard 系数，对中文图片描述更稳健。
+        SequenceMatcher 对长中文文本过于敏感（公共字符/量词导致误判），
+        2-gram Jaccard 基于"共同出现的相邻字对"，能更好区分不同图片。
+        """
         if not a or not b:
             return 0.0
         if a == b:
             return 1.0
-        return SequenceMatcher(None, a, b).ratio()
+        # 生成 2-gram 集合
+        ba = set(a[i:i + 2] for i in range(len(a) - 1))
+        bb = set(b[i:i + 2] for i in range(len(b) - 1))
+        inter = len(ba & bb)
+        union = len(ba | bb)
+        return inter / union if union else 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -449,6 +459,7 @@ class SmartPerceptionPipeline:
                     "type": m.message_type,
                     "image_description": m.image_description,
                     "image_text": m.image_text,
+                    "is_image_duplicate": m.is_image_duplicate,
                 }
                 for m in extraction_messages
             ]
@@ -787,9 +798,10 @@ class SmartPerceptionPipeline:
                 continue
 
             # 图片去重：同一聊天同一 sender 在短时间内发送相似图片
+            is_dup = False
             if msg_type in ("image", "sticker") and image_description:
                 if self.image_dedup.is_duplicate(chat_name, sender, image_description):
-                    image_description = "[重复图片/表情包]"
+                    is_dup = True
                 else:
                     self.image_dedup.add(chat_name, sender, image_description)
 
@@ -802,6 +814,7 @@ class SmartPerceptionPipeline:
                     message_type=msg_type,
                     image_description=image_description,
                     image_text=image_text,
+                    is_image_duplicate=is_dup,
                 )
             )
         return messages

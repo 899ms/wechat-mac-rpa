@@ -196,6 +196,7 @@ class WeChatBot:
                     "text": m.text,
                     "type": m.message_type,
                     "image_desc": m.image_description,
+                    "image_dup": m.is_image_duplicate,
                 }
                 for m in messages
             ]
@@ -206,6 +207,7 @@ class WeChatBot:
                     "text": m.text,
                     "type": m.message_type,
                     "image_desc": m.image_description,
+                    "image_dup": m.is_image_duplicate,
                 }
                 for m in unreplied
             ]
