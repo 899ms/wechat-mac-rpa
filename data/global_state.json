@@ -8740,6 +8740,26 @@
         "replied": true,
         "reply_text": "(未回复)",
         "reply_time": 1777878349.666168
+      },
+      {
+        "text": "\"海洋\" 拍了拍 \"!\"",
+        "sender": "系统消息",
+        "sender_type": "other",
+        "chat_name": "CowAgent交流38群（397）",
+        "is_at_me": false,
+        "replied": true,
+        "reply_text": "(未回复)",
+        "reply_time": 1777888395.752467
+      },
+      {
+        "text": "@! 🙏",
+        "sender": "陈平安",
+        "sender_type": "other",
+        "chat_name": "CowAgent交流38群（397）",
+        "is_at_me": false,
+        "replied": true,
+        "reply_text": "(未回复)",
+        "reply_time": 1777888395.752526
       }
     ]
   },

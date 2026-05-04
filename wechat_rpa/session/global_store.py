@@ -27,16 +27,20 @@ def _text_hash(text: str) -> str:
     return hashlib.md5(normalized.encode()).hexdigest()[:16]
 
 
-def _msg_id(chat_name: str, text: str, sender: str = "") -> str:
-    """消息唯一ID：用 chat_name + sender + text。
+def _msg_id(chat_name: str, msg: ChatMessage) -> str:
+    """消息唯一ID：用 chat_name + sender + 内容指纹。
 
-    包含 sender 是为了检测接龙（不同人复制粘贴同一条消息）。
-    sender 已在 wechat_bot.py 中规范化（私聊统一为 chat_name），
-    所以 sender 不稳定的问题已缓解。
+    文字消息：基于 text。
+    图片/表情/混合消息：基于 message_type + image_description，避免不同图片
+    因 text 都为空而被误判为相同。
     """
-    normalized = " ".join(text.split())
+    if msg.message_type in ("image", "sticker", "mixed"):
+        content = f"[{msg.message_type}]{msg.image_description}"
+    else:
+        content = msg.text
+    normalized = " ".join(content.split())
     text_hash = hashlib.md5(normalized.encode()).hexdigest()[:16]
-    return f"{chat_name}|{sender}|{text_hash}"
+    return f"{chat_name}|{msg.sender}|{text_hash}"
 
 
 def _is_fuzzy_duplicate(state, text: str, lookback: int = 10) -> bool:
@@ -103,7 +107,7 @@ class GlobalStore:
         state = self.chats[chat_name]
 
         def _in_history(msg):
-            return _msg_id(chat_name, msg.text, msg.sender) in state._msg_ids or _is_fuzzy_duplicate(state, msg.text)
+            return _msg_id(chat_name, msg) in state._msg_ids or _is_fuzzy_duplicate(state, msg)
 
         # 1. 从后往前找分界点：连续两条都在历史中，才确定后面都是旧消息
         new_start = 0
@@ -117,21 +121,21 @@ class GlobalStore:
             if not _in_history(msg):
                 msg.chat_name = chat_name
                 state.messages.append(msg)
-                state._msg_ids.add(_msg_id(chat_name, msg.text, msg.sender))
+                state._msg_ids.add(_msg_id(chat_name, msg))
 
         # 3. 额外检查：分界点前面最多 5 条，防止边界漏掉新消息
         for msg in messages[max(0, new_start - 5):new_start]:
             if not _in_history(msg):
                 msg.chat_name = chat_name
                 state.messages.append(msg)
-                state._msg_ids.add(_msg_id(chat_name, msg.text, msg.sender))
+                state._msg_ids.add(_msg_id(chat_name, msg))
 
         # 2. 裁剪旧消息
         if len(state.messages) > self.max_messages:
             removed = state.messages[:-self.max_messages]
             state.messages = state.messages[-self.max_messages:]
             for msg in removed:
-                state._msg_ids.discard(_msg_id(chat_name, msg.text, msg.sender))
+                state._msg_ids.discard(_msg_id(chat_name, msg))
 
         # 3. 收集所有未回复的消息（按时间顺序）
         unreplied = [
@@ -209,7 +213,7 @@ class GlobalStore:
                         reply_time=m.get("reply_time"),
                     )
                     state.messages.append(msg)
-                    state._msg_ids.add(_msg_id(chat_name, msg.text, msg.sender))
+                    state._msg_ids.add(_msg_id(chat_name, msg))
                 self.chats[chat_name] = state
         except Exception:
             pass
@@ -232,6 +236,10 @@ class GlobalStore:
                             "replied": m.replied,
                             "reply_text": m.reply_text,
                             "reply_time": m.reply_time,
+                            "message_type": m.message_type,
+                            "image_description": m.image_description,
+                            "image_text": m.image_text,
+                            "is_image_duplicate": m.is_image_duplicate,
                         }
                         for m in state.messages
                     ],
