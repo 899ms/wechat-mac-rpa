@@ -21,15 +21,24 @@
 
 ### 2. `wechat_rpa/session/global_store.py` — 全局消息存储 ✅ 已实现
 - **引用位置**: `wechat_bot.py` tick → store → merge
-- **文件**: `wechat_rpa/session/global_store.py`（243 行）
+- **文件**: `wechat_rpa/session/global_store.py`
 - **功能**:
   - 每个聊天一个 `ChatState`（消息列表 + 会话状态）
   - `merge_tick(tick_msgs)` → 未回复消息列表（含新消息 + 历史遗留未回复）
   - `mark_replied(chat_name, target_msg, reply_text)` — 支持 is 匹配 + text+sender 兜底
   - `last_reply_time(chat_name)` / `reply_count(chat_name)` — 统计信息
   - 磁盘持久化（`data/global_state.json`）
-  - 模糊去重：`difflib.SequenceMatcher` + 动态阈值（短消息更严格，0.90→0.80）
-  - 边界保护：分界点前最多 5 条额外检查，防止漏掉新消息
+  - **去重策略（滑动前缀匹配）**：
+    - 在历史消息序列中滑动寻找 tick 的最长前缀匹配位置（允许起点在历史任意位置）
+    - tick 全部匹配历史 → 无新消息（用户向上滚动查看旧消息）
+    - tick 前缀匹配历史末尾，后缀不匹配 → 后缀为新消息
+    - 完全无匹配 → 回退到逐条 `_in_history` 检查
+  - **Sender 标准化**：`_normalize_sender()` 统一处理昵称差异
+    - `self` → "自己"
+    - `other` 且 sender="对方"/空 → 用 `chat_name` 替代（私聊时即为对方昵称）
+    - 其余保留原始 sender（群聊中提取到的具体昵称）
+  - **模糊去重**：`difflib.SequenceMatcher` + 动态阈值（短消息更严格，0.90→0.80）
+  - **图片去重**：2-gram Jaccard，阈值 0.001（极低，容错 qwen 描述不稳定）
 - **状态**: ✅ 已完成
 
 ---

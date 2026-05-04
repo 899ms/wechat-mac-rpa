@@ -31,8 +31,24 @@ def _text_hash(text: str) -> str:
     return hashlib.md5(normalized.encode()).hexdigest()[:16]
 
 
+def _normalize_sender(chat_name: str, msg: ChatMessage) -> str:
+    """标准化 sender 用于去重匹配。
+
+    规则：
+    - 自己发的消息 → "自己"
+    - 对方消息：如果 sender 是"对方"或空，用 chat_name 替代（私聊时 chat_name
+      就是对方昵称；群聊时 chat_name 是群名，至少比"对方"好）
+    - 否则保留原始 sender（群聊中 API 返回的具体昵称）
+    """
+    if msg.sender_type == SenderType.SELF:
+        return "自己"
+    if msg.sender in ("对方", ""):
+        return chat_name
+    return msg.sender
+
+
 def _msg_id(chat_name: str, msg: ChatMessage) -> str:
-    """消息唯一ID：用 chat_name + sender + 内容指纹。
+    """消息唯一ID：用 chat_name + 标准化 sender + 内容指纹。
 
     文字消息：基于 text。
     图片/表情/混合消息：基于 message_type + image_description，避免不同图片
@@ -44,7 +60,8 @@ def _msg_id(chat_name: str, msg: ChatMessage) -> str:
         content = msg.text
     normalized = " ".join(content.split())
     text_hash = hashlib.md5(normalized.encode()).hexdigest()[:16]
-    return f"{chat_name}|{msg.sender}|{text_hash}"
+    normalized_sender = _normalize_sender(chat_name, msg)
+    return f"{chat_name}|{normalized_sender}|{text_hash}"
 
 
 def _is_fuzzy_duplicate(state, msg: ChatMessage, lookback: int = 10) -> bool:
@@ -76,7 +93,7 @@ def _is_fuzzy_duplicate(state, msg: ChatMessage, lookback: int = 10) -> bool:
             inter = len(ba & bb)
             union = len(ba | bb)
             sim = inter / union if union else 0.0
-            if sim >= 0.2:
+            if sim >= 0.001:
                 return True
         return False
 
@@ -118,9 +135,12 @@ def _match_single(a: ChatMessage, b: ChatMessage, chat_name: str) -> bool:
     文字：SequenceMatcher >= 0.80
     图片：2-gram Jaccard >= 0.001（容错极大，应对 qwen 描述不稳定）
     """
-    # 精确匹配
+    # 精确匹配（使用标准化 sender）
     if _msg_id(chat_name, a) == _msg_id(chat_name, b):
         return True
+    # sender_type 不同直接不匹配（避免自己消息和对方消息误匹配）
+    if a.sender_type != b.sender_type:
+        return False
     # 类型不同直接不匹配
     if a.message_type != b.message_type:
         return False
@@ -176,9 +196,13 @@ class GlobalStore:
         """
         合并 tick 检测到的消息，返回 (state, 未回复的消息列表).
 
-        去重策略：从后往前对齐匹配 + 截断检查。
-        - 从后往前对齐：利用聊天记录的顺序稳定性
-        - 截断检查：最顶部消息可能被上滑截断一半，用子串包含关系兜底
+        去重策略：滑动前缀匹配。
+        1. 在历史消息序列中寻找 tick 的最长前缀匹配位置（允许匹配起点在历史任意位置）
+        2. 如果 tick 全部匹配历史 → 无新消息（用户在向上滚动查看旧消息）
+        3. 如果 tick 前缀匹配历史，后缀不匹配 → 后缀是新消息
+        4. 如果完全无匹配 → 回退到逐条 _in_history 检查
+
+        匹配使用标准化 sender + 内容，消除"对方"与昵称不一致问题。
         """
         if chat_name not in self.chats:
             self.chats[chat_name] = ChatState(
@@ -188,41 +212,71 @@ class GlobalStore:
 
         state = self.chats[chat_name]
 
-        # 对齐窗口：历史最近 len(messages)+10 条
-        history_window = state.messages[-(len(messages) + 10):]
-        matched_new_indices: set = set()
-        hist_ptr = len(history_window) - 1
-        new_ptr = len(messages) - 1
+        def _in_history(msg: ChatMessage) -> bool:
+            return _msg_id(chat_name, msg) in state._msg_ids or _is_fuzzy_duplicate(
+                state, msg, lookback=len(state.messages)
+            )
 
-        # 从后往前对齐匹配
-        while hist_ptr >= 0 and new_ptr >= 0:
-            if _match_single(history_window[hist_ptr], messages[new_ptr], chat_name):
-                matched_new_indices.add(new_ptr)
-                hist_ptr -= 1
-                new_ptr -= 1
-            else:
-                # 尝试跳过历史消息（可能被上滑截断了）
-                if hist_ptr > 0 and _match_single(
-                    history_window[hist_ptr - 1], messages[new_ptr], chat_name
-                ):
-                    hist_ptr -= 1
+        # tick 内去重（同一 tick 中重复消息只保留一条）
+        seen_ids = set()
+        unique_messages = []
+        for msg in messages:
+            mid = _msg_id(chat_name, msg)
+            if mid not in seen_ids:
+                seen_ids.add(mid)
+                unique_messages.append(msg)
+        messages = unique_messages
+
+        new_messages: List[ChatMessage] = []
+
+        if not messages:
+            # tick 为空，直接返回当前未回复列表
+            pass
+        elif not state.messages:
+            # 没有历史，全部是新消息
+            new_messages = messages
+        else:
+            # 滑动前缀匹配：在历史末尾窗口中寻找 tick 的最长前缀匹配
+            search_window = min(len(state.messages), max(50, len(messages) * 3))
+            history_window = state.messages[-search_window:]
+
+            best_match_len = 0
+            best_match_start = -1
+
+            for i in range(len(history_window)):
+                match_len = 0
+                for j in range(len(messages)):
+                    if i + j >= len(history_window):
+                        break
+                    if _match_single(history_window[i + j], messages[j], chat_name):
+                        match_len += 1
+                    else:
+                        break
+                if match_len > best_match_len:
+                    best_match_len = match_len
+                    best_match_start = i
+
+            if best_match_len == len(messages):
+                # tick 全部在历史中，无新消息（用户在向上滚动）
+                new_messages = []
+            elif best_match_len >= 1:
+                # 前缀匹配成功，检查匹配段是否接近历史末尾
+                match_end_in_history = best_match_start + best_match_len
+                if match_end_in_history >= len(history_window) - 2:
+                    # 匹配段接近末尾，后缀是新消息
+                    new_messages = messages[best_match_len:]
                 else:
-                    new_ptr -= 1
+                    # 匹配到历史中间，但 tick 比匹配段长——不合理，回退逐条检查
+                    new_messages = [msg for msg in messages if not _in_history(msg)]
+            else:
+                # 完全无匹配，回退到逐条检查
+                new_messages = [msg for msg in messages if not _in_history(msg)]
 
-        # 截断检查：第一条未匹配消息可能是顶部截断消息
-        unmatched = [i for i in range(len(messages)) if i not in matched_new_indices]
-        if unmatched:
-            first_unmatched = min(unmatched)
-            if _is_truncated(messages[first_unmatched], history_window):
-                matched_new_indices.add(first_unmatched)
-
-        # 添加真正的新消息
-        for i, msg in enumerate(messages):
-            if i not in matched_new_indices:
-                if _msg_id(chat_name, msg) not in state._msg_ids:
-                    msg.chat_name = chat_name
-                    state.messages.append(msg)
-                    state._msg_ids.add(_msg_id(chat_name, msg))
+        # 添加新消息到历史
+        for msg in new_messages:
+            msg.chat_name = chat_name
+            state.messages.append(msg)
+            state._msg_ids.add(_msg_id(chat_name, msg))
 
         # 裁剪旧消息
         if len(state.messages) > self.max_messages:

@@ -82,6 +82,7 @@ done | sort | uniq -c | sort -rn | head -10
 |------|--------|--------|---------|
 | `chat_name` | 非空字符串 | `''` | `title_y_max` 过小 / title 识别失败 |
 | `new_messages_count` | ≥0 | 始终 0 | 消息提取失败 / 会话去重过于激进 |
+| `new_messages_count` | ≥0 | **异常增大**（如历史消息全变未读）| sender 标准化失效 / 对齐匹配锚点错误 / 用户向上滚动 |
 | `should_reply` | True/False | 始终 False | Policy 过滤 / 群聊缺少 @ |
 | `switch_reason` | `未读 N` / `无未读项` | `chat_list_items 为空` | 聊天列表解析失败 |
 
@@ -221,7 +222,38 @@ for e in d['ocr_elements']:
 
 **处理：** 非代码 bug，检查 WeChat 窗口状态。
 
-### 3.5 debug JSON 中 screenshot_path 指向 /tmp 而非 data/screenshots
+### 3.5 重启后大量历史消息变成未读（已读变未读）
+
+**症状：** `new_messages_count` 突然增大到几十条，且都是历史旧消息。
+
+**根因：** `merge_tick` 去重匹配失败，历史消息被重复添加。
+
+**排查步骤：**
+```python
+import json
+
+# 1. 检查 global_state.json 中该聊天的消息数量是否异常膨胀
+with open('data/global_state.json') as f:
+    state = json.load(f)
+chat = state.get('<聊天名>', {})
+print(f"历史消息数: {len(chat.get('messages', []))}")
+
+# 2. 检查最后几条消息的 sender 和 text
+for m in chat.get('messages', [])[-10:]:
+    print(f"  sender={m['sender']!r} text={m['text'][:40]!r}")
+```
+
+**常见原因：**
+1. **sender 不一致**：历史存的是昵称（如"秋水文章"），tick API 返回的是"对方" → `_msg_id` 精确匹配失效
+2. **滚动位置变化**：用户向上滚动查看历史，tick 显示的是历史中间段，与历史末尾不重叠 → 对齐匹配锚点错误
+3. **持久化后 `_msg_ids` 未重建**：加载旧状态时 `_msg_ids` 集合为空或错误
+
+**修复方向：**
+- 确认 `_normalize_sender()` 正确运行（`对方` → `chat_name`）
+- 确认 `merge_tick` 使用滑动前缀匹配（而非强制末尾对齐）
+- 确认 `_load()` 重建了 `_msg_ids` 集合
+
+### 3.6 debug JSON 中 screenshot_path 指向 /tmp 而非 data/screenshots
 
 **症状：** `screenshot_path` 为 `/tmp/wechat_capture_xxxx.png`，无法直接关联到 `data/screenshots/` 下的实际截图
 

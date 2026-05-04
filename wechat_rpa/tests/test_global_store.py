@@ -128,3 +128,68 @@ class TestGlobalStore:
         store.merge_tick("群2", [m2])
         assert len(store.get_unreplied("群1")) == 1
         assert len(store.get_unreplied("群2")) == 1
+
+    def test_merge_tick_sender_normalization(self, store):
+        """tick 中 sender='对方' 能匹配历史中 sender='昵称'"""
+        # 历史存的是昵称
+        hist = ChatMessage(text="hello", sender="秋水文章", sender_type=SenderType.OTHER, chat_name="秋水文章")
+        store.merge_tick("秋水文章", [hist])
+        assert len(store.chats["秋水文章"].messages) == 1
+
+        # tick 中 API 返回的是 "对方"
+        tick = ChatMessage(text="hello", sender="对方", sender_type=SenderType.OTHER, chat_name="秋水文章")
+        state, unreplied = store.merge_tick("秋水文章", [tick])
+        # 不应重复添加
+        assert len(state.messages) == 1
+        # 未回复列表仍返回该消息（因为它本来就未回复）
+        assert len(unreplied) == 1
+
+    def test_merge_tick_scroll_no_new_messages(self, store):
+        """用户向上滚动，tick 显示历史中间段，不应产生新消息"""
+        # 构建历史：10 条消息
+        history = []
+        for i in range(10):
+            msg = ChatMessage(
+                text=f"msg{i}",
+                sender="秋水文章" if i % 2 == 0 else "自己",
+                sender_type=SenderType.OTHER if i % 2 == 0 else SenderType.SELF,
+                chat_name="秋水文章",
+            )
+            history.append(msg)
+        store.merge_tick("秋水文章", history)
+        assert len(store.chats["秋水文章"].messages) == 10
+
+        # tick 只显示历史中间 3 条（索引 3-5）
+        tick = history[3:6]
+        state, unreplied = store.merge_tick("秋水文章", tick)
+        # 不应添加任何新消息
+        assert len(state.messages) == 10
+
+    def test_merge_tick_prefix_match_new_suffix(self, store):
+        """tick 前缀匹配历史末尾，后缀是新消息"""
+        # 历史：5 条旧消息
+        history = []
+        for i in range(5):
+            msg = ChatMessage(
+                text=f"msg{i}",
+                sender="秋水文章" if i % 2 == 0 else "自己",
+                sender_type=SenderType.OTHER if i % 2 == 0 else SenderType.SELF,
+                chat_name="秋水文章",
+            )
+            history.append(msg)
+        store.merge_tick("秋水文章", history)
+
+        # tick：前 3 条是历史末尾，后 2 条是新的
+        tick = [
+            ChatMessage(text="msg3", sender="自己", sender_type=SenderType.SELF, chat_name="秋水文章"),
+            ChatMessage(text="msg4", sender="秋水文章", sender_type=SenderType.OTHER, chat_name="秋水文章"),
+            ChatMessage(text="new1", sender="秋水文章", sender_type=SenderType.OTHER, chat_name="秋水文章"),
+            ChatMessage(text="new2", sender="自己", sender_type=SenderType.SELF, chat_name="秋水文章"),
+        ]
+        state, unreplied = store.merge_tick("秋水文章", tick)
+        # 应添加 2 条新消息
+        assert len(state.messages) == 7
+        assert state.messages[-2].text == "new1"
+        assert state.messages[-1].text == "new2"
+        # 未回复列表包含所有对方消息（包括旧的历史中未回复的）
+        assert len(unreplied) == 4  # msg0, msg2, msg4, new1
