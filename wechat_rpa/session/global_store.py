@@ -305,6 +305,10 @@ class GlobalStore:
                         replied=m.get("replied", False),
                         reply_text=m.get("reply_text", ""),
                         reply_time=m.get("reply_time"),
+                        message_type=m.get("message_type", "text"),
+                        image_description=m.get("image_description", ""),
+                        image_text=m.get("image_text", ""),
+                        is_image_duplicate=m.get("is_image_duplicate", False),
                     )
                     state.messages.append(msg)
                     state._msg_ids.add(_msg_id(chat_name, msg))
