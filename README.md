@@ -45,13 +45,13 @@ pip install pyobjc numpy scipy pillow python-dotenv
 
 ```bash
 cd ~/wechat-mac-rpa
-python3 -m wechat_rpa.bot.wechat_bot
+python3 run_bot.py
 ```
 
 或运行集成测试：
 
 ```bash
-python3 tests/test_integration.py
+python3 -m pytest wechat_rpa/tests/
 ```
 
 ---
@@ -60,7 +60,7 @@ python3 tests/test_integration.py
 
 ### API Key 配置
 
-编辑 `~/omni-bot-sdk-oss/.env`:
+编辑 `~/wechat-mac-rpa/.env`:
 
 ```env
 KIMI_API_KEY=your_api_key_here
@@ -87,7 +87,7 @@ wechat-mac-rpa/
 │   ├── layout/                      # L3: 布局解析
 │   │   └── layout_parser.py
 │   ├── session/                     # L4: 会话与去重
-│   │   └── chat_session.py
+│   │   └── global_store.py
 │   ├── reply/                       # L4: 回复决策与生成
 │   │   ├── policy.py
 │   │   └── generator.py
@@ -117,12 +117,12 @@ wechat-mac-rpa/
 ### 启动机器人
 ```bash
 cd ~/wechat-mac-rpa
-python3 -m wechat_rpa.bot.wechat_bot
+python3 run_bot.py
 ```
 
 ### 运行测试
 ```bash
-python3 tests/test_integration.py
+python3 -m pytest wechat_rpa/tests/
 ```
 
 ### 查看 OCR 识别历史
@@ -135,7 +135,7 @@ python3 scripts/view_ocr_history.py
 python3 scripts/view_ocr_history.py export
 ```
 
-**入口: `python3 -m wechat_rpa.bot.wechat_bot`**
+**入口: `python3 run_bot.py`**
 
 ## ⚠️ 注意事项
 

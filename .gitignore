@@ -24,6 +24,11 @@ data/logs/
 # 运行时生成的数据
 data/logs/
 data/screenshots/
+data/global_state.json
+data/memory/
+
+# PID 文件
+bot.pid
 
 # 敏感配置
 .env

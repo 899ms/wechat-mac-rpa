@@ -15,13 +15,13 @@ class TestMsgId:
     def test_msg_id_deterministic(self):
         """相同消息生成相同 ID"""
         msg = ChatMessage(text="hello", sender="A", sender_type=SenderType.OTHER, chat_name="群1")
-        assert _msg_id(msg) == _msg_id(msg)
+        assert _msg_id("群1", msg) == _msg_id("群1", msg)
 
     def test_msg_id_differs_by_chat(self):
         """不同聊天生成不同 ID"""
         m1 = ChatMessage(text="hi", sender="A", sender_type=SenderType.OTHER, chat_name="群1")
         m2 = ChatMessage(text="hi", sender="A", sender_type=SenderType.OTHER, chat_name="群2")
-        assert _msg_id(m1) != _msg_id(m2)
+        assert _msg_id("群1", m1) != _msg_id("群2", m2)
 
 
 class TestGlobalStore:

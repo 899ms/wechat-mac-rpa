@@ -5,7 +5,6 @@ import time
 from typing import Any, Dict, List
 
 from wechat_rpa.models.base import ChatMessage, SenderType
-from wechat_rpa.session.chat_session import ChatSession
 from wechat_rpa.tools import get_registry, register_builtin_tools
 from wechat_rpa.reply.session_memory import SessionMemory, _extract_query_key
 

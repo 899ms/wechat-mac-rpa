@@ -55,7 +55,7 @@ class TestWeChatBot:
         bot.policy.should_reply.return_value = True
 
         bot.generator = Mock()
-        bot.generator.generate.return_value = "在的"
+        bot.generator.generate.return_value = ["在的"]
 
         bot.sender = Mock()
         bot.sender.send.return_value = ActionResult(success=True, sent_text="在的")

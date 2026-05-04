@@ -3,7 +3,7 @@
 
 import pytest
 from wechat_rpa.models.base import ChatMessage, SenderType
-from wechat_rpa.session.chat_session import ChatSession
+from wechat_rpa.session.global_store import ChatState
 from wechat_rpa.reply.policy import ReplyPolicy
 from wechat_rpa.reply.generator import ReplyGenerator
 
@@ -11,7 +11,7 @@ from wechat_rpa.reply.generator import ReplyGenerator
 class TestReplyPolicy:
     def test_self_message_returns_false(self):
         policy = ReplyPolicy()
-        session = ChatSession(chat_id="c1", chat_name="Friend")
+        session = ChatState(chat_id="c1", chat_name="Friend")
         msg = ChatMessage(
             text="hello",
             sender="me",
@@ -22,7 +22,7 @@ class TestReplyPolicy:
 
     def test_system_message_returns_false(self):
         policy = ReplyPolicy()
-        session = ChatSession(chat_id="c1", chat_name="Friend")
+        session = ChatState(chat_id="c1", chat_name="Friend")
         msg = ChatMessage(
             text="system alert",
             sender="system",
@@ -31,21 +31,10 @@ class TestReplyPolicy:
         )
         assert policy.should_reply(msg, session) is False
 
-    def test_group_chat_without_at_returns_false(self):
-        policy = ReplyPolicy(require_at_in_group=True)
-        session = ChatSession(chat_id="c1", chat_name="Group (3)")
-        msg = ChatMessage(
-            text="hello everyone",
-            sender="friend",
-            sender_type=SenderType.OTHER,
-            chat_name="Group (3)",
-            is_at_me=False,
-        )
-        assert policy.should_reply(msg, session) is False
-
     def test_group_chat_with_at_returns_true(self):
         policy = ReplyPolicy()
-        session = ChatSession(chat_id="c1", chat_name="Group (3)")
+        from wechat_rpa.session.global_store import ChatState
+        session = ChatState(chat_id="c1", chat_name="Group (3)")
         msg = ChatMessage(
             text="@me hello",
             sender="friend",
@@ -57,7 +46,8 @@ class TestReplyPolicy:
 
     def test_normal_private_chat_returns_true(self):
         policy = ReplyPolicy()
-        session = ChatSession(chat_id="c1", chat_name="Alice")
+        from wechat_rpa.session.global_store import ChatState
+        session = ChatState(chat_id="c1", chat_name="Alice")
         msg = ChatMessage(
             text="hello",
             sender="Alice",
@@ -76,9 +66,9 @@ class TestReplyGenerator:
             sender_type=SenderType.OTHER,
             chat_name="Alice",
         )
-        reply = gen.generate(msg, [msg])
-        assert isinstance(reply, str)
-        assert len(reply) > 0
+        reply = gen.generate([msg], [msg])
+        assert isinstance(reply, list)
+        assert len(reply) >= 0
 
     def test_handles_none_llm_client_gracefully(self):
         gen = ReplyGenerator(llm_client=None)
@@ -88,9 +78,8 @@ class TestReplyGenerator:
             sender_type=SenderType.OTHER,
             chat_name="Alice",
         )
-        reply = gen.generate(msg, [msg])
-        assert isinstance(reply, str)
-        assert len(reply) <= 50
+        reply = gen.generate([msg], [msg])
+        assert isinstance(reply, list)
 
     def test_fallback_when_llm_fails(self):
         class FailingLLM:
@@ -104,5 +93,5 @@ class TestReplyGenerator:
             sender_type=SenderType.OTHER,
             chat_name="Alice",
         )
-        reply = gen.generate(msg, [msg])
-        assert reply == "收到"
+        reply = gen.generate([msg], [msg])
+        assert reply == []

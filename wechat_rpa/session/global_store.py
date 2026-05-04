@@ -4,12 +4,16 @@
 import difflib
 import hashlib
 import json
+import logging
+import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from wechat_rpa.models.base import ChatMessage, SenderType
+
+_logger = logging.getLogger("wechat_rpa.global_store")
 
 
 @dataclass
@@ -243,8 +247,8 @@ class GlobalStore:
                     state.messages.append(msg)
                     state._msg_ids.add(_msg_id(chat_name, msg))
                 self.chats[chat_name] = state
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning(f"加载状态失败: {e}")
 
     def save(self):
         """保存状态到磁盘"""
@@ -272,7 +276,9 @@ class GlobalStore:
                         for m in state.messages
                     ],
                 }
-            with open(self._state_file, "w", encoding="utf-8") as f:
+            tmp_file = self._state_file.with_suffix(".tmp")
+            with open(tmp_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
+            os.replace(tmp_file, self._state_file)
+        except Exception as e:
+            _logger.warning(f"GlobalStore save failed: {e}")

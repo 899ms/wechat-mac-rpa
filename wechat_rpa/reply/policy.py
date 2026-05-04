@@ -2,7 +2,7 @@
 """L4 Reply Policy - 回复决策."""
 
 from wechat_rpa.models.base import ChatMessage, SenderType
-from wechat_rpa.session.chat_session import ChatSession
+from typing import Any
 
 
 def _is_group_chat(chat_name: str) -> bool:
@@ -19,7 +19,7 @@ class ReplyPolicy:
     def __init__(self, require_at_in_group: bool = False):
         self.require_at_in_group = require_at_in_group
 
-    def should_reply(self, msg: ChatMessage, session: ChatSession) -> bool:
+    def should_reply(self, msg: ChatMessage, session: Any) -> bool:
         """
         所有回复判断交给 AI 自主决定（输出 replies: [] 表示不回复）。
         代码层只做最基本的过滤。

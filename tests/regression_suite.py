@@ -74,41 +74,43 @@ class RegressionReporter:
 def test_session_dedup(reporter):
     print("\n📦 L1: Session / Deduplication")
     try:
-        from wechat_rpa.session.chat_session import ChatSession
+        from wechat_rpa.session.global_store import GlobalStore
         from wechat_rpa.models.base import ChatMessage, SenderType
     except ImportError as e:
         reporter.skip(f"导入失败: {e}")
         return
 
-    session = ChatSession(chat_id="test_001", chat_name="测试群")
+    store = GlobalStore(max_messages=200, state_file="data/test_global_state.json")
+    chat_name = "测试群"
 
     # 测试用例 1: 首次消息应被识别为新消息
-    msg1 = ChatMessage(text="hello", sender="A", chat_name="测试群", sender_type=SenderType.OTHER)
+    msg1 = ChatMessage(text="hello", sender="A", chat_name=chat_name, sender_type=SenderType.OTHER)
     try:
-        new_msgs = session.filter_new([msg1])
-        if len(new_msgs) == 1:
+        state, unreplied = store.merge_tick(chat_name, [msg1])
+        if len(unreplied) == 1:
             reporter.ok("首次消息被正确识别为新消息")
         else:
             reporter.fail("首次消息未被识别为新消息")
     except Exception as e:
-        reporter.fail(f"filter_new 首次调用异常: {e}")
+        reporter.fail(f"merge_tick 首次调用异常: {e}")
 
     # 测试用例 2: 完全相同的消息重复出现应被过滤
     try:
-        new_msgs = session.filter_new([msg1])
-        if len(new_msgs) == 0:
+        count_before = len(state.messages)
+        state, _ = store.merge_tick(chat_name, [msg1])
+        if len(state.messages) == count_before:
             reporter.ok("重复消息被正确过滤")
         else:
             reporter.fail("重复消息未被过滤")
     except Exception as e:
-        reporter.fail(f"filter_new 重复调用异常: {e}")
+        reporter.fail(f"merge_tick 重复调用异常: {e}")
 
-    # 测试用例 3: 回声检测
+    # 测试用例 3: 回声检测（自己发送的消息不计入未回复）
     try:
-        session.record_sent("收到了")
-        echo_msg = ChatMessage(text="收到了", sender="自己", chat_name="测试群", sender_type=SenderType.SELF)
-        new_msgs = session.filter_new([echo_msg])
-        if len(new_msgs) == 0:
+        store.mark_replied(chat_name, msg1, "收到了")
+        echo_msg = ChatMessage(text="收到了", sender="自己", chat_name=chat_name, sender_type=SenderType.SELF)
+        state, unreplied = store.merge_tick(chat_name, [echo_msg])
+        if echo_msg not in unreplied:
             reporter.ok("回声消息被正确过滤")
         else:
             reporter.fail("回声消息未被过滤")

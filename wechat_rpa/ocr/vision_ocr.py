@@ -6,10 +6,13 @@ L2 OCR 模块 - VisionOCREngine
 纯 OCR 提取，不做任何业务过滤或布局判断。
 """
 
+import logging
 import os
 from typing import List
 
 import Vision
+
+_logger = logging.getLogger("wechat_rpa.vision_ocr")
 import Quartz
 from Foundation import NSURL, NSArray
 from PIL import Image
@@ -55,10 +58,12 @@ class VisionOCREngine:
         image_url = NSURL.fileURLWithPath_(image_path)
         image_source = Quartz.CGImageSourceCreateWithURL(image_url, None)
         if image_source is None:
+            _logger.warning(f"无法从 URL 创建图片源: {image_path}")
             return []
 
         cg_image = Quartz.CGImageSourceCreateImageAtIndex(image_source, 0, None)
         if cg_image is None:
+            _logger.warning(f"无法从图片源创建 CGImage: {image_path}")
             return []
 
         handler = Vision.VNImageRequestHandler.alloc().initWithCGImage_options_(
@@ -67,6 +72,7 @@ class VisionOCREngine:
 
         success, error = handler.performRequests_error_([request], None)
         if not success:
+            _logger.warning(f"Vision OCR 请求失败: {error}")
             return []
 
         elements: List[OCRTextElement] = []

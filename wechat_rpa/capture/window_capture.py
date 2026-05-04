@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """L2 Capture - 窗口截图模块"""
 
+import logging
 import subprocess
 import time
 from dataclasses import dataclass
@@ -8,6 +9,8 @@ from typing import Optional, Tuple
 
 import Quartz
 import AppKit
+
+_logger = logging.getLogger("wechat_rpa.window_capture")
 
 from wechat_rpa.models.base import Rect
 from wechat_rpa.action.login_recovery import (
@@ -127,8 +130,8 @@ class WindowCapture:
             screen = AppKit.NSScreen.mainScreen()
             if screen is not None:
                 return float(screen.backingScaleFactor())
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning(f"获取屏幕缩放因子失败: {e}")
         return 1.0
 
     def _to_screencapture_region(self, rect: Rect) -> str:
@@ -178,8 +181,9 @@ class WindowCapture:
             left_region = img.crop((0, 0, min(img.width, 60), min(img.height, 200)))
             left_text = pytesseract.image_to_string(left_region, lang='chi_sim+eng').strip()
             return bool(left_text)  # 左侧有文字/图标说明是微信
-        except Exception:
+        except Exception as e:
             # 验证失败不阻断流程，返回 True 让上层继续处理
+            _logger.warning(f"截图验证异常: {e}")
             return True
 
     def capture(self) -> CaptureResult:

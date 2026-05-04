@@ -2,10 +2,13 @@
 """Memory Engine - LLM Wiki based long-term memory with overrides support."""
 
 import json
+import logging
 import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
+
+_logger = logging.getLogger("wechat_rpa.memory.engine")
 
 
 # 默认 wiki 模板
@@ -89,8 +92,8 @@ class MemoryEngine:
                 data = json.loads(aliases_path.read_text(encoding="utf-8"))
                 for user, cfg in data.get("users", {}).items():
                     self._aliases[user] = cfg.get("aliases", [])
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.warning(f"加载 aliases 失败: {e}")
 
         # facts
         facts_path = self.overrides_dir / "facts.json"
@@ -99,8 +102,8 @@ class MemoryEngine:
                 data = json.loads(facts_path.read_text(encoding="utf-8"))
                 for user, cfg in data.get("users", {}).items():
                     self._facts[user] = cfg.get("facts", [])
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.warning(f"加载 facts 失败: {e}")
 
         # corrections
         corrections_path = self.overrides_dir / "corrections.json"
@@ -109,8 +112,8 @@ class MemoryEngine:
                 data = json.loads(corrections_path.read_text(encoding="utf-8"))
                 for group, cfg in data.get("groups", {}).items():
                     self._corrections[group] = cfg.get("corrections", [])
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.warning(f"加载 corrections 失败: {e}")
 
     def _resolve_alias(self, user_name: str) -> str:
         """根据别名找到主用户名。"""
@@ -217,14 +220,15 @@ class MemoryEngine:
     def _load_wiki(self, path: Path) -> str:
         try:
             return path.read_text(encoding="utf-8")
-        except Exception:
+        except Exception as e:
+            _logger.warning(f"加载 wiki 失败 {path}: {e}")
             return ""
 
     def _save_wiki(self, path: Path, content: str) -> None:
         try:
             path.write_text(content, encoding="utf-8")
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning(f"保存 wiki 失败 {path}: {e}")
 
     def _compress_wiki(self, wiki: str, max_chars: int) -> str:
         """压缩 wiki 到指定长度。"""
@@ -279,8 +283,8 @@ class MemoryEngine:
             new_wiki = new_wiki.strip()
             if new_wiki and len(new_wiki) > 50:
                 self._save_wiki(path, new_wiki)
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning(f"更新 wiki 失败: {e}")
 
     def _expand_search_keywords(self, keyword: str) -> List[str]:
         """把关键词扩展为包含主名和所有别名的搜索词列表。"""

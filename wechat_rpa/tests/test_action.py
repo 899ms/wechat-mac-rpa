@@ -29,8 +29,8 @@ class TestWeChatMessageSender:
         assert result.success is True
         assert result.sent_text == text
 
-        # Should be called 3 times: activate WeChat, pbcopy, paste AppleScript
-        assert mock_run.call_count == 3
+        # Should be called 4 times: activate WeChat, pbcopy, focus input, paste AppleScript
+        assert mock_run.call_count == 4
 
         calls = mock_run.call_args_list
 
@@ -46,14 +46,21 @@ class TestWeChatMessageSender:
         assert calls[1][1]["input"] == text.encode("utf-8")
         assert calls[1][1]["timeout"] == 2
 
-        # 3. AppleScript paste
+        # 3. Focus input box AppleScript
         assert calls[2][0][0][0] == "osascript"
         assert calls[2][0][0][1] == "-e"
-        script = calls[2][0][0][2]
-        assert 'keystroke "v" using command down' in script
-        assert "keystroke return" in script
+        assert "tell application" in calls[2][0][0][2]
         assert calls[2][1]["capture_output"] is True
         assert calls[2][1]["timeout"] == 5
+
+        # 4. AppleScript paste
+        assert calls[3][0][0][0] == "osascript"
+        assert calls[3][0][0][1] == "-e"
+        script = calls[3][0][0][2]
+        assert 'keystroke "v" using command down' in script
+        assert "keystroke return" in script
+        assert calls[3][1]["capture_output"] is True
+        assert calls[3][1]["timeout"] == 5
 
     def test_send_includes_wechat_activation_step(self):
         sender = WeChatMessageSender()
