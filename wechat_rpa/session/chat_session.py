@@ -65,15 +65,7 @@ class ChatSession:
         return msg.text
 
     def _find_similar_seen(self, msg: ChatMessage) -> bool:
-        """检查 msg 是否与历史消息相似（LCS >= 80%）。
-
-        图片/表情/混合消息不参与文本去重：
-        - 图片是上下文的关键部分，即使之前"看过"，在新的文字追问时仍然需要保留
-        - 重复图片的去重由上层 ImageDedupTracker（is_image_duplicate）负责
-        """
-        if msg.message_type in ("image", "sticker", "mixed"):
-            return False
-
+        """检查 msg 是否与历史消息相似（LCS >= 80%）。"""
         norm = _normalize_for_compare(self._message_fingerprint(msg))
         for chat, sender, hist_norm in self.seen_messages:
             if chat == msg.chat_name and sender == msg.sender:

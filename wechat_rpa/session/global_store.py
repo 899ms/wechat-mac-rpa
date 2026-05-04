@@ -43,15 +43,40 @@ def _msg_id(chat_name: str, msg: ChatMessage) -> str:
     return f"{chat_name}|{msg.sender}|{text_hash}"
 
 
-def _is_fuzzy_duplicate(state, text: str, lookback: int = 10) -> bool:
+def _is_fuzzy_duplicate(state, msg: ChatMessage, lookback: int = 10) -> bool:
     """模糊去重：对最近 lookback 条消息做文本相似度比较。
 
     OCR 偶尔错几个字，精确 hash 会失效。用 difflib.SequenceMatcher
     计算相似度，>= threshold 视为同一条消息。
 
+    图片/表情/混合消息：基于 image_description 做 2-gram Jaccard 模糊去重。
+
     阈值按消息长度动态调整：越短的消息要求越严格（避免不同短句误判）。
     只对 lookback 条消息比较，避免遍历全部历史影响性能。
     """
+    # 图片/表情/混合消息：基于 image_description 做 2-gram Jaccard
+    if msg.message_type in ("image", "sticker", "mixed"):
+        desc = msg.image_description
+        if not desc:
+            return False
+        for hist_msg in state.messages[-lookback:]:
+            if hist_msg.sender_type.value == "self":
+                continue
+            if hist_msg.message_type not in ("image", "sticker", "mixed"):
+                continue
+            hist_desc = hist_msg.image_description
+            if not hist_desc:
+                continue
+            ba = set(desc[i:i + 2] for i in range(len(desc) - 1))
+            bb = set(hist_desc[i:i + 2] for i in range(len(hist_desc) - 1))
+            inter = len(ba & bb)
+            union = len(ba | bb)
+            sim = inter / union if union else 0.0
+            if sim >= 0.2:
+                return True
+        return False
+
+    text = msg.text
     if not text:
         return False
 
@@ -67,11 +92,14 @@ def _is_fuzzy_duplicate(state, text: str, lookback: int = 10) -> bool:
         threshold = 0.80
 
     normalized = " ".join(text.split())
-    for msg in state.messages[-lookback:]:
+    for hist_msg in state.messages[-lookback:]:
         # 跳过 Bot 自己的消息，避免拿 Bot 回复去重用户新消息
-        if msg.sender_type.value == "self":
+        if hist_msg.sender_type.value == "self":
             continue
-        other = " ".join(msg.text.split())
+        # 跳过图片类消息（不参与文字模糊去重）
+        if hist_msg.message_type in ("image", "sticker", "mixed"):
+            continue
+        other = " ".join(hist_msg.text.split())
         if not other:
             continue
         similarity = difflib.SequenceMatcher(None, normalized, other).ratio()
