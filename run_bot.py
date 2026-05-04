@@ -125,6 +125,22 @@ class SingleInstanceLock:
                 pass
 
 
+def _cleanup_old_files(debug_dir: Path, screenshots_dir: Path, keep: int = 50):
+    """清理旧的 debug JSON 和截图，只保留最近 N 个。"""
+    for directory, pattern in [(debug_dir, "*.json"), (screenshots_dir, "*.png")]:
+        if not directory.exists():
+            continue
+        files = sorted(directory.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
+        to_delete = files[keep:]
+        if to_delete:
+            for f in to_delete:
+                try:
+                    f.unlink()
+                except OSError:
+                    pass
+            print(f"  • 清理 {directory.name}: 保留最新 {keep} 个，删除 {len(to_delete)} 个旧文件")
+
+
 def main():
     with SingleInstanceLock():
         print("=" * 60)
@@ -136,6 +152,11 @@ def main():
         print("  • 策略: 群聊直接回复（无需 @）")
         interval = 10.0 if os.environ.get("ALWAYS_USE_API", "false").lower() in ("1", "true", "yes") else 5.0
         print(f"  • 轮询: 每 {interval:.0f} 秒感知一次")
+
+        # 启动时清理旧文件
+        data_dir = Path(__file__).parent / "data"
+        _cleanup_old_files(data_dir / "debug", data_dir / "screenshots", keep=50)
+
         print("=" * 60)
         print("按 Ctrl+C 停止\n")
 

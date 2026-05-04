@@ -273,10 +273,11 @@ class SmartPerceptionPipeline:
     与 VisionPipeline 接口完全兼容（duck typing），可直接替换。
     """
 
-    # 消息区域像素差异阈值（0.005 = 0.5%）
-    DEFAULT_PIXEL_DIFF_THRESHOLD = 0.005
+    # 消息区域像素差异阈值（0.001 = 0.1%）
+    # 原值 0.005 导致大量无实质变化的截图触发 API，烧钱过快
+    DEFAULT_PIXEL_DIFF_THRESHOLD = 0.001
     # 消息区域 ROI（相对坐标 x1, y1, x2, y2），排除左侧列表和底部输入框
-    DEFAULT_MESSAGE_REGION = (0.35, 0.08, 0.95, 0.88)
+    DEFAULT_MESSAGE_REGION = (0.35, 0.12, 0.95, 0.85)
     # 窗口最小有效尺寸（小于此值视为异常，如登录浮窗）
     MIN_WINDOW_WIDTH = 800
     MIN_WINDOW_HEIGHT = 600
@@ -305,6 +306,11 @@ class SmartPerceptionPipeline:
         self.always_use_api = always_use_api
         self._last_screenshot: Optional[Path] = None
         self._last_hash: Optional[str] = None
+
+        # 连续低差异计数：连续 N 帧差异 < 阈值，进入稳定模式进一步降低阈值
+        self._consecutive_low_diff = 0
+        self._stable_mode_threshold = pixel_diff_threshold * 0.5
+        self._stable_mode_after = 3  # 连续 3 帧低差异后触发
 
         # 统计
         self.api_call_count = 0
@@ -367,19 +373,33 @@ class SmartPerceptionPipeline:
             if curr_hash == self._last_hash:
                 skip_api = True
                 diff_ratio = 0.0
+                self._consecutive_low_diff += 1
                 _logger.info(
                     f"[SmartPipeline] 截图完全相同 (hash一致)，跳过API调用"
                 )
             else:
                 diff_ratio = self._check_pixel_diff(str(self._last_screenshot), image_path)
-                skip_api = diff_ratio < self.pixel_diff_threshold
+                # 稳定模式：连续多帧低差异后，阈值临时降低 50%
+                effective_threshold = self.pixel_diff_threshold
+                if self._consecutive_low_diff >= self._stable_mode_after:
+                    effective_threshold = self._stable_mode_threshold
+                    _logger.info(
+                        f"[SmartPipeline] 稳定模式已触发 (连续{self._consecutive_low_diff}帧低差异)，"
+                        f"有效阈值降至 {effective_threshold:.6f}"
+                    )
+                skip_api = diff_ratio < effective_threshold
+                if skip_api:
+                    self._consecutive_low_diff += 1
+                else:
+                    self._consecutive_low_diff = 0
                 _logger.info(
                     f"[SmartPipeline] 像素差异: {diff_ratio:.6f} "
-                    f"(阈值={self.pixel_diff_threshold}), "
+                    f"(阈值={effective_threshold}), "
                     f"决策={'跳过API' if skip_api else '调用API'}"
                 )
         else:
             _logger.info("[SmartPipeline] 无历史截图，首次运行，调用API")
+            self._consecutive_low_diff = 0
 
         self._last_screenshot = Path(image_path)
         self._last_hash = self._compute_hash(image_path)
