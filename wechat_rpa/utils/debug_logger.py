@@ -57,6 +57,18 @@ class TickDebugInfo:
     reply_system_prompt: str = ""
     reply_user_prompt: str = ""
     reply_raw_response: str = ""
+    reply_llm_calls: List[Dict[str, Any]] = field(default_factory=list)
+    reply_tool_calls: List[Dict[str, Any]] = field(default_factory=list)
+    # 完整生成链路 trace（含每次 LLM 请求的完整 messages + response）
+    reply_generation_trace: List[Dict[str, Any]] = field(default_factory=list)
+    # Skill 加载状态
+    loaded_skills: List[str] = field(default_factory=list)
+    skill_injected_content: str = ""
+    # Hermes 联调专用字段
+    active_llm: str = ""  # "deepseek" or "hermes"
+    hermes_fallback_triggered: bool = False  # 是否触发了 use_hermes fallback
+    hermes_messages: List[Dict[str, Any]] = field(default_factory=list)  # Hermes 请求 messages
+    hermes_response: str = ""  # Hermes 响应原文
 
     # ===== Layer 1: Session 输入输出 =====
     session_input_chat_name: str = ""
@@ -255,3 +267,34 @@ class DebugLogger:
         self.current.perception_chat_name = chat_name
         self.current.perception_messages_count = messages_count
         self.current.perception_chat_list_count = chat_list_count
+
+    def log_reply_generation(
+        self,
+        system_prompt: str = "",
+        user_prompt: str = "",
+        raw_response: str = "",
+        llm_calls: list = None,
+        tool_calls: list = None,
+        trace: list = None,
+        loaded_skills: list = None,
+        skill_injected_content: str = "",
+        active_llm: str = "",
+        hermes_fallback_triggered: bool = False,
+        hermes_messages: list = None,
+        hermes_response: str = "",
+    ) -> None:
+        """记录 Reply Generator 的完整调用链路（含多轮 LLM + 工具调用）。"""
+        if self.current is None:
+            return
+        self.current.reply_system_prompt = system_prompt
+        self.current.reply_user_prompt = user_prompt
+        self.current.reply_raw_response = raw_response
+        self.current.reply_llm_calls = llm_calls or []
+        self.current.reply_tool_calls = tool_calls or []
+        self.current.reply_generation_trace = trace or []
+        self.current.loaded_skills = loaded_skills or []
+        self.current.skill_injected_content = skill_injected_content or ""
+        self.current.active_llm = active_llm
+        self.current.hermes_fallback_triggered = hermes_fallback_triggered
+        self.current.hermes_messages = hermes_messages or []
+        self.current.hermes_response = hermes_response or ""

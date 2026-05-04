@@ -1,12 +1,15 @@
 """内置工具 - 时间、天气、搜索"""
 
+import html
 import json
+import re
 from datetime import datetime
 from typing import Dict, Any
 
 import requests
 
 from .tool_registry import get_registry
+from .stock_tools import stock_query
 
 
 def _get_current_time() -> str:
@@ -35,27 +38,57 @@ def _get_weather(city: str = "", date: str = "今天") -> str:
 
 
 def _web_search(query: str = "") -> str:
-    """网页搜索"""
+    """网页搜索（360 搜索，中文查询效果最佳）"""
     if not query:
         return "请提供搜索关键词"
     try:
-        # 使用 DuckDuckGo HTML 搜索
-        url = "https://duckduckgo.com/html/"
-        params = {"q": query, "kl": "zh-cn"}
+        url = "https://www.so.com/s"
+        params = {"q": query}
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
         }
         resp = requests.get(url, params=params, headers=headers, timeout=10)
-        # 简单提取搜索结果标题和摘要
-        import re
+        text = resp.text
+
         results = []
-        # 匹配结果标题和摘要
-        for m in re.finditer(r'<a[^>]*class="result__a"[^>]*>(.*?)</a>', resp.text):
-            title = re.sub(r'<[^>]+>', '', m.group(1)).strip()
-            if title and len(title) > 5:
+        # 360 结果在 <li class="res-list"> 中
+        for block in re.finditer(r'<li[^>]*class=["\']res-list["\'][^>]*>(.*?)</li>', text, re.DOTALL | re.IGNORECASE):
+            block_html = block.group(1)
+
+            # 标题
+            title = ""
+            hm = re.search(r'<h3[^>]*>(.*?)</h3>', block_html, re.DOTALL | re.IGNORECASE)
+            if hm:
+                am = re.search(r'<a[^>]*>(.*?)</a>', hm.group(1), re.DOTALL | re.IGNORECASE)
+                if am:
+                    title = re.sub(r'<[^>]+>', '', am.group(1)).strip()
+            if not title or len(title) <= 3 or '360' in title.lower():
+                continue
+
+            # 摘要
+            snippet = ""
+            sm = re.search(r'<p[^>]*class=["\']res-desc["\'][^>]*>(.*?)</p>', block_html, re.DOTALL | re.IGNORECASE)
+            if sm:
+                snippet = re.sub(r'<[^>]+>', '', sm.group(1)).strip()
+
+            # 清理
+            title = html.unescape(title)
+            snippet = html.unescape(snippet)
+            snippet = re.sub(r'\s+', ' ', snippet)
+            if len(snippet) > 200:
+                snippet = snippet[:200] + "..."
+
+            if snippet:
+                results.append(f"{title}\n   {snippet}")
+            else:
                 results.append(title)
-            if len(results) >= 5:
+
+            if len(results) >= 20:
                 break
+
         if results:
             return f"搜索结果（{query}）：\n" + "\n".join(f"{i+1}. {r}" for i, r in enumerate(results))
         return f"未找到关于'{query}'的搜索结果"
@@ -111,4 +144,20 @@ def register_builtin_tools():
             "required": ["query"],
         },
         func=_web_search,
+    )
+
+    registry.register(
+        name="stock_query",
+        description="查询股票实时行情。支持A股（sh600519/sz000001）、港股（hk00700）、美股（AAPL）。多个代码用逗号分隔。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "stock_code": {
+                    "type": "string",
+                    "description": "股票代码，如 sh600519、sz000001、hk00700、AAPL。多个用逗号分隔。",
+                },
+            },
+            "required": ["stock_code"],
+        },
+        func=stock_query,
     )

@@ -165,12 +165,13 @@ python3 -m wechat_rpa.bot.wechat_bot
 ### 关键文件
 | 文件 | 说明 |
 |------|------|
-| `wechat_rpa/bot/wechat_bot.py` | 当前唯一入口（L1-L5 模块化架构） |
-| `wechat_rpa/parser/wechat_parser.py` | 当前模块化实现中的解析器 |
-| `wechat_rpa/action/reply_generator.py` | 当前模块化实现中的回复策略与生成器 |
-| `tests/fixtures/errors/` | 错误用例库 |
-| `wechat_rpa/tests/test_modules.py` | 模块化单元测试 |
-| `docs/02-architecture/ARCHITECTURE.md` | 目标重构架构设计（与当前 `wechat_rpa/` 结构存在差异） |
+| `wechat_rpa/bot/wechat_bot.py` | L5 主循环编排（唯一入口） |
+| `wechat_rpa/perception/smart_pipeline.py` | L3.5 智能感知管道（主力：本地预判 + qwen3.6-flash API 兜底） |
+| `wechat_rpa/perception/vision_pipeline.py` | L3.5 纯本地 OCR 管道（备用回退） |
+| `wechat_rpa/layout/layout_parser.py` + `wechat_rpa/message/extractor.py` | L3 布局解析与消息提取 |
+| `wechat_rpa/reply/policy.py` + `wechat_rpa/reply/generator.py` | L4 回复策略与生成 |
+| `tests/` 目录 | 各模块独立测试 |
+| `docs/02-architecture/ARCHITECTURE.md` | 架构设计文档 |
 
 ### 发送消息的正确方式
 ```python
@@ -180,5 +181,5 @@ subprocess.run(['pbcopy'], input=text.encode('utf-8'), timeout=2)
 
 ---
 
-**更新时间**: 2026-04-19
-**状态**: 模块化架构运行稳定，已解决循环发送和乱码问题；架构文档已同步更新去重机制（时间窗口优先 + MessageIdentity）
+**更新时间**: 2026-05-03
+**状态**: 模块化架构运行稳定；架构文档已与代码同步（双管道架构、废弃路径已清理）

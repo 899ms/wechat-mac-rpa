@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""L3.5 Smart Vision Pipeline - 本地预判 + qwen3.5-flash API 兜底
+"""L3.5 Smart Vision Pipeline - 本地预判 + qwen3.6-flash API 兜底
 
 架构:
     截图 → 像素差异判断 ──无变化──→ 本地 LayoutParser(chat_list) + 空 messages
                     │
-                    └──有变化──→ 本地 LayoutParser(chat_list) + qwen3.5-flash(messages)
+                    └──有变化──→ 本地 LayoutParser(chat_list) + qwen3.6-flash(messages)
 
 优势:
     - 92.6% 的 tick 无需调用 API（基于 69 张连续截图评测）
-    - 消息提取准确率从本地 OCR 的 ~60% 提升到 qwen3.5-flash 的 ~83%
+    - 消息提取准确率从本地 OCR 的 ~60% 提升到 qwen3.6-flash 的 ~83%
     - 群聊昵称识别、emoji、换行格式全部保留
 """
 
@@ -32,7 +32,7 @@ from wechat_rpa.action.login_recovery import WeChatLoginHandler
 _logger = logging.getLogger("wechat_rpa.smart_pipeline")
 
 # ---------------------------------------------------------------------------
-# Qwen3.5-flash API 客户端（轻量封装，避免循环导入 benchmark 脚本）
+# Qwen3.6-flash API 客户端（轻量封装，避免循环导入 benchmark 脚本）
 # ---------------------------------------------------------------------------
 
 import base64
@@ -70,8 +70,8 @@ QWEN_SYSTEM_PROMPT = """你是一位专精 UI 截图文字识别的 OCR 引擎�
   ],
   "messages": [
     {"sender": "自己", "text": "消息内容"},
-    {"sender": "wanglc", "text": "群聊中对方的消息，sender 为消息上方显示的实际昵称"},
-    {"sender": "对方", "text": "私聊中对方的消息"}
+    {"sender": "对方", "text": "私聊中对方的消息（私聊只有两个人，对方消息上方不显示昵称）"},
+    {"sender": "群成员昵称", "text": "群聊中对方的消息（群聊消息上方会显示发送者昵称，sender必须填这个昵称）"}
   ]
 }
 
@@ -89,14 +89,18 @@ QWEN_SYSTEM_PROMPT = """你是一位专精 UI 截图文字识别的 OCR 引擎�
    - 预览消息文字不要放入 nickname
 
 3. 消息 sender 判断（这是最容易出错的地方，请仔细看气泡颜色和布局）：
-   - 【最重要】绿色背景的气泡 = "自己" 发送的消息，sender 必须填 "自己"
-   - 白色或浅灰色背景的气泡 = 对方发送的消息
-   - 群聊中：对方消息上方会显示发送者昵称，sender 必须填这个实际昵称（如 "wanglc"），绝对不能填 "对方"
-   - 私聊中：对方消息的 sender 填 "对方"
-   - 辅助判断：右侧对齐的气泡是自己，左侧对齐的气泡是对方
+   - 【最重要】气泡颜色是判断 sender 的第一依据：
+     - 绿色背景的气泡 = "自己" 发送的消息，sender 必须填 "自己"
+     - 白色或浅灰色背景的气泡 = 对方发送的消息，sender 填 "对方"（私聊）或群成员昵称（群聊）
+   - 【绝对不能搞反】白色气泡绝对不是自己发的，绿色气泡绝对不是对方发的
+   - 【群聊 vs 私聊区分】
+     - 群聊：消息气泡上方会显示发送者昵称 → sender 必须填这个实际昵称
+     - 私聊：只有两个人，消息气泡上方不显示发送者昵称 → sender 必须填 "对方"
+   - 绝对不能把私聊中的对方消息填成群成员昵称或具体人名
+   - 辅助判断（颜色看不清时用）：右侧对齐的气泡是自己，左侧对齐的气泡是对方
    - 时间戳（如"昨天 21:58"、"11:34"、"00:22"）不是消息，不要输出
    - 【图片/表情包过滤】图片、表情包、链接卡片上的文字不要当作聊天消息输出，只输出消息气泡里的实际对话内容
-   - 【常见错误】不要把对方消息错标为 "自己"，也不要把 "收到"、"好的" 等短消息默认当成自己发的
+   - 【常见错误】不要把白色气泡的对方消息错标为 "自己"，也不要把短消息默认当成自己发的
 
 4. 消息（messages）：
    - 只包含实际对话内容，排除所有时间戳
@@ -112,7 +116,7 @@ QWEN_SYSTEM_PROMPT = """你是一位专精 UI 截图文字识别的 OCR 引擎�
 
 
 class _QwenAPIClient:
-    """轻量级 qwen3.5-flash API 客户端，只保留核心调用逻辑。"""
+    """轻量级 qwen3.6-flash API 客户端，只保留核心调用逻辑。"""
 
     def __init__(self, api_key: Optional[str] = None, model: str = "qwen3.6-flash"):
         self.api_key = api_key or os.environ.get("DASHSCOPE_API_KEY")
@@ -178,7 +182,7 @@ class _QwenAPIClient:
 # ---------------------------------------------------------------------------
 
 class SmartPerceptionPipeline:
-    """智能感知管道：本地预判 + qwen3.5-flash API 兜底。
+    """智能感知管道：本地预判 + qwen3.6-flash API 兜底。
 
     与 VisionPipeline 接口完全兼容（duck typing），可直接替换。
     """
@@ -300,7 +304,7 @@ class SmartPerceptionPipeline:
             )
             return self._run_local_only(image_path, window_rect, scale_factor)
 
-        # 4. 有变化：本地 Layout + qwen3.5-flash API（并行）
+        # 4. 有变化：本地 Layout + qwen3.6-flash API（并行）
         self.api_call_count += 1
         _logger.info(
             f"[SmartPipeline] 触发API调用: api_count={self.api_call_count}, "
@@ -593,13 +597,13 @@ class SmartPerceptionPipeline:
         return {"layout": layout, "elements": elements}
 
     def _run_api_pipeline(self, image_path: str) -> dict:
-        """调用 qwen3.5-flash API。"""
+        """调用 qwen3.6-flash API。"""
         client = self._get_api_client()
         if client is None:
             _logger.warning("[SmartPipeline] API客户端不可用，跳过API调用")
             return {}
         t0 = time.time()
-        _logger.info(f"[SmartPipeline] API请求开始: model=qwen3.5-flash, image={Path(image_path).name}")
+        _logger.info(f"[SmartPipeline] API请求开始: model=qwen3.6-flash, image={Path(image_path).name}")
         try:
             raw, prompt, response_text = client.recognize_with_debug(image_path)
             latency_ms = (time.time() - t0) * 1000
@@ -630,7 +634,7 @@ class SmartPerceptionPipeline:
         try:
             self._api_client = _QwenAPIClient(api_key=self._api_key)
             self._api_available = True
-            _logger.info("qwen3.5-flash API 客户端初始化成功")
+            _logger.info("qwen3.6-flash API 客户端初始化成功")
             return self._api_client
         except Exception as e:
             self._api_available = False

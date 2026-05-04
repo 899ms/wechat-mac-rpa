@@ -1,11 +1,11 @@
 # 微信 Mac RPA 架构设计文档
 
-> ⚠️ **重要提示：本文档描述的是目标重构架构（Target Architecture），而非当前实际代码结构。**
-> 
-> 当前实际代码位于 `wechat_rpa/` 目录下，但结构与本文档存在差异（例如：当前使用 `wechat_rpa/parser/wechat_parser.py` 统一处理解析，而非本文档中的 `layout/` + `message/` 拆分；当前 `action/reply_generator.py` 同时包含策略与生成逻辑，而非本文档中的 `reply/policy.py` + `reply/generator.py` 拆分）。
-> 
-> **文档分类**：`ARCHITECTURE.md`、`API_SURFACE.md`、`MODULE_INDEX.md` 属于**重构目标文档**。其他文档（如 `README.md`、`PROJECT_STATUS.md`、`LESSONS_LEARNED.md`）主要描述**当前实现**。
-> 
+> **重要提示：本文档描述的是当前已落地的生产架构（Current Production Architecture）。**
+>
+> 当前实际代码位于 `wechat_rpa/` 目录下，模块化架构（L1-L5）已全部落地。
+>
+> **文档分类**：`ARCHITECTURE.md`、`API_SURFACE.md`、`MODULE_INDEX.md` 描述**当前生产架构**。其他文档（如 `PROJECT_STATUS.md`、`LESSONS_LEARNED.md`）主要描述**当前实现状态和经验教训**。
+>
 > 目标：让任何 AI Agent 在 5 分钟内理解系统结构，并能独立修改任一模块。
 
 ---
@@ -38,10 +38,9 @@
         │                     │                     │
         ▼                     ▼                     ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Layer 3.5: Vision Pipeline                                 │
-│  wechat_rpa/perception/vision_pipeline.py                   │
-│  感知管道：capture → ocr → layout → extract                 │
-│  对 Bot 层完全隐藏视觉实现细节                              │
+│  Layer 3.5: SmartPerceptionPipeline                         │
+│  wechat_rpa/perception/smart_pipeline.py                    │
+│  智能感知管道：本地预判 + API兜底，对 Bot 层隐藏视觉细节    │
 └─────────────────────────────────────────────────────────────┘
                               │
         ┌─────────────────────┼─────────────────────┐
@@ -455,13 +454,52 @@ class MessageExtractor:
 
 ---
 
-### 2.7 Vision Pipeline (L3.5)
+### 2.7 Perception Pipeline (L3.5)
 
-**文件**: `wechat_rpa/perception/vision_pipeline.py`
+**文件**: 
+- `wechat_rpa/perception/smart_pipeline.py` — 主力感知管道（本地预判 + API 兜底）
+- `wechat_rpa/perception/vision_pipeline.py` — 纯本地 OCR 管道（备用回退）
 
 **职责**: 将 Capture → OCR → Layout → Extract 的完整视觉链路封装为单一接口。对 Bot 层完全隐藏视觉实现细节。
 
-**接口**:
+#### SmartPerceptionPipeline（主力）
+
+`SmartPerceptionPipeline` 采用"本地预判 + API 兜底"策略：
+
+1. **本地预判**：先用本地 `VisionPipeline`（OCR + Layout + Extract）提取消息
+2. **智能决策**：如果本地预判结果足够（有新消息、内容完整），直接返回
+3. **API 兜底**：如果本地预判为空或不完整，调用 qwen3.x-flash 多模态 API 对截图进行端到端识别
+4. **结果合并**：将 API 返回的消息与本地预判结果合并去重
+
+**环境变量控制**：
+- `USE_MULTIMODAL_OCR=true`（默认）：启用 SmartPerceptionPipeline
+- `ALWAYS_USE_API=true`：禁用本地预判，每次 tick 都走 API
+- `USE_MULTIMODAL_OCR=false`：回退到纯本地 VisionPipeline
+
+```python
+class SmartPerceptionPipeline:
+    def __init__(self, profile: LayoutProfile, always_use_api: bool = False):
+        self.local_pipeline = VisionPipeline(profile)
+        self.api_client = _QwenAPIClient()  # qwen3.x-flash 多模态
+        self.always_use_api = always_use_api
+    
+    def perceive(self) -> Optional[PerceptionResult]:
+        """
+        执行智能感知链路：
+        1. 本地预判 → 如果结果可用则直接返回
+        2. API 兜底 → 调用多模态 API 端到端识别
+        3. 合并去重 → 返回最终结果
+        
+        Returns:
+            PerceptionResult: 包含结构化消息列表、聊天名、截图路径
+            None: 当 Capture 失败时返回 None，由 Bot 层跳过本轮
+        """
+        pass
+```
+
+#### VisionPipeline（备用）
+
+纯本地 OCR 管道，不依赖任何外部 API：
 
 ```python
 class VisionPipeline:
@@ -480,13 +518,12 @@ class VisionPipeline:
             None: 当 Capture 失败（如未找到窗口）时返回 None，由 Bot 层跳过本轮
         """
         pass
-    
-
 ```
 
 **设计要点**:
 - Bot 层禁止直接操作 `OCRTextElement`、`UILayout`、`CaptureResult`
-- `VisionPipeline` 是 Bot 层与视觉系统之间的唯一边界
+- `SmartPerceptionPipeline` 是默认感知管道，通过 `run_bot.py` 中的 `_create_perception()` 创建
+- `VisionPipeline` 仅在 SmartPerceptionPipeline 初始化失败或环境变量指定时作为回退
 
 ---
 
@@ -632,8 +669,8 @@ class ChatSession:
 ### 2.9 Reply Policy & Generator (L4)
 
 **文件**: 
-- `wechat_rpa/reply/policy.py`
-- `wechat_rpa/reply/generator.py`
+- `wechat_rpa/reply/policy.py` — 回复决策
+- `wechat_rpa/reply/generator.py` — 回复生成
 
 **职责**:
 - `policy`: 决定是否回复
@@ -655,12 +692,24 @@ class ReplyPolicy:
         pass
 
 class ReplyGenerator:
-    def __init__(self, llm_client=None):
-        self.llm_client = llm_client or KimiClient()
+    def __init__(self, llm_client=None, complex_llm_client=None, memory_engine=None):
+        """
+        Args:
+            llm_client: 主 LLM 客户端（deepseek-v4-flash via dashscope）
+            complex_llm_client: 复杂任务 LLM 客户端（OpenClaw/Hermes，连接 127.0.0.1:18790）
+            memory_engine: 记忆引擎（可选，用于个性化回复）
+        """
+        self.llm_client = llm_client
+        self.complex_llm_client = complex_llm_client
+        self.memory_engine = memory_engine
     
-    def generate(self, msg: ChatMessage, session: ChatSession) -> str:
+    def generate(self, msg: ChatMessage, session: ChatSession) -> List[str]:
         """
         调用 LLM 生成回复。
+        
+        Returns:
+            List[str]: 可能包含多条回复（如需要分段发送）
+            []: 当不应回复时返回空列表
         
         系统提示词固定：
         - 友好自然
@@ -672,7 +721,9 @@ class ReplyGenerator:
 
 **约束**:
 - `generator` 只做内容生成，不做发送决策
-- 生成失败时返回兜底文案 "收到"
+- 生成失败时返回空列表 `[]`（不回复，不使用兜底话术）
+- `openclaw_client.py` 在 LLM 返回空响应时抛出 `RuntimeError`，由 `reply/generator.py` 的 ReplyGenerator 捕获并跳过回复
+- ReplyGenerator 支持双模型路由：简单任务走 `llm_client`（OpenClaw/Kimi），复杂任务（带 skill/tool 匹配）走 `complex_llm_client`（Hermes）
 
 ---
 
@@ -796,11 +847,16 @@ class WeChatLoginHandler:
 ```python
 class WeChatBot:
     def __init__(self, profile: LayoutProfile, on_message: Optional[Callable] = None):
-        # Bot 层只依赖 VisionPipeline，禁止直接持有 Capture/OCR/Layout/Extractor
-        self.perception = VisionPipeline(profile)
+        # Bot 层只依赖感知管道，禁止直接持有 Capture/OCR/Layout/Extractor
+        self.perception = SmartPerceptionPipeline(profile)  # 主力：本地预判 + API 兜底
+        # 回退：感知管道初始化失败时使用纯本地 VisionPipeline
+        # self.perception = VisionPipeline(profile)
         self.sessions: Dict[str, ChatSession] = {}
         self.policy = ReplyPolicy()
-        self.generator = ReplyGenerator()
+        self.generator = ReplyGenerator(
+            llm_client=DashscopeClient(model="deepseek-v4-flash"),     # 主模型
+            complex_llm_client=OpenClawClient(url="http://127.0.0.1:18790"),  # 复杂任务
+        )
         self.sender = WeChatMessageSender()
         self.on_message = on_message  # 预留：外部系统集成回调
         self.running = False
@@ -1046,10 +1102,10 @@ class ProfileSelector:
    ```
 
 3. **替换回复生成器**
-   `ReplyGenerator` 的接口已经是抽象的，可通过注入不同的 `llm_client` 实现：
-   - 本地 LLM（默认 `KimiClient`）
-   - 远程 Agent Client（OpenClaw）
-   - 规则引擎/固定回复
+   `ReplyGenerator` 的接口已经是抽象的，可通过注入不同的 LLM 客户端实现：
+   - `llm_client`: 主模型（deepseek-v4-flash via dashscope，默认）
+   - `complex_llm_client`: 复杂任务模型（OpenClaw → Kimi Code，连接 127.0.0.1:18790）
+   - `memory_engine`: 可选，用于个性化回复
 
 **更远的未来**：可把 `WeChatBot` 包装为 MCP Server，提供工具 `send_wechat_message` 和资源 `wechat://recent_messages/{chat_name}`。
 
@@ -1063,7 +1119,7 @@ class ProfileSelector:
 | OCR | 无文本识别 | 继续执行，返回空列表 |
 | Layout | 无法提取 chat_name | 跳过回复，尝试切换到未读聊天 |
 | Session | 检测到回声消息 | `filter_new()` 过滤掉，不回复 |
-| Generator | LLM 调用失败 | 返回兜底文案 "收到" |
+| Generator | LLM 调用失败 | 返回空列表 `[]`，不回复（无兜底话术） |
 | Sender | AppleScript 失败 | 返回 `ActionResult(success=False)`，不重试 |
 
 **原则**: 任何一层失败都不应该让整个系统崩溃，应该优雅降级。
@@ -1135,6 +1191,6 @@ wechat-mac-rpa/
 
 ---
 
-**最后更新**: 2026-04-17
+**最后更新**: 2026-05-03
 **文档状态**: 已覆盖全部模块，重构已完成
-**状态**: ✅ L1-L5 模块化架构已全部落地，`auto_bot_vision_ocr_v4.py` 已拆分为 `wechat_rpa/` 目录下的独立模块，旧 V2/V3/V4 文件已删除
+**状态**: ✅ L1-L5 模块化架构已全部落地。核心架构更新：SmartPerceptionPipeline（本地预判+API兜底）、双模型架构（deepseek-v4-flash + OpenClaw/Hermes）、兜底话术废弃（返回空列表）

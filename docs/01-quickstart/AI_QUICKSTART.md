@@ -56,17 +56,23 @@ python -m pytest tests/ -v
 
 ## 模块速查表
 
-| 如果你要改... | 读这个文件（当前实际代码） | 目标架构对应文件 |
-|--------------|------------------------|----------------|
-| 截图逻辑 | `wechat_rpa/capture/window_capture.py` | `wechat_rpa/capture/window_capture.py` ✅ |
-| OCR 识别 | `wechat_rpa/ocr/vision_ocr.py` | `wechat_rpa/ocr/vision_ocr.py` ✅ |
-| 布局+消息解析 | `wechat_rpa/parser/wechat_parser.py` | `wechat_rpa/layout/layout_parser.py` + `wechat_rpa/message/extractor.py` |
-| 回复策略+生成 | `wechat_rpa/action/reply_generator.py` | `wechat_rpa/reply/policy.py` + `wechat_rpa/reply/generator.py` |
-| 发送动作 | `wechat_rpa/action/message_sender.py` | `wechat_rpa/action/message_sender.py` ✅ |
-| 主循环 | `wechat_rpa/bot/wechat_bot.py` | `wechat_rpa/bot/wechat_bot.py` ✅ |
-| 运行日志 | `wechat_rpa/logging/bot_logger.py` | `wechat_rpa/logging/bot_logger.py` ✅ |
-| 聊天记录 | `wechat_rpa/storage/chat_history.py` | `wechat_rpa/storage/chat_history.py` ✅ |
-| 测试 | `wechat_rpa/tests/test_modules.py` | `tests/` 目录 |
+| 如果你要改... | 修改文件 |
+|--------------|---------|
+| 截图逻辑 | `wechat_rpa/capture/window_capture.py` ✅ |
+| OCR 识别 | `wechat_rpa/ocr/vision_ocr.py` ✅ |
+| 布局解析 | `wechat_rpa/layout/layout_parser.py` ✅ |
+| 消息提取 | `wechat_rpa/message/extractor.py` ✅ |
+| 感知管道（智能预判/API兜底切换） | `wechat_rpa/perception/smart_pipeline.py` ✅ |
+| 纯本地 OCR 管道 | `wechat_rpa/perception/vision_pipeline.py` ✅ |
+| 布局配置（边界值、阈值） | `wechat_rpa/layout/profile.py` ✅ |
+| 会话/去重 | `wechat_rpa/session/chat_session.py` ✅ |
+| 回复策略 | `wechat_rpa/reply/policy.py` ✅ |
+| 回复生成 | `wechat_rpa/reply/generator.py` ✅ |
+| 发送动作 | `wechat_rpa/action/message_sender.py` ✅ |
+| 主循环 | `wechat_rpa/bot/wechat_bot.py` ✅ |
+| 运行日志 | `wechat_rpa/logging/bot_logger.py` ✅ |
+| 聊天记录 | `wechat_rpa/storage/chat_history.py` ✅ |
+| 测试 | `tests/` 目录 ✅ |
 
 ---
 

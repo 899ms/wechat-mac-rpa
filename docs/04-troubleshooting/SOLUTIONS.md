@@ -16,7 +16,7 @@
 - **L1 Domain**: `models/base.py`
 - **L2 Capture/OCR**: `capture/window_capture.py`, `ocr/vision_ocr.py`
 - **L3 Layout/Extract**: `layout/layout_parser.py`, `layout/profile.py`, `message/extractor.py`
-- **L3.5 Pipeline**: `perception/vision_pipeline.py`
+- **L3.5 Pipeline**: `perception/smart_pipeline.py`（主力：本地预判 + API 兜底）, `perception/vision_pipeline.py`（备用回退）
 - **L4 Session/Reply/Action**: `session/chat_session.py`, `reply/generator.py`, `action/message_sender.py`, `action/login_recovery.py`
 - **L5 Bot**: `bot/wechat_bot.py`
 
@@ -24,7 +24,7 @@
 
 ```bash
 cd ~/wechat-mac-rpa
-python3 tests/test_integration.py
+python3 run_bot.py
 ```
 
 ### 核心特性
@@ -130,7 +130,8 @@ python3 scripts/view_ocr_history.py raw 100
 | 文件 | 说明 |
 |------|------|
 | `wechat_rpa/bot/wechat_bot.py` | ⭐ L5 主循环编排 |
-| `wechat_rpa/perception/vision_pipeline.py` | L3.5 视觉感知管道 |
+| `wechat_rpa/perception/smart_pipeline.py` | L3.5 智能感知管道（主力：本地预判 + API 兜底） |
+| `wechat_rpa/perception/vision_pipeline.py` | L3.5 纯本地 OCR 管道（备用回退） |
 | `wechat_rpa/capture/window_capture.py` | 窗口捕获（含登录恢复） |
 | `wechat_rpa/ocr/vision_ocr.py` | Vision OCR 引擎 |
 | `wechat_rpa/layout/layout_parser.py` | UI 布局分组 |

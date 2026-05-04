@@ -7,7 +7,7 @@
 > **当前唯一可用入口**：
 > ```bash
 > cd ~/wechat-mac-rpa
-> python3 -m wechat_rpa.bot.wechat_bot
+> python3 run_bot.py
 > ```
 >
 > **相关文档**：

@@ -1,17 +1,20 @@
 # 微信 Mac RPA 项目进度
 
 ## 更新时间
-2026-04-19 18:00
+2026-05-03 18:00
 
 ## 当前状态
-- ✅ 项目架构：Vision OCR 视觉识别方案（L1-L5 模块化已完成）
+- ✅ 项目架构：双感知管道（SmartPerceptionPipeline 主力 + VisionPipeline 备用）
 - ✅ 微信运行（版本 4.1.8）
 - ✅ OCR 识别正常
-- ✅ LLM 连接正常
+- ✅ LLM 连接正常（OpenClaw/Kimi 用于回复生成，qwen3.6-flash 用于感知 API 兜底）
 - ✅ 消息发送正常
 - ✅ 登录恢复：支持自动点击登录按钮并恢复主窗口
-- ✅ 模块化实现（`wechat_rpa/`）全部完成：Capture / OCR / Layout / Message / VisionPipeline / Session / Reply / Action / Bot
-- ✅ 真实场景回归测试已建立（`test_real_scene_extraction.py`）
+- ✅ 模块化实现（`wechat_rpa/`）全部完成
+- ✅ 真实场景回归测试已建立（`tests/test_real_scene_extraction.py`）
+- ✅ 智能感知管道已上线（`SmartPerceptionPipeline`：本地预判 + API 兜底，92.6% tick 无需调用 API）
+- ✅ Memory 引擎集成完成
+- ✅ Tool calling / Skill 匹配机制完成
 - ⏳ 昵称识别准确率仍需优化
 - ⏳ 多显示器场景支持
 
@@ -50,11 +53,11 @@
 ### 新架构模块化版（当前唯一版本）
 ```bash
 cd ~/wechat-mac-rpa
-python3 -m wechat_rpa.bot.wechat_bot
-# 或运行集成测试
-python3 tests/test_integration.py
+python3 run_bot.py
 ```
 - L1-L5 模块化架构（`wechat_rpa/`）
+- 双感知管道：SmartPerceptionPipeline（主力，本地预判 + qwen3.6-flash API 兜底） + VisionPipeline（纯本地 OCR 备用回退）
+- 环境变量 `USE_MULTIMODAL_OCR=false` 可切换回纯本地模式
 - 支持自动登录恢复（`WeChatLoginHandler`）
 - 真实场景回归测试覆盖
 
@@ -78,19 +81,23 @@ python3 tests/test_integration.py
 | 文件 | 说明 |
 |------|------|
 | `wechat_rpa/bot/wechat_bot.py` | ⭐ 模块化架构机器人（当前唯一版本） |
+| `run_bot.py` | 一键启动脚本（双管道自动选择） |
 | `scripts/view_ocr_history.py` | 查看识别历史 |
-| `utils/llm_client.py` | Kimi LLM 客户端 |
 
 ### 模块化架构（按 `ARCHITECTURE.md` 拆分）
 | 文件 | 说明 |
 |------|------|
-| `wechat_rpa/perception/vision_pipeline.py` | L3.5 视觉感知管道 |
+| `wechat_rpa/perception/smart_pipeline.py` | ⭐ L3.5 智能感知管道（主力：本地预判 + qwen3.6-flash API 兜底） |
+| `wechat_rpa/perception/vision_pipeline.py` | L3.5 纯本地 OCR 管道（备用回退） |
 | `wechat_rpa/session/chat_session.py` | L4 会话与去重 |
 | `wechat_rpa/reply/policy.py` | L4 回复决策 |
+| `wechat_rpa/reply/generator.py` | L4 回复生成（支持双模型：OpenClaw/Kimi + Hermes） |
 | `wechat_rpa/action/message_sender.py` | L4 消息发送 |
-| `wechat_rpa/bot/wechat_bot.py` | L5 主循环编排 |
+| `wechat_rpa/bot/wechat_bot.py` | ⭐ L5 主循环编排 |
 | `wechat_rpa/logging/bot_logger.py` | 运行时日志 |
 | `wechat_rpa/storage/chat_history.py` | 聊天记录持久化 |
+| `wechat_rpa/memory/engine.py` | Memory 引擎 |
+| `wechat_rpa/tools/` | Tool Registry & Built-in Tools |
 
 ---
 

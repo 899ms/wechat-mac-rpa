@@ -1,8 +1,6 @@
 # 模块索引 (Module Index)
 
-> ⚠️ **本文档基于目标重构架构（Target Architecture）编写，当前实际代码结构与此存在差异。**
-> 
-> 当前实际代码中，解析由 `wechat_rpa/parser/wechat_parser.py` 负责，回复策略与生成由 `wechat_rpa/action/reply_generator.py` 负责，测试位于 `wechat_rpa/tests/test_modules.py`。
+> **本文档描述的是当前已落地的生产架构（Current Production Architecture）。**
 >
 > AI 开发时的快速导航页。
 > 
@@ -85,11 +83,15 @@
 - **改什么**: 消息合并规则、昵称匹配、sender_type 判定
 - **不改什么**: OCR、截图
 
+### `wechat_rpa/perception/smart_pipeline.py`
+- **定位**: L3.5 智能感知管道（主力）
+- **改什么**: 本地预判与 API 兜底的切换逻辑、像素差异阈值、多模态 API 调用
+- **不改什么**: 去重策略、回复生成
+
 ### `wechat_rpa/perception/vision_pipeline.py`
-- **定位**: L3.5 视觉感知管道
+- **定位**: L3.5 纯本地 OCR 管道（备用回退）
 - **改什么**: 聚合视觉链路、错误处理、聊天切换预留接口
 - **不改什么**: 去重策略、回复生成
-- **原则**: Bot 层唯一允许直接依赖的视觉模块
 
 ### `wechat_rpa/session/chat_session.py`
 - **定位**: L4 会话/去重
@@ -103,8 +105,9 @@
 
 ### `wechat_rpa/reply/generator.py`
 - **定位**: L4 生成
-- **改什么**: Prompt 工程、LLM 调用、兜底回复
+- **改什么**: Prompt 工程、LLM 调用
 - **不改什么**: 去重逻辑
+- **注意**: 兜底回复已废弃（返回空列表），不再生成固定话术
 
 ### `wechat_rpa/action/message_sender.py`
 - **定位**: L4 执行
@@ -149,7 +152,9 @@ models/base.py
     │
     ├── message/extractor.py
     │       ↑
-    │   perception/vision_pipeline.py  ← 聚合 capture / ocr / layout / extractor
+    │   perception/vision_pipeline.py  ← 纯本地 OCR 管道
+    │       ↑
+    │   perception/smart_pipeline.py  ← 主力：本地预判 + API 兜底
     │       ↑
     │   session/chat_session.py
     │   reply/policy.py

@@ -11,17 +11,18 @@ from wechat_rpa.models.base import ActionResult, ChatMessage, PerceptionResult, 
 from wechat_rpa.perception.vision_pipeline import VisionPipeline
 from wechat_rpa.layout.profile import LayoutProfile
 from wechat_rpa.session.global_store import GlobalStore
-from wechat_rpa.reply.policy import ReplyPolicy
+from wechat_rpa.reply.policy import ReplyPolicy, _is_group_chat
 from wechat_rpa.reply.generator import ReplyGenerator
 from wechat_rpa.action.message_sender import WeChatMessageSender
 from wechat_rpa.action.chat_list_clicker import ChatListClicker
 from wechat_rpa.logging.bot_logger import BotLogger, get_logger
 from wechat_rpa.storage.message_store import MessageStore
 from wechat_rpa.utils.debug_logger import DebugLogger
+from wechat_rpa.memory import MemoryEngine
 
 
 def _try_create_openclaw_client():
-    """尝试创建 OpenClaw 客户端，失败时返回 None（使用兜底回复）"""
+    """尝试创建 OpenClaw 客户端，失败时返回 None（退化为单模型模式）"""
     try:
         from wechat_rpa.llm.openclaw_client import OpenClawClient
         return OpenClawClient.from_openclaw_config()
@@ -45,7 +46,7 @@ def _normalize_chat_name(name: str) -> str:
 
 class WeChatBot:
     def __init__(self, profile: LayoutProfile, on_message: Optional[Callable] = None, llm_client=None,
-                 debug_mode: bool = False, use_openclaw: bool = True, perception=None):
+                 complex_llm_client=None, debug_mode: bool = False, use_openclaw: bool = True, perception=None):
         if perception is not None:
             self.perception = perception
         else:
@@ -59,7 +60,21 @@ class WeChatBot:
             actual_llm = _try_create_openclaw_client()
         else:
             actual_llm = None
-        self.generator = ReplyGenerator(llm_client=actual_llm)
+
+        # 启动时自动同步 knowledge_source.md → JSON / wiki
+        try:
+            import sys
+            sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+            from scripts.sync_knowledge import sync
+            if sync():
+                print("[knowledge] 已自动同步 knowledge_source.md")
+        except Exception:
+            pass
+
+        # 先创建记忆引擎（ReplyGenerator 初始化时需要）
+        self.memory_engine: MemoryEngine = MemoryEngine(llm_client=actual_llm)
+        # 再创建 Generator，把 memory_engine 直接传入（这样 search_memory 工具才能注册）
+        self.generator = ReplyGenerator(llm_client=actual_llm, complex_llm_client=complex_llm_client, memory_engine=self.memory_engine)
         self.sender = WeChatMessageSender()
         self.on_message = on_message
         self.logger: BotLogger = get_logger()
@@ -137,24 +152,28 @@ class WeChatBot:
             chat_name = _normalize_chat_name(result.chat_name)
 
             # sender 规范化：私聊统一用聊天框名称作为对方昵称
-            is_group = self.policy._is_group_chat(chat_name)
+            is_group = _is_group_chat(chat_name)
             for msg in messages:
                 if msg.sender_type == SenderType.OTHER:
                     if not is_group:
                         # 私聊：不管 API 返回什么 sender，统一设为聊天框名称
                         msg.sender = chat_name
-                    elif msg.sender in ("对方", ""):
-                        # 群聊：sender 缺失时标记为未知
+                    elif msg.sender in ("对方", "") or msg.sender == chat_name:
+                        # 群聊：sender 缺失或等于群名时，标记为未知
                         msg.sender = "[未知]"
 
             if not chat_name:
-                self.logger.warning("当前聊天名为空，可能未打开任何聊天窗口，尝试切换到未读")
-                # 右侧可能折叠了，尝试点击左侧未读聊天展开右侧
-                switch_target = self._try_switch_to_unread_chat(result)
-                if switch_target:
-                    self.debug_logger.log_action("switch", action_input=switch_target, success=True)
+                if messages:
+                    # 右侧有消息但标题栏 OCR 失败，不切换避免误点当前聊天
+                    self.logger.warning("当前聊天名为空但检测到消息，标题栏识别失败，跳过切换避免误点")
+                    self.debug_logger.log_action("none", action_input="", success=False, error="标题栏识别失败，跳过避免误点")
                 else:
-                    self.debug_logger.log_action("none", action_input="", success=False, error="聊天名为空且无未读")
+                    self.logger.warning("当前聊天名为空且无消息，可能未打开任何聊天窗口，尝试切换到未读")
+                    switch_target = self._try_switch_to_unread_chat(result)
+                    if switch_target:
+                        self.debug_logger.log_action("switch", action_input=switch_target, success=True)
+                    else:
+                        self.debug_logger.log_action("none", action_input="", success=False, error="聊天名为空且无未读")
                 return
 
             self.logger.log_layout(
@@ -246,11 +265,22 @@ class WeChatBot:
                 reason=f"触发回复条件 (未读 {len(unreplied)} 条，需回复 {len(to_reply)} 条，生成 {len(replies)} 条回复)",
                 latest_text=unreplied[-1].text, reply_text=reply_text
             )
-            # 记录 LLM 回复生成的 prompt/response
+            # 记录 LLM 回复生成的完整链路（含多轮调用 + 工具调用）
             if self.debug_logger.current is not None:
-                self.debug_logger.current.reply_system_prompt = getattr(self.generator, 'last_system_prompt', '')
-                self.debug_logger.current.reply_user_prompt = getattr(self.generator, 'last_user_prompt', '')
-                self.debug_logger.current.reply_raw_response = getattr(self.generator, 'last_raw_response', '')
+                self.debug_logger.log_reply_generation(
+                    system_prompt=getattr(self.generator, 'last_system_prompt', ''),
+                    user_prompt=getattr(self.generator, 'last_user_prompt', ''),
+                    raw_response=getattr(self.generator, 'last_raw_response', ''),
+                    llm_calls=getattr(self.generator, 'last_llm_calls', []),
+                    tool_calls=getattr(self.generator, 'last_tool_calls', []),
+                    trace=getattr(self.generator, 'last_generation_trace', []),
+                    loaded_skills=getattr(self.generator, 'last_loaded_skills', []),
+                    skill_injected_content=getattr(self.generator, 'last_skill_injected_content', ''),
+                    active_llm=getattr(self.generator, 'last_active_llm', ''),
+                    hermes_fallback_triggered=getattr(self.generator, 'last_hermes_fallback_triggered', False),
+                    hermes_messages=getattr(self.generator, 'last_hermes_messages', []),
+                    hermes_response=getattr(self.generator, 'last_hermes_response', ''),
+                )
             self.debug_logger.log_bot_decision(
                 chat_name=chat_name,
                 new_messages_count=len(unreplied),
@@ -261,6 +291,9 @@ class WeChatBot:
 
             if not replies:
                 self.debug_logger.log_action("none", action_input="", success=False, error="所有消息都跳过")
+                # 即使不回复，也标记为已处理，避免下一轮又当成未读
+                for msg in to_reply:
+                    self.global_store.mark_replied(chat_name, msg, "(未回复)")
                 return
 
             # 免回复聊天：跳过回复，尝试切换到其他未读聊天
@@ -292,6 +325,19 @@ class WeChatBot:
             # 标记所有 to_reply 的消息为已回复（用最后一条回复文本）
             for msg in to_reply:
                 self.global_store.mark_replied(chat_name, msg, reply_text)
+
+            # 触发记忆更新（异步，不阻塞）
+            if self.memory_engine is not None:
+                # 取对方用户名：私聊用 chat_name，群聊用最后一条未读的发送者
+                is_group = _is_group_chat(chat_name)
+                user_name = chat_name if not is_group else (to_reply[-1].sender if to_reply else "")
+                if user_name:
+                    self.memory_engine.update_user_wiki(
+                        user_name=user_name,
+                        chat_name=chat_name,
+                        messages=to_reply,
+                        bot_replies=replies,
+                    )
             return
 
         except Exception as exc:

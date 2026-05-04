@@ -39,7 +39,7 @@ def _msg_id(chat_name: str, text: str, sender: str = "") -> str:
     return f"{chat_name}|{sender}|{text_hash}"
 
 
-def _is_fuzzy_duplicate(state, text: str, lookback: int = 20) -> bool:
+def _is_fuzzy_duplicate(state, text: str, lookback: int = 10) -> bool:
     """模糊去重：对最近 lookback 条消息做文本相似度比较。
 
     OCR 偶尔错几个字，精确 hash 会失效。用 difflib.SequenceMatcher
@@ -51,19 +51,22 @@ def _is_fuzzy_duplicate(state, text: str, lookback: int = 20) -> bool:
     if not text:
         return False
 
-    # 按长度动态调整阈值
+    # 按长度动态调整阈值（OCR 对中文短句容易错 1-2 个字，适当放宽）
     text_len = len(text)
     if text_len <= 3:
-        threshold = 0.95
-    elif text_len <= 8:
         threshold = 0.90
-    elif text_len <= 20:
+    elif text_len <= 8:
         threshold = 0.85
+    elif text_len <= 20:
+        threshold = 0.82
     else:
         threshold = 0.80
 
     normalized = " ".join(text.split())
     for msg in state.messages[-lookback:]:
+        # 跳过 Bot 自己的消息，避免拿 Bot 回复去重用户新消息
+        if msg.sender_type.value == "self":
+            continue
         other = " ".join(msg.text.split())
         if not other:
             continue
@@ -152,7 +155,7 @@ class GlobalStore:
                 msg.replied = True
                 msg.reply_text = reply_text
                 msg.reply_time = now
-                break
+                # 不 break，继续标记所有匹配的消息（OCR 不稳定可能导致同一条消息存了多份）
 
     def get_unreplied(self, chat_name: str) -> List[ChatMessage]:
         """获取某聊天中所有未回复的消息（按时间顺序）"""

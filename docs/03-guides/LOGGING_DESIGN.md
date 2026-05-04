@@ -110,9 +110,9 @@
 
 #### `smart_pipeline_api_call`
 ```json
-{"ts":"2026-04-15T09:12:35.567890","event":"smart_pipeline_api_call","tick_id":42,"model":"qwen3.5-flash","latency_ms":3250,"success":true,"messages_count":3,"chat_list_count":5}
+{"ts":"2026-05-03T09:12:35.567890","event":"smart_pipeline_api_call","tick_id":42,"model":"qwen3.6-flash","latency_ms":3250,"success":true,"messages_count":3,"chat_list_count":5}
 ```
-触发条件：像素差异 >= 阈值，调用 qwen3.5-flash API。
+触发条件：像素差异 >= 阈值或本地预判为空，调用 qwen3.x-flash 多模态 API 兜底。
 
 #### `smart_pipeline_fallback`
 ```json

@@ -2,7 +2,11 @@
 
 > ⚠️ **本文档描述的是目标重构架构（Target Architecture）的接口定义，当前实际代码结构与此存在差异。**
 > 
-> 当前实际实现请参考 `wechat_rpa/` 目录下的现有代码：`capture/window_capture.py`、`ocr/vision_ocr.py`、`parser/wechat_parser.py`、`action/reply_generator.py`、`action/message_sender.py`、`bot/wechat_bot.py`。
+> 当前实际实现请参考 `wechat_rpa/` 目录下的现有代码：
+> - 感知：`perception/smart_pipeline.py`（主力，双管道） + `perception/vision_pipeline.py`（备用回退）
+> - LLM：`reply/generator.py`（ReplyGenerator，支持双模型路由）
+> - 动作：`action/message_sender.py`、`action/chat_list_clicker.py`、`action/ui_interactor.py`、`action/login_recovery.py`
+> - 编排：`bot/wechat_bot.py`
 >
 > 所有公共接口集中于此。AI 写代码前可直接复制粘贴。
 
@@ -211,7 +215,7 @@ class MessageExtractor:
 
 ---
 
-## L3.5: VisionPipeline
+## L3.5: VisionPipeline (备用回退)
 
 ### VisionPipeline
 ```python
@@ -220,9 +224,24 @@ class VisionPipeline:
     def perceive(self) -> Optional[PerceptionResult]: ...
 ```
 
+## L3.5: SmartPerceptionPipeline (主力)
+
+### SmartPerceptionPipeline
+```python
+class SmartPerceptionPipeline:
+    """智能感知管道：本地预判 + qwen3.6-flash API 兜底"""
+    def __init__(self, profile: LayoutProfile,
+                 use_multimodal_ocr: bool = True,
+                 api_base_url: str = None,
+                 api_key: str = None,
+                 api_model: str = "qwen3.6-flash",
+                 use_local_fallback: bool = True): ...
+    def perceive(self) -> Optional[PerceptionResult]: ...
+```
+
 ---
 
-## L4: ChatSession
+## L4: Reply
 
 ### ChatSession
 ```python
@@ -368,11 +387,17 @@ class ChatHistory:
 ### WeChatBot
 ```python
 class WeChatBot:
-    def __init__(self, profile: LayoutProfile, on_message: Optional[Callable] = None):
-        self.perception = VisionPipeline(profile)
+    def __init__(self, profile: LayoutProfile,
+                 perception=None,      # SmartPerceptionPipeline 或 VisionPipeline
+                 llm_client=None,      # OpenClawClient 或 LLMClient
+                 complex_llm_client=None,  # HermesClient for tool calling
+                 message_store=None,
+                 logger=None,
+                 on_message: Optional[Callable] = None):
+        self.perception = perception  # SmartPerceptionPipeline (主力) 或 VisionPipeline (回退)
         self.sessions: Dict[str, ChatSession] = {}
         self.policy = ReplyPolicy()
-        self.generator = ReplyGenerator()
+        self.generator = ReplyGenerator(llm_client=llm_client, complex_llm_client=complex_llm_client)
         self.sender = WeChatMessageSender()
         self.on_message = on_message
     def tick(self) -> None: ...
@@ -380,3 +405,15 @@ class WeChatBot:
     def _get_session(self, chat_name: str) -> ChatSession: ...
     def send_to_chat(self, chat_name: str, text: str) -> ActionResult: ...
 ```
+
+---
+
+## L5: 启动入口
+
+### run_bot.py
+```bash
+cd ~/wechat-mac-rpa
+python3 run_bot.py
+```
+- 自动选择感知管道：SmartPerceptionPipeline（主力）或 VisionPipeline（回退）
+- 环境变量 `USE_MULTIMODAL_OCR=false` 可切换回纯本地模式

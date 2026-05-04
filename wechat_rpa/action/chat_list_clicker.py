@@ -27,7 +27,8 @@ class ChatListClicker:
 
         策略：
         1. 先激活微信窗口（确保有焦点）
-        2. 点击位置向左偏移，覆盖头像区域（rect 可能只包含昵称）
+        2. 点击位置取列表项中心（rect 包含昵称+预览，x 偏移确保在条目内）
+        3. 点击后等待右侧展开，避免快速连续点击导致误触
 
         Args:
             item: 要点击的 ChatListItem，包含 rect（截图像素坐标）
@@ -35,8 +36,8 @@ class ChatListClicker:
         Returns:
             True 如果点击命令执行成功
         """
-        # 点击位置：x 向左偏移 30 像素（确保覆盖头像区域），y 取中心
-        click_x = max(0, item.rect.x - 30 + item.rect.width // 2)
+        # 点击位置：取 rect 中心，避免偏左偏右点到相邻项
+        click_x = item.rect.x + item.rect.width // 2
         click_y = item.rect.y + item.rect.height // 2
 
         abs_x = int(self.window_rect.x + click_x / self.scale_factor)
@@ -49,15 +50,17 @@ class ChatListClicker:
                 timeout=3,
                 capture_output=True,
             )
-            # Step 2: 等待窗口激活 + 展开动画
+            # Step 2: 等待窗口激活 + 避免快速连续点击
             import time
-            time.sleep(0.5)
+            time.sleep(0.8)
             # Step 3: 点击
             subprocess.run(
                 ["/opt/homebrew/bin/cliclick", f"c:{abs_x},{abs_y}"],
                 check=True,
                 timeout=5,
             )
+            # Step 4: 点击后等待右侧展开稳定
+            time.sleep(0.5)
             return True
         except Exception:
             return False
