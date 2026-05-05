@@ -165,6 +165,9 @@ class WindowCapture:
         方法：OCR 截图顶部区域，检查是否有微信特有的 UI 元素
         （如左侧边栏的"搜索"、聊天列表、或标题栏文字）。
         这是一种轻量级的布局验证，不依赖具体聊天内容。
+
+        注：Tesseract 未安装时跳过验证（graceful degrade），
+        不阻断主流程，因为主 OCR 使用 qwen-vl-ocr / Vision 框架。
         """
         try:
             import pytesseract
@@ -181,6 +184,9 @@ class WindowCapture:
             left_region = img.crop((0, 0, min(img.width, 60), min(img.height, 200)))
             left_text = pytesseract.image_to_string(left_region, lang='chi_sim+eng').strip()
             return bool(left_text)  # 左侧有文字/图标说明是微信
+        except pytesseract.TesseractNotFoundError:
+            _logger.debug("Tesseract 未安装，跳过截图内容验证")
+            return True
         except Exception as e:
             _logger.warning(f"截图验证异常: {e}")
             return False
