@@ -60,13 +60,13 @@
 **强制排查流程（5 步）**：
 
 ```
-Step 1: 看排查文档 → 先读 TROUBLESHOOTING.md，按已有流程排查，不重新发明
+Step 1: 看排查文档 → 先读 RUNTIME_INVESTIGATION.md，按已有流程排查，不重新发明
 Step 2: 看日志 → 定位异常 tick
 Step 3: 看截图 → 验证 OCR 结果是否真实存在于窗口中（ground truth）
 Step 4: 看调试 JSON → 了解 Bot 决策过程（辅助参考）
 Step 5: 分层归因 → 确定问题在 Capture/OCR/Layout/Extract/Bot 哪一层
 Step 6: 修复 → 在正确层级修复，禁止跨层 workaround
-Step 7: 更新文档 → 把新发现的经验写回 TROUBLESHOOTING.md，形成沉淀
+Step 7: 更新文档 → 把新发现的经验写回 RUNTIME_INVESTIGATION.md，形成沉淀
 ```
 
 **知识沉淀闭环**：

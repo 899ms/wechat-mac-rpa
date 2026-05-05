@@ -80,7 +80,7 @@
 | `LESSONS_LEARNED.md` | 当前实现 | 🚀 已上线 |
 | `LOGGING_DESIGN.md` | 当前实现 | 🚀 已上线 |
 | `TICK_INVESTIGATION_GUIDE.md` | 当前实现 | 🚀 已上线 |
-| `TROUBLESHOOTING.md` | 当前实现 | 🚀 已上线 |
+| `RUNTIME_INVESTIGATION.md` | 当前实现 | 🚀 已上线 |
 | `ARCHITECTURE.md` | 目标重构架构 | ⚠️ 部分实现（代码与文档存在差异） |
 | `API_SURFACE.md` | 目标重构架构 | ⚠️ 部分实现（代码与文档存在差异） |
 | `MODULE_INDEX.md` | 目标重构架构 | ⚠️ 部分实现（代码与文档存在差异） |

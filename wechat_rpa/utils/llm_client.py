@@ -8,9 +8,9 @@ import sys
 from pathlib import Path
 from typing import List, Dict
 
-# 加载 .env
+# 加载 .env（项目根目录）
 def load_env():
-    env_path = Path(__file__).parent.parent.parent / "omni-bot-sdk-oss" / ".env"
+    env_path = Path(__file__).parent.parent.parent / ".env"
     if env_path.exists():
         with open(env_path) as f:
             for line in f:

@@ -61,13 +61,6 @@ class ChatMessage:
 
 
 @dataclass
-class SentMessage:
-    """记录由 Bot 自己发送的消息"""
-    text: str
-    sent_at: float
-
-
-@dataclass
 class ActionResult:
     success: bool
     sent_text: Optional[str] = None

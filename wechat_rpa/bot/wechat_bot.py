@@ -16,7 +16,6 @@ from wechat_rpa.reply.generator import ReplyGenerator
 from wechat_rpa.action.message_sender import WeChatMessageSender
 from wechat_rpa.action.chat_list_clicker import ChatListClicker
 from wechat_rpa.logging.bot_logger import BotLogger, get_logger
-from wechat_rpa.storage.message_store import MessageStore
 from wechat_rpa.utils.debug_logger import DebugLogger
 from wechat_rpa.memory import MemoryEngine
 
@@ -82,7 +81,6 @@ class WeChatBot:
         self.sender = WeChatMessageSender()
         self.on_message = on_message
         self.logger: BotLogger = get_logger()
-        self.message_store = MessageStore()
         self.running = False
         self._tick_id = 0
         self.debug_mode = debug_mode
@@ -142,7 +140,7 @@ class WeChatBot:
 
             if result.screenshot_path:
                 try:
-                    saved_path = self.message_store.save_screenshot(
+                    saved_path = self.global_store.save_screenshot(
                         result.screenshot_path, session_id=str(tick_id)
                     )
                     self.logger.debug(f"截图已保存: {saved_path}")

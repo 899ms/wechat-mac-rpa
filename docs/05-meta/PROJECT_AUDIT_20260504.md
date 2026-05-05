@@ -170,7 +170,7 @@ Python dataclass 严格拒绝未声明的 kwarg。API 路径遇到图片/表情�
 | P1-28 | PROJECT_STATUS.md LLM 名称、qwen 版本号、已清理 error 条目残留 | `PROJECT_STATUS.md` |
 | P1-29 | ARCHITECTURE.md 标记 "⚠️ 部分实现"，ChatSession/GlobalStore 名实不符 | `ARCHITECTURE.md` |
 | P1-30 | CODE_OF_CONDUCT.md 文档分类表与实际状态有出入 | `CODE_OF_CONDUCT.md` |
-| P1-31 | 大量未提交变更（7 文件 + TROUBLESHOOTING.md + data/memory/） | git status |
+| P1-31 | 大量未提交变更（7 文件 + RUNTIME_INVESTIGATION.md + data/memory/） | git status |
 | P1-32 | 无 `requirements.txt`，新人无法一键安装 | 项目根目录 |
 
 ---

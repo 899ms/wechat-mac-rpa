@@ -4,7 +4,7 @@
 import pytest
 from wechat_rpa.models.base import (
     Point, Rect, OCRTextElement, SenderType,
-    ChatMessage, SentMessage, ActionResult,
+    ChatMessage, ActionResult,
     ChatListItem, PerceptionResult
 )
 
@@ -73,13 +73,6 @@ class TestChatMessage:
         assert msg.is_at_me is True
         assert msg.timestamp == "12:34"
         assert len(msg.source_elements) == 1
-
-
-class TestSentMessage:
-    def test_creation(self):
-        sm = SentMessage(text="收到", sent_at=1234567890.0)
-        assert sm.text == "收到"
-        assert sm.sent_at == 1234567890.0
 
 
 class TestActionResult:

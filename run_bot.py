@@ -28,7 +28,7 @@ from wechat_rpa.perception.smart_pipeline import SmartPerceptionPipeline
 
 def _create_llm_client():
     """创建默认 LLM 客户端（deepseek）。"""
-    from utils.qwen_client import QwenClient
+    from wechat_rpa.utils.qwen_client import QwenClient
     print("  • LLM:  Qwen (deepseek-v4-flash via dashscope)")
     return QwenClient()
 

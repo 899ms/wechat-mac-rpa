@@ -23,10 +23,10 @@
 ### "回复时机错了"
 | 现象 | 可能原因 | 修改文件 |
 |------|---------|---------|
-| 自己发的话又回复 | 去重/回声检测失效 | `wechat_rpa/session/chat_session.py` |
-| 对同一句话反复回复 | `filter_new()` 去重不严格 | `wechat_rpa/session/chat_session.py` |
+| 自己发的话又回复 | 去重/回声检测失效 | `wechat_rpa/session/global_store.py` |
+| 对同一句话反复回复 | `merge_tick()` 去重不严格 | `wechat_rpa/session/global_store.py` |
 | 群聊没@也回复 | `@检测` 或 `群聊判断` 错误 | `wechat_rpa/reply/policy.py` |
-| 回复太频繁 | cooldown 时间太短 | `wechat_rpa/session/chat_session.py` |
+| 回复太频繁 | cooldown 时间太短 | `wechat_rpa/session/global_store.py` |
 
 ### "发送内容错了"
 | 现象 | 可能原因 | 修改文件 |
@@ -93,10 +93,11 @@
 - **改什么**: 聚合视觉链路、错误处理、聊天切换预留接口
 - **不改什么**: 去重策略、回复生成
 
-### `wechat_rpa/session/chat_session.py`
-- **定位**: L4 会话/去重
-- **改什么**: 去重算法、冷却策略、回声检测
+### `wechat_rpa/session/global_store.py`
+- **定位**: L4 会话/去重/持久化
+- **改什么**: `merge_tick()` 去重算法（LCS 序列对齐）、`_match_single()` 匹配逻辑、`_is_fuzzy_duplicate()` 模糊兜底、持久化格式
 - **不改什么**: 回复生成
+- **注意**: 该文件同时承担会话状态管理和 JSON 持久化职责，所有去重策略集中于此
 
 ### `wechat_rpa/reply/policy.py`
 - **定位**: L4 决策
@@ -156,7 +157,7 @@ models/base.py
     │       ↑
     │   perception/smart_pipeline.py  ← 主力：本地预判 + API 兜底
     │       ↑
-    │   session/chat_session.py
+    │   session/global_store.py
     │   reply/policy.py
     │   reply/generator.py
     │   action/message_sender.py

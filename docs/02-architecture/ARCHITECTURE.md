@@ -533,142 +533,135 @@ class VisionPipeline:
 
 ---
 
-### 2.8 Chat Session (L4)
+### 2.8 GlobalStore (L4)
 
-**文件**: `wechat_rpa/session/chat_session.py`
+**文件**: `wechat_rpa/session/global_store.py`
 
-**职责**: 会话状态管理 + 去重核心。**这是防止循环发送的关键层。**
+**职责**: 全局消息存储 —— 管理所有聊天的消息历史、去重、回复状态和持久化。**这是防止循环发送和消息重复处理的关键层。**
 
 **接口**:
 
 ```python
-class ChatSession:
-    def __init__(
-        self,
-        chat_id: str,
-        chat_name: str,
-        echo_time_window: float = 10.0,
-        echo_history_limit: int = 5,
-    ):
-        self.chat_id = chat_id
-        self.chat_name = chat_name
-        self.echo_time_window = echo_time_window
-        self.echo_history_limit = echo_history_limit
-        
-        # 已见过消息的去重缓存：key = (chat_name, sender, text_hash)
-        self.seen_messages: Set[Tuple[str, str, str]] = set()
-        
-        # 已见过的消息窗口指纹（用于检测滚动导致的重复视图），最多保留最近 100 个
-        from collections import deque
-        self.seen_window_hashes: deque[str] = deque(maxlen=100)
-        
-        # 自己发送的消息记录（用于回声检测）
-        self.sent_messages: List[SentMessage] = []
-        
-        self.last_reply_time: Optional[float] = None
-        self.reply_count: int = 0
+class GlobalStore:
+    def __init__(self, max_messages: int = 200, state_file: str = "data/global_state.json"):
+        self.chats: Dict[str, ChatState] = {}  # chat_name -> ChatState
+        self.max_messages = max_messages
+        self._state_file = Path(state_file)
     
-    def filter_new(self, messages: List[ChatMessage]) -> List[ChatMessage]:
+    def merge_tick(self, chat_name: str, messages: List[ChatMessage]) -> Tuple[ChatState, List[ChatMessage]]:
         """
-        从当前识别的消息列表中过滤出真正的新消息。
+        合并 tick 检测到的消息，返回 (state, 未回复的消息列表).
         
-        检查顺序（重要）：
-        1. 窗口指纹检测（如果整体消息列表近期已出现过，认为是滚动重复）
-        2. 逐条回声检测（是否是自己刚发的消息）
-        3. 上下文去重（结合上一条消息是否也匹配历史，判断是否为重复）
+        去重策略：LCS 序列对齐。
+        1. 取历史末尾 50 条作为窗口
+        2. 用 _match_single（二值匹配）做 DP 求最长公共子序列
+        3. 回溯得到 tick 中匹配 history 的索引集合 matched
+        4. matched 的最右端索引 max_matched 之后的 unmatched → 新消息
+        5. max_matched 之前的 unmatched → 旧的（嵌在匹配序列中的跳过项，通常是 OCR 抖动）
+        6. 如果 matched 为空（完全无序列匹配）→ 回退到逐条 _in_history 检查
         """
         pass
     
-    def record_sent(self, text: str) -> None:
-        """记录 Bot 自己发送的消息。"""
+    def mark_replied(self, chat_name: str, target_msg: ChatMessage, reply_text: str):
+        """标记单条消息已回复。"""
         pass
     
-    def is_in_cooldown(self, seconds: float = 30.0) -> bool:
-        """检查是否在冷却期内"""
+    def get_unreplied(self, chat_name: str) -> List[ChatMessage]:
+        """获取某聊天中所有未回复的消息（按时间顺序）"""
         pass
     
-    # 注意：回复决策统一由 ReplyPolicy 负责，Session 只提供状态查询
-
-# 去重键直接使用 Tuple[str, str, str] = (chat_name, sender, text_hash)
-# 若未来去重逻辑需要更多字段，可重新引入 MessageIdentity
+    def save(self):
+        """保存状态到磁盘（加锁保护读-改-写操作）"""
+        pass
 ```
 
-**去重算法**（完整类内实现）：
+**去重算法**（`merge_tick` 核心逻辑）：
 
 ```python
-import time
-from hashlib import md5
-
-class ChatSession:
-    # ... __init__ 如上 ...
-
-    def filter_new(self, messages: List[ChatMessage]) -> List[ChatMessage]:
-        if not messages:
-            return []
-        
-        # 1. 窗口指纹检测：如果整个消息列表近期已出现过，认为是滚动重复
-        window_hash = self._hash_messages(messages)
-        if window_hash in self.seen_window_hashes:
-            return []
-        
-        new_messages = []
-        for i, msg in enumerate(messages):
-            # 2. 回声检测：是否是自己刚发的
-            if any(self._is_echo(msg.text, sent) for sent in reversed(self.sent_messages[-self.echo_history_limit:])):
-                continue
-            
-            # 3. 上下文去重：如果该消息及其上一条都与历史匹配，则认为是重复视图
-            if self._is_seen_with_context(msg, messages, i):
-                continue
-            
-            new_messages.append(msg)
-        
-        # 将本轮所有消息记录到 seen_messages，供下一轮上下文去重使用
-        for msg in messages:
-            key = (msg.chat_name, msg.sender, md5(msg.text.encode()).hexdigest())
-            self.seen_messages.add(key)
-        
-        self.seen_window_hashes.append(window_hash)
-        return new_messages
-
-    def _is_echo(self, msg_text: str, sent: SentMessage) -> bool:
-        """判断 msg 是否是 sent 的"回声"。条件：时间窗口内 + 文本包含关系。"""
-        time_match = (time.time() - sent.sent_at) < self.echo_time_window
-        text_match = sent.text in msg_text or msg_text in sent.text
-        return time_match and text_match
-
-    def _is_seen_with_context(self, msg: ChatMessage, messages: List[ChatMessage], index: int) -> bool:
-        """
-        结合上下文判断 msg 是否是重复消息。
-        如果 msg 本身已在 seen_messages 中，且上一条消息也匹配历史，则大概率是滚动导致的重复视图。
-        """
-        key = (msg.chat_name, msg.sender, md5(msg.text.encode()).hexdigest())
-        if key not in self.seen_messages:
-            return False
-        
-        # 上下文检查：上一条消息是否也在 seen_messages 中
-        if index > 0:
-            prev = messages[index - 1]
-            prev_key = (prev.chat_name, prev.sender, md5(prev.text.encode()).hexdigest())
-            if prev_key in self.seen_messages:
-                return True
-        
+def _match_single(a: ChatMessage, b: ChatMessage, chat_name: str) -> bool:
+    """直接比较两条消息是否匹配（二值：匹配/不匹配）。"""
+    # 1. 精确匹配（标准化 sender + 内容 hash）
+    if _msg_id(chat_name, a) == _msg_id(chat_name, b):
+        return True
+    # 2. sender_type 或 message_type 不同 → 不匹配
+    if a.sender_type != b.sender_type or a.message_type != b.message_type:
         return False
+    # 3. 文字消息：SequenceMatcher >= 0.80
+    if a.message_type == "text":
+        return difflib.SequenceMatcher(None, _normalize_text(a.text), 
+                                       _normalize_text(b.text)).ratio() >= 0.80
+    # 4. 图片/表情/混合：2-gram Jaccard >= 0.08
+    return _jaccard_2gram(a.image_description, b.image_description) >= 0.08
 
-    def _hash_messages(self, messages: List[ChatMessage]) -> str:
-        """计算消息列表的上下文指纹。"""
-        content = "|".join(
-            f"{m.chat_name}:{m.sender}:{md5(m.text.encode()).hexdigest()}"
-            for m in messages
-        )
-        return md5(content.encode()).hexdigest()
+def _lcs_match(history, tick, chat_name) -> set:
+    """LCS 序列对齐：返回 tick 中匹配 history 的索引集合。"""
+    m, n = len(history), len(tick)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if _match_single(history[i - 1], tick[j - 1], chat_name):
+                dp[i][j] = dp[i - 1][j - 1] + 1
+            else:
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+    # 回溯找匹配的 tick 索引
+    matched = set()
+    i, j = m, n
+    while i > 0 and j > 0:
+        if _match_single(history[i - 1], tick[j - 1], chat_name):
+            matched.add(j - 1)
+            i -= 1; j -= 1
+        elif dp[i][j] == dp[i - 1][j]:
+            i -= 1
+        else:
+            j -= 1
+    return matched
+
+def merge_tick(self, chat_name, messages):
+    # ... tick 内去重 ...
+    
+    history_window = state.messages[-50:]  # 取最近 50 条
+    matched = _lcs_match(history_window, messages, chat_name)
+    
+    if not matched:
+        # 完全无序列匹配，回退逐条检查
+        new_messages = [msg for msg in messages if not _in_history(msg)]
+    else:
+        max_matched = max(matched)
+        # max_matched 之前的 unmatched → 旧的（OCR 抖动导致 _match_single 失败）
+        # max_matched 之后的 unmatched → 新的
+        new_messages = [
+            messages[i] for i in range(len(messages))
+            if i not in matched and i > max_matched
+        ]
+    
+    # 添加新消息到历史 + 持久化
+    for msg in new_messages:
+        state.messages.append(msg)
+        state._msg_ids.add(_msg_id(chat_name, msg))
+    
+    # 裁剪旧消息
+    if len(state.messages) > self.max_messages:
+        removed = state.messages[:-self.max_messages]
+        state.messages = state.messages[-self.max_messages:]
+        for msg in removed:
+            state._msg_ids.discard(_msg_id(chat_name, msg))
+    
+    unreplied = [msg for msg in state.messages 
+                 if not msg.replied and msg.sender_type != SenderType.SELF]
+    return state, unreplied
 ```
 
+**模糊兜底**（`_is_fuzzy_duplicate`）：
+- 文字消息：按长度动态阈值（短句 0.90，长句 0.80），用 SequenceMatcher 比较最近 10 条历史
+- 图片消息：基于 `image_description` 做 2-gram Jaccard，阈值 0.08
+- 跳过 Bot 自己发的消息（避免用 Bot 回复去重新消息）
+
 **设计要点**:
-- 去重核心不在 Storage，而在 Session
-- `sent_messages` 明确记录"这是我发的"
-- 回声检测以 **时间窗口**（10 秒内）和 **文本包含** 为主要条件
-- 引入 **窗口指纹** 和 **上下文去重** 解决聊天滚动导致的 Y 坐标不可靠问题
+- 去重核心在 GlobalStore，同时承担持久化职责
+- LCS 序列对齐优于逐条独立判断：对 OCR/API 描述抖动更鲁棒（如 "说过" vs "said"、emoji 变化）
+- `_msg_id` 使用标准化 sender（私聊对方统一为 chat_name，消除 API 昵称识别不稳定）
+- 50 条 history_window 平衡了召回率和性能
+- 持久化使用"写临时文件 + os.replace"的原子写入，外加 threading.Lock 保护
 
 ---
 
@@ -857,7 +850,7 @@ class WeChatBot:
         self.perception = SmartPerceptionPipeline(profile)  # 主力：本地预判 + API 兜底
         # 回退：感知管道初始化失败时使用纯本地 VisionPipeline
         # self.perception = VisionPipeline(profile)
-        self.sessions: Dict[str, ChatSession] = {}
+        self.global_store = GlobalStore()
         self.policy = ReplyPolicy()
         self.generator = ReplyGenerator(
             llm_client=DashscopeClient(model="deepseek-v4-flash"),     # 主模型
@@ -898,26 +891,25 @@ def tick(self) -> None:
     messages = result.messages
     chat_name = result.chat_name
     
-    session = self._get_session(chat_name)
-    new_messages = session.filter_new(messages)
+    state, unreplied = self.global_store.merge_tick(chat_name, messages)
     
-    if not new_messages:
+    if not unreplied:
         return
     
     # 推送新消息给外部系统（如 OpenClaw）
-    for msg in new_messages:
+    for msg in unreplied:
         if self.on_message:
-            self.on_message(msg, session)
+            self.on_message(msg, state)
     
-    latest = new_messages[-1]
-    should_send = self.policy.should_reply(latest, session)
+    latest = unreplied[-1]
+    should_send = self.policy.should_reply(latest, state)
     
     if should_send:
-        reply = self.generator.generate(latest, session)
+        reply = self.generator.generate(latest, state)
         if reply:
             action_result = self.sender.send(reply)
             if action_result.success:
-                session.record_sent(reply)
+                self.global_store.mark_replied(chat_name, latest, reply)
 ```
 
 **运行一次的数据流**:
@@ -1156,7 +1148,7 @@ wechat-mac-rpa/
 │   │   └── extractor.py
 │   ├── session/
 │   │   ├── __init__.py
-│   │   └── chat_session.py
+│   │   └── global_store.py
 │   ├── reply/
 │   │   ├── __init__.py
 │   │   ├── policy.py

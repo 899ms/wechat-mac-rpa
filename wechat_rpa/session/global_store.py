@@ -28,10 +28,20 @@ class ChatState:
     _msg_ids: set = field(default_factory=set)  # 去重集合（不序列化）
 
 
-def _text_hash(text: str) -> str:
-    """文本归一化后计算 hash"""
-    normalized = " ".join(text.split())
-    return hashlib.md5(normalized.encode()).hexdigest()[:16]
+def _normalize_text(text: str) -> str:
+    """文本归一化：压缩连续空白为单个空格，去除首尾空白。"""
+    return " ".join(text.split())
+
+
+def _jaccard_2gram(a: str, b: str) -> float:
+    """计算两个字符串的 2-gram Jaccard 相似度。"""
+    if not a or not b:
+        return 0.0
+    ga = set(a[i:i + 2] for i in range(len(a) - 1))
+    gb = set(b[i:i + 2] for i in range(len(b) - 1))
+    inter = len(ga & gb)
+    union = len(ga | gb)
+    return inter / union if union else 0.0
 
 
 def _is_group_chat_name(chat_name: str) -> bool:
@@ -67,7 +77,7 @@ def _msg_id(chat_name: str, msg: ChatMessage) -> str:
         content = f"[{msg.message_type}]{msg.image_description}"
     else:
         content = msg.text
-    normalized = " ".join(content.split())
+    normalized = _normalize_text(content)
     text_hash = hashlib.md5(normalized.encode()).hexdigest()[:16]
     normalized_sender = _normalize_sender(chat_name, msg)
     return f"{chat_name}|{normalized_sender}|{text_hash}"
@@ -97,11 +107,7 @@ def _is_fuzzy_duplicate(state, msg: ChatMessage, lookback: int = 10) -> bool:
             hist_desc = hist_msg.image_description
             if not hist_desc:
                 continue
-            ba = set(desc[i:i + 2] for i in range(len(desc) - 1))
-            bb = set(hist_desc[i:i + 2] for i in range(len(hist_desc) - 1))
-            inter = len(ba & bb)
-            union = len(ba | bb)
-            sim = inter / union if union else 0.0
+            sim = _jaccard_2gram(desc, hist_desc)
             if sim >= 0.08:
                 return True
         return False
@@ -121,7 +127,7 @@ def _is_fuzzy_duplicate(state, msg: ChatMessage, lookback: int = 10) -> bool:
     else:
         threshold = 0.80
 
-    normalized = " ".join(text.split())
+    normalized = _normalize_text(text)
     for hist_msg in state.messages[-lookback:]:
         # 跳过 Bot 自己的消息，避免拿 Bot 回复去重用户新消息
         if hist_msg.sender_type.value == "self":
@@ -129,7 +135,7 @@ def _is_fuzzy_duplicate(state, msg: ChatMessage, lookback: int = 10) -> bool:
         # 跳过图片类消息（不参与文字模糊去重）
         if hist_msg.message_type in ("image", "sticker", "mixed"):
             continue
-        other = " ".join(hist_msg.text.split())
+        other = _normalize_text(hist_msg.text)
         if not other:
             continue
         similarity = difflib.SequenceMatcher(None, normalized, other).ratio()
@@ -155,8 +161,8 @@ def _match_single(a: ChatMessage, b: ChatMessage, chat_name: str) -> bool:
         return False
     # 文字消息
     if a.message_type == "text":
-        text_a = " ".join(a.text.split())
-        text_b = " ".join(b.text.split())
+        text_a = _normalize_text(a.text)
+        text_b = _normalize_text(b.text)
         if not text_a or not text_b:
             return False
         return difflib.SequenceMatcher(None, text_a, text_b).ratio() >= 0.80
@@ -165,11 +171,7 @@ def _match_single(a: ChatMessage, b: ChatMessage, chat_name: str) -> bool:
     desc_b = b.image_description
     if not desc_a or not desc_b:
         return False
-    ba = set(desc_a[i:i + 2] for i in range(len(desc_a) - 1))
-    bb = set(desc_b[i:i + 2] for i in range(len(desc_b) - 1))
-    inter = len(ba & bb)
-    union = len(ba | bb)
-    sim = inter / union if union else 0.0
+    sim = _jaccard_2gram(desc_a, desc_b)
     return sim >= 0.08
 
 
@@ -217,6 +219,8 @@ class GlobalStore:
         self.max_messages = max_messages
         self._state_file = Path(state_file)
         self._state_file.parent.mkdir(parents=True, exist_ok=True)
+        self._screenshots_dir = self._state_file.parent / "screenshots"
+        self._screenshots_dir.mkdir(exist_ok=True)
         self._lock = threading.Lock()
         self._load()
 
@@ -457,3 +461,15 @@ class GlobalStore:
                 _logger.warning(f"GlobalStore save failed (IO): {type(e).__name__}: {e}")
             except Exception as e:
                 _logger.error(f"GlobalStore save failed unexpectedly: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+
+    def save_screenshot(self, image_path: str, session_id: str = None) -> str:
+        """保存截图到 data/screenshots/ 目录。"""
+        import shutil
+        from datetime import datetime
+        if session_id is None:
+            session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        filename = f"wechat_{session_id}_{timestamp}.png"
+        filepath = self._screenshots_dir / filename
+        shutil.copy2(image_path, filepath)
+        return str(filepath)

@@ -109,14 +109,14 @@ no_reply_chats = {"腾讯新闻", "文件传输助手"}
 
 ### Step 5: 深度分析单个异常 tick
 
-如果你已经通过 Step 1-4 定位到一个具体异常 tick，**不要直接写脚本分析**，先对照 **TROUBLESHOOTING.md** 的 §2 症状速查表：
+如果你已经通过 Step 1-4 定位到一个具体异常 tick，**不要直接写脚本分析**，先对照 **RUNTIME_INVESTIGATION.md** 的 §2 症状速查表：
 
 1. **加载 tick JSON** 确认字段完整性
 2. **对照症状速查表**（A-F）定位问题类别
 3. **按速查表指引的 §3 深度验证方法** 确认根因
 4. 如果速查表未匹配，运行 **§4 全面数据提取脚本**
 
-> 完整诊断流程、症状速查表、验证脚本见 `docs/04-troubleshooting/TROUBLESHOOTING.md`
+> 完整诊断流程、症状速查表、验证脚本见 `docs/04-troubleshooting/RUNTIME_INVESTIGATION.md`
 
 ---
 
@@ -172,7 +172,7 @@ grep -n "log_bot_decision" wechat_rpa/bot/wechat_bot.py
 如果根因是 **session 消息未持久化**（`data/sessions.json` 中 `messages=0`），检查 `save_sessions` / `load_sessions` 是否遗漏了 `seen_messages`：
 
 ```bash
-grep -n "seen_messages\|seen_window_hashes" wechat_rpa/session/chat_session.py
+grep -n "_msg_ids\|_is_fuzzy_duplicate\|_match_single\|_lcs_match" wechat_rpa/session/global_store.py
 ```
 
 ---
