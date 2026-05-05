@@ -682,8 +682,6 @@ class ReplyGenerator:
         msg_type = m.message_type or "text"
 
         if msg_type == "image":
-            if m.is_image_duplicate:
-                return f"{sender_name}：[重复图片]"
             desc = m.image_description or "图片"
             text_part = m.image_text or m.text or ""
             if text_part:
@@ -691,8 +689,6 @@ class ReplyGenerator:
             return f"{sender_name}：[图片] {desc}"
 
         elif msg_type == "sticker":
-            if m.is_image_duplicate:
-                return f"{sender_name}：[重复表情包]"
             desc = m.image_description or "表情包"
             text_part = m.image_text or m.text or ""
             if text_part:

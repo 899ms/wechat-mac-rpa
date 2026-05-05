@@ -399,7 +399,6 @@ class GlobalStore:
                             "message_type": m.message_type,
                             "image_description": m.image_description,
                             "image_text": m.image_text,
-                            "is_image_duplicate": m.is_image_duplicate,
                         }
                         for m in state.messages
                     ],

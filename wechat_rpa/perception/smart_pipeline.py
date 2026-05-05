@@ -210,62 +210,6 @@ from collections import deque
 from difflib import SequenceMatcher
 
 
-class ImageDedupTracker:
-    """基于描述文本相似度的图片去重器。
-
-    策略：同一聊天、同一发送者在时间窗口内，如果图片描述相似度超过阈值，
-    视为重复图片/表情包，避免 Bot 对同一张图反复反应。
-    """
-
-    def __init__(self, window_seconds: float = 60.0, similarity_threshold: float = 0.2):
-        self._entries: deque = deque()  # (chat_name, sender, description, timestamp)
-        self.window_seconds = window_seconds
-        self.similarity_threshold = similarity_threshold
-
-    def is_duplicate(self, chat_name: str, sender: str, description: str) -> bool:
-        """检查是否为重复图片。"""
-        if not description or description.startswith("["):
-            # 隐私保护标记或空描述，不参与去重判断
-            return False
-
-        now = time.time()
-        # 清理过期条目
-        while self._entries and now - self._entries[0][3] > self.window_seconds:
-            self._entries.popleft()
-
-        for cn, s, desc, _ in self._entries:
-            if cn == chat_name and s == sender:
-                sim = self._similarity(desc, description)
-                if sim >= self.similarity_threshold:
-                    return True
-        return False
-
-    def add(self, chat_name: str, sender: str, description: str):
-        """记录一张图片的描述。"""
-        if not description or description.startswith("["):
-            return
-        self._entries.append((chat_name, sender, description, time.time()))
-
-    @staticmethod
-    def _similarity(a: str, b: str) -> float:
-        """计算两段描述文本的相似度，0.0~1.0。
-
-        使用 2-gram Jaccard 系数，对中文图片描述更稳健。
-        SequenceMatcher 对长中文文本过于敏感（公共字符/量词导致误判），
-        2-gram Jaccard 基于"共同出现的相邻字对"，能更好区分不同图片。
-        """
-        if not a or not b:
-            return 0.0
-        if a == b:
-            return 1.0
-        # 生成 2-gram 集合
-        ba = set(a[i:i + 2] for i in range(len(a) - 1))
-        bb = set(b[i:i + 2] for i in range(len(b) - 1))
-        inter = len(ba & bb)
-        union = len(ba | bb)
-        return inter / union if union else 0.0
-
-
 # ---------------------------------------------------------------------------
 # SmartPerceptionPipeline
 # ---------------------------------------------------------------------------
@@ -319,9 +263,6 @@ class SmartPerceptionPipeline:
         self.api_call_count = 0
         self.skip_count = 0
         self.local_fallback_count = 0
-
-        # 图片去重跟踪器
-        self.image_dedup = ImageDedupTracker(window_seconds=60.0, similarity_threshold=0.2)
 
     # -----------------------------------------------------------------------
     # 公共接口（与 VisionPipeline.perceive 签名一致）
@@ -482,7 +423,7 @@ class SmartPerceptionPipeline:
                     "type": m.message_type,
                     "image_description": m.image_description,
                     "image_text": m.image_text,
-                    "is_image_duplicate": m.is_image_duplicate,
+
                 }
                 for m in extraction_messages
             ]
@@ -820,14 +761,6 @@ class SmartPerceptionPipeline:
             if not text and not is_media:
                 continue
 
-            # 图片去重：同一聊天同一 sender 在短时间内发送相似图片
-            is_dup = False
-            if msg_type in ("image", "sticker") and image_description:
-                if self.image_dedup.is_duplicate(chat_name, sender, image_description):
-                    is_dup = True
-                else:
-                    self.image_dedup.add(chat_name, sender, image_description)
-
             messages.append(
                 ChatMessage(
                     text=text,
@@ -837,7 +770,6 @@ class SmartPerceptionPipeline:
                     message_type=msg_type,
                     image_description=image_description,
                     image_text=image_text,
-                    is_image_duplicate=is_dup,
                 )
             )
         return messages
