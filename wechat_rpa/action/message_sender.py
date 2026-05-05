@@ -38,10 +38,25 @@ class WeChatMessageSender(MessageSender):
         发送文本消息到当前微信聊天。
 
         流程：
-        1. 激活 WeChat 窗口
-        2. 将文本复制到剪贴板 (pbcopy)
-        3. 通过 AppleScript 执行 Command+V 粘贴并回车发送
+        1. 保存用户当前剪贴板内容（pbpaste）
+        2. 激活 WeChat 窗口
+        3. 将文本复制到剪贴板 (pbcopy)
+        4. 通过 AppleScript 执行 Command+V 粘贴并回车发送
+        5. 恢复用户原来的剪贴板内容
         """
+        # 保存用户原始剪贴板内容（尽力恢复文本内容）
+        original_clipboard = ""
+        try:
+            r_clip = subprocess.run(
+                ["pbpaste"],
+                timeout=2,
+                capture_output=True,
+            )
+            if r_clip.returncode == 0:
+                original_clipboard = r_clip.stdout.decode("utf-8", errors="replace")
+        except Exception:
+            pass
+
         try:
             # 1. 确保微信窗口在前台，防止消息发到其他应用
             r1 = subprocess.run(
@@ -108,6 +123,17 @@ class WeChatMessageSender(MessageSender):
             return ActionResult(success=True, sent_text=text)
         except Exception as e:
             return ActionResult(success=False, error=str(e))
+        finally:
+            # 5. 恢复用户原始剪贴板内容
+            try:
+                subprocess.run(
+                    ["pbcopy"],
+                    input=original_clipboard.encode("utf-8"),
+                    timeout=2,
+                    capture_output=True,
+                )
+            except Exception:
+                pass
 
     def send_image(self, image_path: str) -> ActionResult:
         """预留：将图片复制到剪贴板后 Command+V 粘贴发送。"""

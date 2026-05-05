@@ -42,17 +42,11 @@ class VisionOCREngine:
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image not found: {image_path}")
 
-        # 获取图片尺寸用于坐标转换
-        img = Image.open(image_path).convert("RGB")
-        image_width, image_height = img.size
-        self._last_image_width = image_width
-        self._last_image_height = image_height
-
-        # 创建 Vision 请求
-        request = Vision.VNRecognizeTextRequest.alloc().init()
-        request.setRecognitionLanguages_(NSArray.arrayWithObject_(self.language))
-        request.setRecognitionLevel_(Vision.VNRequestTextRecognitionLevelAccurate)
-        request.setUsesLanguageCorrection_(True)
+        # 获取图片尺寸用于坐标转换（使用 with 确保关闭）
+        with Image.open(image_path).convert("RGB") as img:
+            image_width, image_height = img.size
+            self._last_image_width = image_width
+            self._last_image_height = image_height
 
         # 加载图片
         image_url = NSURL.fileURLWithPath_(image_path)
@@ -63,49 +57,66 @@ class VisionOCREngine:
 
         cg_image = Quartz.CGImageSourceCreateImageAtIndex(image_source, 0, None)
         if cg_image is None:
+            Quartz.CFRelease(image_source)
             _logger.warning(f"无法从图片源创建 CGImage: {image_path}")
             return []
 
-        handler = Vision.VNImageRequestHandler.alloc().initWithCGImage_options_(
-            cg_image, None
-        )
+        request = None
+        handler = None
+        try:
+            # 创建 Vision 请求
+            request = Vision.VNRecognizeTextRequest.alloc().init()
+            request.setRecognitionLanguages_(NSArray.arrayWithObject_(self.language))
+            request.setRecognitionLevel_(Vision.VNRequestTextRecognitionLevelAccurate)
+            request.setUsesLanguageCorrection_(True)
 
-        success, error = handler.performRequests_error_([request], None)
-        if not success:
-            _logger.warning(f"Vision OCR 请求失败: {error}")
-            return []
-
-        elements: List[OCRTextElement] = []
-        for observation in request.results():
-            text = str(observation.text())
-            confidence = float(observation.confidence())
-            bbox = observation.boundingBox()
-
-            # Vision 使用左下角原点、归一化坐标；转换为左上角原点像素坐标
-            vx = float(bbox.origin.x)
-            vy = float(bbox.origin.y)
-            vw = float(bbox.size.width)
-            vh = float(bbox.size.height)
-
-            x = int(vx * image_width)
-            y = int((1.0 - vy - vh) * image_height)
-            width = int(vw * image_width)
-            height = int(vh * image_height)
-            cx = int((vx + vw / 2) * image_width)
-            cy = int((1.0 - vy - vh / 2) * image_height)
-
-            elements.append(
-                OCRElement(
-                    text=text.strip(),
-                    bbox=Rect(x=x, y=y, width=width, height=height),
-                    center=Point(x=cx, y=cy),
-                    confidence=confidence,
-                )
+            handler = Vision.VNImageRequestHandler.alloc().initWithCGImage_options_(
+                cg_image, None
             )
 
-        # 按 center.y 升序排列（从上到下）
-        elements.sort(key=lambda e: e.center.y)
-        return elements
+            success, error = handler.performRequests_error_([request], None)
+            if not success:
+                _logger.warning(f"Vision OCR 请求失败: {error}")
+                return []
+
+            elements: List[OCRTextElement] = []
+            for observation in request.results():
+                text = str(observation.text())
+                confidence = float(observation.confidence())
+                bbox = observation.boundingBox()
+
+                # Vision 使用左下角原点、归一化坐标；转换为左上角原点像素坐标
+                vx = float(bbox.origin.x)
+                vy = float(bbox.origin.y)
+                vw = float(bbox.size.width)
+                vh = float(bbox.size.height)
+
+                x = int(vx * image_width)
+                y = int((1.0 - vy - vh) * image_height)
+                width = int(vw * image_width)
+                height = int(vh * image_height)
+                cx = int((vx + vw / 2) * image_width)
+                cy = int((1.0 - vy - vh / 2) * image_height)
+
+                elements.append(
+                    OCRElement(
+                        text=text.strip(),
+                        bbox=Rect(x=x, y=y, width=width, height=height),
+                        center=Point(x=cx, y=cy),
+                        confidence=confidence,
+                    )
+                )
+
+            # 按 center.y 升序排列（从上到下）
+            elements.sort(key=lambda e: e.center.y)
+            return elements
+        finally:
+            if handler is not None:
+                handler.release()
+            if request is not None:
+                request.release()
+            Quartz.CGImageRelease(cg_image)
+            Quartz.CFRelease(image_source)
 
     @property
     def image_width(self) -> int:

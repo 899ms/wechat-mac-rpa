@@ -67,12 +67,19 @@ def _web_search(query: str = "") -> str:
                 if am:
                     link = html.unescape(am.group(1)).strip()
                     title = re.sub(r'<[^>]+>', '', am.group(2)).strip()
-                    # 360 跳转链接解码
-                    if link.startswith("https://www.so.com/link?"):
-                        m = re.search(r'[?&]url=([^&]+)', link)
-                        if m:
-                            from urllib.parse import unquote
-                            link = unquote(m.group(1))
+                    # 优先从 data-mdurl 拿真实URL（360 跳转链接是加密的，无法直接访问）
+                    mdurl = re.search(r'data-mdurl=["\']([^"\']+)["\']', block_html)
+                    if mdurl:
+                        real = html.unescape(mdurl.group(1)).strip()
+                        if real.startswith(("http://", "https://")):
+                            link = real
+                    else:
+                        # 兜底：360 旧版跳转链接解码（url= 参数）
+                        if link.startswith("https://www.so.com/link?"):
+                            m = re.search(r'[?&]url=([^&]+)', link)
+                            if m:
+                                from urllib.parse import unquote
+                                link = unquote(m.group(1))
             if not title or len(title) <= 3 or '360' in title.lower():
                 continue
 

@@ -182,9 +182,8 @@ class WindowCapture:
             left_text = pytesseract.image_to_string(left_region, lang='chi_sim+eng').strip()
             return bool(left_text)  # 左侧有文字/图标说明是微信
         except Exception as e:
-            # 验证失败不阻断流程，返回 True 让上层继续处理
             _logger.warning(f"截图验证异常: {e}")
-            return True
+            return False
 
     def capture(self) -> CaptureResult:
         """
@@ -201,6 +200,19 @@ class WindowCapture:
             WeChatNotReadyError: 窗口尺寸异常，可能需要扫码登录
             CaptureValidationError: 截图内容验证失败
         """
+        # 清理旧截图（超过1小时的临时文件，避免 /tmp 无限累积）
+        try:
+            import glob, time
+            cutoff = time.time() - 3600
+            for old in glob.glob("/tmp/wechat_capture_*.png"):
+                try:
+                    if os.path.getmtime(old) < cutoff:
+                        os.remove(old)
+                except OSError:
+                    pass
+        except Exception:
+            pass
+
         # 每次调用生成新的输出路径，避免覆盖旧截图
         # 这是 SmartPerceptionPipeline 像素 diff 正确工作的前提
         import os

@@ -7,7 +7,9 @@ import json
 import logging
 import os
 import re
+import threading
 import time
+import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -48,9 +50,8 @@ def _normalize_sender(chat_name: str, msg: ChatMessage) -> str:
     if msg.sender_type == SenderType.SELF:
         return "自己"
     if not _is_group_chat_name(chat_name):
-        # 私聊：sender 缺失时用 chat_name 替代
-        if msg.sender in ("对方", "", "[未知]"):
-            return chat_name
+        # 私聊：对方 sender 统一为 chat_name，避免 API 昵称识别不稳定导致去重失效
+        return chat_name
     # 群聊：保留原始 sender（具体昵称或"对方"）
     return msg.sender
 
@@ -101,7 +102,7 @@ def _is_fuzzy_duplicate(state, msg: ChatMessage, lookback: int = 10) -> bool:
             inter = len(ba & bb)
             union = len(ba | bb)
             sim = inter / union if union else 0.0
-            if sim >= 0.001:
+            if sim >= 0.08:
                 return True
         return False
 
@@ -169,25 +170,43 @@ def _match_single(a: ChatMessage, b: ChatMessage, chat_name: str) -> bool:
     inter = len(ba & bb)
     union = len(ba | bb)
     sim = inter / union if union else 0.0
-    return sim >= 0.001
+    return sim >= 0.08
 
 
-def _is_truncated(msg: ChatMessage, history_window: List[ChatMessage]) -> bool:
-    """检查 msg 是否是历史中某条文字消息的截断版本（子串包含关系）。"""
-    if msg.message_type != "text":
-        return False
-    text = msg.text.strip()
-    if not text:
-        return False
-    for hist_msg in history_window:
-        if hist_msg.message_type != "text":
-            continue
-        hist_text = hist_msg.text.strip()
-        if not hist_text:
-            continue
-        if text in hist_text or hist_text in text:
-            return True
-    return False
+def _lcs_match(history: List[ChatMessage], tick: List[ChatMessage], chat_name: str) -> set:
+    """LCS 序列对齐：返回 tick 中匹配 history 的索引集合。
+
+    使用二值 match_score：_match_single 返回 True → 得 1 分，否则 0 分。
+    回溯得到 matched_tick_indices，用于判断 tick 中哪些消息是旧的。
+    """
+    m, n = len(history), len(tick)
+    if m == 0 or n == 0:
+        return set()
+
+    # dp[i][j] = history[0:i] 和 tick[0:j] 的 LCS 长度
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if _match_single(history[i - 1], tick[j - 1], chat_name):
+                dp[i][j] = dp[i - 1][j - 1] + 1
+            else:
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+
+    # 回溯找匹配的 tick 索引
+    matched = set()
+    i, j = m, n
+    while i > 0 and j > 0:
+        if _match_single(history[i - 1], tick[j - 1], chat_name):
+            # match 时 dp[i][j] 一定等于 dp[i-1][j-1]+1（单调性保证）
+            matched.add(j - 1)
+            i -= 1
+            j -= 1
+        elif dp[i][j] == dp[i - 1][j]:
+            i -= 1
+        else:
+            j -= 1
+
+    return matched
 
 
 class GlobalStore:
@@ -198,26 +217,11 @@ class GlobalStore:
         self.max_messages = max_messages
         self._state_file = Path(state_file)
         self._state_file.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.Lock()
         self._load()
 
-    def merge_tick(self, chat_name: str, messages: List[ChatMessage]) -> Tuple[ChatState, List[ChatMessage]]:
-        """
-        合并 tick 检测到的消息，返回 (state, 未回复的消息列表).
-
-        去重策略：滑动前缀匹配。
-        1. 在历史消息序列中寻找 tick 的最长前缀匹配位置（允许匹配起点在历史任意位置）
-        2. 如果 tick 全部匹配历史 → 无新消息（用户在向上滚动查看旧消息）
-        3. 如果 tick 前缀匹配历史，后缀不匹配 → 后缀是新消息
-        4. 如果完全无匹配 → 回退到逐条 _in_history 检查
-
-        匹配使用标准化 sender + 内容，消除"对方"与昵称不一致问题。
-        """
-        if chat_name not in self.chats:
-            self.chats[chat_name] = ChatState(
-                chat_id=f"chat_{len(self.chats)}",
-                chat_name=chat_name,
-            )
-
+    def _merge_tick_legacy(self, chat_name: str, messages: List[ChatMessage]) -> List[ChatMessage]:
+        """旧算法：滑动前缀匹配（保留用于 A/B 对比测试）。"""
         state = self.chats[chat_name]
 
         def _in_history(msg: ChatMessage) -> bool:
@@ -225,7 +229,7 @@ class GlobalStore:
                 state, msg, lookback=len(state.messages)
             )
 
-        # tick 内去重（同一 tick 中重复消息只保留一条）
+        # tick 内去重
         seen_ids = set()
         unique_messages = []
         for msg in messages:
@@ -235,50 +239,89 @@ class GlobalStore:
                 unique_messages.append(msg)
         messages = unique_messages
 
-        new_messages: List[ChatMessage] = []
+        if not messages or not state.messages:
+            return messages if not state.messages else []
 
-        if not messages:
-            # tick 为空，直接返回当前未回复列表
-            pass
-        elif not state.messages:
-            # 没有历史，全部是新消息
-            new_messages = messages
-        else:
-            # 滑动前缀匹配：在历史末尾窗口中寻找 tick 的最长前缀匹配
-            search_window = min(len(state.messages), max(50, len(messages) * 3))
-            history_window = state.messages[-search_window:]
+        search_window = min(len(state.messages), max(50, len(messages) * 3))
+        history_window = state.messages[-search_window:]
 
-            best_match_len = 0
-            best_match_start = -1
-
-            for i in range(len(history_window)):
-                match_len = 0
-                for j in range(len(messages)):
-                    if i + j >= len(history_window):
-                        break
-                    if _match_single(history_window[i + j], messages[j], chat_name):
-                        match_len += 1
-                    else:
-                        break
-                if match_len > best_match_len:
-                    best_match_len = match_len
-                    best_match_start = i
-
-            if best_match_len == len(messages):
-                # tick 全部在历史中，无新消息（用户在向上滚动）
-                new_messages = []
-            elif best_match_len >= 1:
-                # 前缀匹配成功，检查匹配段是否接近历史末尾
-                match_end_in_history = best_match_start + best_match_len
-                if match_end_in_history >= len(history_window) - 2:
-                    # 匹配段接近末尾，后缀是新消息
-                    new_messages = messages[best_match_len:]
+        best_match_len = 0
+        best_match_start = -1
+        for i in range(len(history_window)):
+            match_len = 0
+            for j in range(len(messages)):
+                if i + j >= len(history_window):
+                    break
+                if _match_single(history_window[i + j], messages[j], chat_name):
+                    match_len += 1
                 else:
-                    # 匹配到历史中间，但 tick 比匹配段长——不合理，回退逐条检查
-                    new_messages = [msg for msg in messages if not _in_history(msg)]
+                    break
+            if match_len > best_match_len:
+                best_match_len = match_len
+                best_match_start = i
+
+        if best_match_len == len(messages):
+            return []
+        elif best_match_len >= 1:
+            match_end_in_history = best_match_start + best_match_len
+            if match_end_in_history >= len(history_window) - 2:
+                return messages[best_match_len:]
             else:
-                # 完全无匹配，回退到逐条检查
-                new_messages = [msg for msg in messages if not _in_history(msg)]
+                return [msg for msg in messages if not _in_history(msg)]
+        else:
+            return [msg for msg in messages if not _in_history(msg)]
+
+    def _merge_tick_lcs(self, chat_name: str, messages: List[ChatMessage]) -> List[ChatMessage]:
+        """新算法：LCS 序列对齐（独立出来用于 A/B 对比测试）。"""
+        state = self.chats[chat_name]
+
+        def _in_history(msg: ChatMessage) -> bool:
+            return _msg_id(chat_name, msg) in state._msg_ids or _is_fuzzy_duplicate(
+                state, msg, lookback=len(state.messages)
+            )
+
+        # tick 内去重
+        seen_ids = set()
+        unique_messages = []
+        for msg in messages:
+            mid = _msg_id(chat_name, msg)
+            if mid not in seen_ids:
+                seen_ids.add(mid)
+                unique_messages.append(msg)
+        messages = unique_messages
+
+        if not messages or not state.messages:
+            return messages if not state.messages else []
+
+        search_window = min(len(state.messages), 50)
+        history_window = state.messages[-search_window:]
+        matched = _lcs_match(history_window, messages, chat_name)
+
+        if not matched:
+            return [msg for msg in messages if not _in_history(msg)]
+
+        max_matched = max(matched)
+        return [
+            messages[i]
+            for i in range(len(messages))
+            if i not in matched and i > max_matched
+        ]
+
+    def merge_tick(self, chat_name: str, messages: List[ChatMessage]) -> Tuple[ChatState, List[ChatMessage]]:
+        """
+        合并 tick 检测到的消息，返回 (state, 未回复的消息列表).
+
+        当前使用旧算法（滑动前缀匹配）。LCS 新算法在 _merge_tick_lcs 中，
+        待 A/B 测试通过后再切换。
+        """
+        if chat_name not in self.chats:
+            self.chats[chat_name] = ChatState(
+                chat_id=f"chat_{len(self.chats)}",
+                chat_name=chat_name,
+            )
+
+        state = self.chats[chat_name]
+        new_messages = self._merge_tick_lcs(chat_name, messages)
 
         # 添加新消息到历史
         for msg in new_messages:
@@ -375,37 +418,42 @@ class GlobalStore:
                     state.messages.append(msg)
                     state._msg_ids.add(_msg_id(chat_name, msg))
                 self.chats[chat_name] = state
+        except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
+            _logger.warning(f"加载状态失败: {type(e).__name__}: {e}")
         except Exception as e:
-            _logger.warning(f"加载状态失败: {e}")
+            _logger.error(f"加载状态发生未预期错误: {type(e).__name__}: {e}\n{traceback.format_exc()}")
 
     def save(self):
-        """保存状态到磁盘"""
-        try:
-            data = {}
-            for chat_name, state in self.chats.items():
-                data[chat_name] = {
-                    "chat_id": state.chat_id,
-                    "chat_name": state.chat_name,
-                    "messages": [
-                        {
-                            "text": m.text,
-                            "sender": m.sender,
-                            "sender_type": m.sender_type.value,
-                            "chat_name": m.chat_name,
-                            "is_at_me": m.is_at_me,
-                            "replied": m.replied,
-                            "reply_text": m.reply_text,
-                            "reply_time": m.reply_time,
-                            "message_type": m.message_type,
-                            "image_description": m.image_description,
-                            "image_text": m.image_text,
-                        }
-                        for m in state.messages
-                    ],
-                }
-            tmp_file = self._state_file.with_suffix(".tmp")
-            with open(tmp_file, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            os.replace(tmp_file, self._state_file)
-        except Exception as e:
-            _logger.warning(f"GlobalStore save failed: {e}")
+        """保存状态到磁盘（加锁保护读-改-写操作）"""
+        with self._lock:
+            try:
+                data = {}
+                for chat_name, state in self.chats.items():
+                    data[chat_name] = {
+                        "chat_id": state.chat_id,
+                        "chat_name": state.chat_name,
+                        "messages": [
+                            {
+                                "text": m.text,
+                                "sender": m.sender,
+                                "sender_type": m.sender_type.value,
+                                "chat_name": m.chat_name,
+                                "is_at_me": m.is_at_me,
+                                "replied": m.replied,
+                                "reply_text": m.reply_text,
+                                "reply_time": m.reply_time,
+                                "message_type": m.message_type,
+                                "image_description": m.image_description,
+                                "image_text": m.image_text,
+                            }
+                            for m in state.messages
+                        ],
+                    }
+                tmp_file = self._state_file.with_suffix(".tmp")
+                with open(tmp_file, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                os.replace(tmp_file, self._state_file)
+            except (PermissionError, OSError) as e:
+                _logger.warning(f"GlobalStore save failed (IO): {type(e).__name__}: {e}")
+            except Exception as e:
+                _logger.error(f"GlobalStore save failed unexpectedly: {type(e).__name__}: {e}\n{traceback.format_exc()}")

@@ -45,44 +45,69 @@ class KimiClient:
         self.model = os.getenv("LLM_MODEL", "kimi-for-coding")
         self.conversations: Dict[str, List[dict]] = {}
     
-    def chat(self, user_id: str, message: str, system_prompt: str = None) -> str:
-        """生成回复"""
-        
-        if user_id not in self.conversations:
-            self.conversations[user_id] = []
-            if system_prompt:
-                self.conversations[user_id].append(
-                    {"role": "system", "content": system_prompt}
-                )
-        
-        self.conversations[user_id].append(
-            {"role": "user", "content": message}
-        )
-        
-        # 限制历史
-        if len(self.conversations[user_id]) > 21:
-            self.conversations[user_id] = [
-                self.conversations[user_id][0],  # system
-                *self.conversations[user_id][-20:]
-            ]
-        
+    def chat(
+        self,
+        user_id: str = None,
+        message: str = None,
+        messages: List[Dict] = None,
+        temperature: float = None,
+        max_tokens: int = None,
+        system_prompt: str = None,
+    ) -> str:
+        """生成回复。
+
+        兼容两种调用方式：
+        - 旧方式: chat(user_id, message, system_prompt)
+        - 新方式: chat(messages=[{"role": "user", "content": "..."}], temperature=0.3)
+        """
+        # 新接口：直接传入 messages 列表
+        if messages is not None:
+            conv_messages = list(messages)
+            user_id = user_id or "default"
+        else:
+            # 旧接口：使用 user_id + message
+            if user_id is None or message is None:
+                raise ValueError("KimiClient.chat 需要传入 messages= 或 (user_id, message)")
+            if user_id not in self.conversations:
+                self.conversations[user_id] = []
+                if system_prompt:
+                    self.conversations[user_id].append(
+                        {"role": "system", "content": system_prompt}
+                    )
+            self.conversations[user_id].append(
+                {"role": "user", "content": message}
+            )
+            # 限制历史
+            if len(self.conversations[user_id]) > 21:
+                self.conversations[user_id] = [
+                    self.conversations[user_id][0],  # system
+                    *self.conversations[user_id][-20:]
+                ]
+            conv_messages = self.conversations[user_id]
+
+        temp = temperature if temperature is not None else 0.7
+        tokens = max_tokens if max_tokens is not None else 1000
+
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
-                messages=self.conversations[user_id],
-                temperature=0.7,
-                max_tokens=1000,
-                timeout=30  # 30秒超时
+                messages=conv_messages,
+                temperature=temp,
+                max_tokens=tokens,
+                timeout=30,
             )
-            
             reply = response.choices[0].message.content
-            self.conversations[user_id].append(
-                {"role": "assistant", "content": reply}
-            )
+
+            # 旧接口模式下保存对话历史
+            if messages is None and user_id in self.conversations:
+                self.conversations[user_id].append(
+                    {"role": "assistant", "content": reply}
+                )
             return reply
-            
+
         except Exception as e:
-            print(f"LLM 错误: {e}")
+            _logger = __import__("logging").getLogger("wechat_rpa.llm_client")
+            _logger.error(f"LLM 错误: {e}")
             return "抱歉，服务暂时不可用"
     
     def clear_history(self, user_id: str):

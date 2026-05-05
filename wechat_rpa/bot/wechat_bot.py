@@ -39,11 +39,8 @@ def _normalize_chat_name(name: str) -> str:
     if not name:
         return ""
     name = name.replace("(", "（").replace(")", "）")
-    name = name.replace('"', '"').replace('"', '"')
-    name = name.replace("'", "'").replace("'", "'")
     name = name.replace("—", "—").replace("–", "—")
     name = name.replace(" ", "").replace("\u00a0", "").replace("\t", "")
-    name = re.sub(r'^[a-zA-Z]+\d+', '', name)
     name = re.sub(r'^\d+[\.\、\s]*', '', name)
     # 去掉群人数后缀（如 'ai开发小分队（128）' → 'ai开发小分队'）
     name = re.sub(r'（\d+）$', '', name)
