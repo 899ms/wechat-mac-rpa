@@ -81,6 +81,11 @@
 - Bot 层直接操作 `OCRTextElement`、`UILayout`、`CaptureResult`
 - Session 层暴露视觉实现细节给 Bot 层
 
+**层边界规则（防越界）**：
+- **L3.5 感知层**：只做"截图 → 提取消息"，**禁止做去重、状态管理、回复决策**。去重是 L4 Session/GlobalStore 的职责
+- **L4 会话层**：只做"去重 + 状态管理 + 持久化"。感知细节对 L4 隐藏
+- **跨层重复功能 = Bug**：如果某功能在两层同时出现（如 SmartPipeline 里的 `ImageDedupTracker` 和 GlobalStore 的 `_is_fuzzy_duplicate`），说明边界混乱，必须迁移到正确层
+
 ---
 
 ## 二、各模块详细设计
@@ -524,6 +529,7 @@ class VisionPipeline:
 - Bot 层禁止直接操作 `OCRTextElement`、`UILayout`、`CaptureResult`
 - `SmartPerceptionPipeline` 是默认感知管道，通过 `run_bot.py` 中的 `_create_perception()` 创建
 - `VisionPipeline` 仅在 SmartPerceptionPipeline 初始化失败或环境变量指定时作为回退
+- **边界约束**：L3.5 只负责提取，不维护任何跨 tick 状态（如历史消息、去重索引）。"合并去重"仅指同一 tick 内本地结果与 API 结果的去重，不是持久化去重
 
 ---
 

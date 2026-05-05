@@ -40,6 +40,7 @@
   - **模糊去重**：`difflib.SequenceMatcher` + 动态阈值（短消息更严格，0.90→0.80）
   - **图片去重**：2-gram Jaccard，阈值 0.001（极低，容错 qwen 描述不稳定）
   - **持久化时机**：`save()` 在每次 tick 的 `finally` 中调用，避免 `mark_replied` 后因重启丢状态
+  - **层边界**：去重只在 GlobalStore 做，SmartPipeline（L3.5）禁止做持久化去重（已移除 `ImageDedupTracker`）
 - **状态**: ✅ 已完成
 
 ---
