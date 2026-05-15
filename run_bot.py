@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Mac 微信 RPA 机器人 - 生产环境启动入口
-使用新模块化架构 (wechat_rpa) + Kimi LLM 回复
+使用新模块化架构 (src) + Kimi LLM 回复
 """
 
 import sys
@@ -21,14 +21,14 @@ if env_file.exists():
                 key, value = line.split("=", 1)
                 os.environ.setdefault(key.strip(), value.strip())
 
-from wechat_rpa.bot.wechat_bot import WeChatBot
-from wechat_rpa.layout.profile import PROFILE_WECHAT_MAC_1760X1280
-from wechat_rpa.perception.smart_pipeline import SmartPerceptionPipeline
+from src.bot.wechat_bot import WeChatBot
+from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
+from src.perception.smart_pipeline import SmartPerceptionPipeline
 
 
 def _create_llm_client():
     """创建默认 LLM 客户端（deepseek）。"""
-    from wechat_rpa.utils.qwen_client import QwenClient
+    from src.utils.qwen_client import QwenClient
     print("  • LLM:  Qwen (deepseek-v4-flash via dashscope)")
     return QwenClient()
 
@@ -39,7 +39,7 @@ def _create_hermes_client():
     如果 Hermes 未启动，返回 None，系统退化为单模型模式。"""
     base_url = os.environ.get("HERMES_BASE_URL", "http://127.0.0.1:8642")
     try:
-        from wechat_rpa.llm.openclaw_client import OpenClawClient
+        from src.llm.openclaw_client import OpenClawClient
         # Hermes API Server 的模型名是 hermes-agent，max_tokens 给大一点
         client = OpenClawClient(base_url=base_url, model="hermes-agent", max_tokens=2000)
         print(f"  • Hermes: {base_url} (model=hermes-agent) 已就绪，复杂任务自动切换")
@@ -66,11 +66,11 @@ def _create_perception(profile):
         except Exception as e:
             print(f"  ⚠️ SmartPerceptionPipeline 初始化失败: {e}")
             print("  • 回退到 VisionPipeline")
-            from wechat_rpa.perception.vision_pipeline import VisionPipeline
+            from src.perception.vision_pipeline import VisionPipeline
             return VisionPipeline(profile)
     else:
         print("  • 感知层: VisionPipeline (纯本地 OCR)")
-        from wechat_rpa.perception.vision_pipeline import VisionPipeline
+        from src.perception.vision_pipeline import VisionPipeline
         return VisionPipeline(profile)
 
 

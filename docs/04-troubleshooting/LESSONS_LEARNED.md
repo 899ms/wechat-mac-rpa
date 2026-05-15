@@ -159,17 +159,17 @@ def _is_echo(self, identity, sent):
 ### 启动自动模式
 ```bash
 cd ~/wechat-mac-rpa
-python3 -m wechat_rpa.bot.wechat_bot
+python3 -m src.bot.wechat_bot
 ```
 
 ### 关键文件
 | 文件 | 说明 |
 |------|------|
-| `wechat_rpa/bot/wechat_bot.py` | L5 主循环编排（唯一入口） |
-| `wechat_rpa/perception/smart_pipeline.py` | L3.5 智能感知管道（主力：本地预判 + qwen3.6-flash API 兜底） |
-| `wechat_rpa/perception/vision_pipeline.py` | L3.5 纯本地 OCR 管道（备用回退） |
-| `wechat_rpa/layout/layout_parser.py` + `wechat_rpa/message/extractor.py` | L3 布局解析与消息提取 |
-| `wechat_rpa/reply/policy.py` + `wechat_rpa/reply/generator.py` | L4 回复策略与生成 |
+| `src/bot/wechat_bot.py` | L5 主循环编排（唯一入口） |
+| `src/perception/smart_pipeline.py` | L3.5 智能感知管道（主力：本地预判 + qwen3.6-flash API 兜底） |
+| `src/perception/vision_pipeline.py` | L3.5 纯本地 OCR 管道（备用回退） |
+| `src/layout/layout_parser.py` + `src/message/extractor.py` | L3 布局解析与消息提取 |
+| `src/reply/policy.py` + `src/reply/generator.py` | L4 回复策略与生成 |
 | `tests/` 目录 | 各模块独立测试 |
 | `docs/02-architecture/ARCHITECTURE.md` | 架构设计文档 |
 

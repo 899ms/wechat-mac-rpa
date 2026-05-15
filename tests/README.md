@@ -2,13 +2,13 @@
 
 ## 测试框架
 
-当前测试基于 `pytest`，覆盖 `wechat_rpa/` 模块化架构和 `tests/` 外部测试套件。
+当前测试基于 `pytest`，覆盖 `src/` 模块化架构和 `tests/` 外部测试套件。
 
 ## 运行测试
 
 ### 运行所有内部测试
 ```bash
-python3 -m pytest wechat_rpa/tests/ -v
+python3 -m pytest src/tests/ -v
 ```
 
 ### 运行所有外部测试
@@ -27,13 +27,13 @@ python3 tests/test_integration.py
 - `{name}.png` - 微信截图
 - `{name}.json` - 预期 OCR 结果
 
-Fixture 存放在 `tests/fixtures/` 和 `wechat_rpa/tests/fixtures/` 下。
+Fixture 存放在 `tests/fixtures/` 和 `src/tests/fixtures/` 下。
 
 ## 当前测试用例
 
 | 测试套件 | 位置 | 数量 | 说明 |
 |---------|------|------|------|
-| 内部单元测试 | `wechat_rpa/tests/` | 148+ | 模块化架构各层单元测试 |
+| 内部单元测试 | `src/tests/` | 148+ | 模块化架构各层单元测试 |
 | 外部集成测试 | `tests/` | 54+ | 端到端场景测试 |
 | 真实场景回归 | `tests/test_real_scene_extraction.py` | - | 基于真实截图的回归验证 |
 
@@ -68,4 +68,4 @@ tests/
 
 ---
 
-**历史说明**: 旧版 `test_ocr_v4.py`、`add_test_case.py` 及 `core/auto_bot_vision_ocr_v4.py` 已删除，由 `wechat_rpa/` 模块化架构 + pytest 完全替代。
+**历史说明**: 旧版 `test_ocr_v4.py`、`add_test_case.py` 及 `core/auto_bot_vision_ocr_v4.py` 已删除，由 `src/` 模块化架构 + pytest 完全替代。

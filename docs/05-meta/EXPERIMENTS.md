@@ -18,13 +18,13 @@
 [你预期什么改动会带来什么效果？]
 
 ### 改动内容
-- 文件: `wechat_rpa/xxx.py`
+- 文件: `src/xxx.py`
 - 具体修改: [一句话描述]
 
 ### 验证方法
 - [ ] 跑 `python3 scripts/doc_lint.py && python3 scripts/doc_review.py`
 - [ ] 跑 `python3 tests/test_integration.py`
-- [ ] 跑 `python3 -m pytest tests/ wechat_rpa/tests/ -v`
+- [ ] 跑 `python3 -m pytest tests/ src/tests/ -v`
 - [ ] 手动截图验证 [N] 轮
 - [ ] 其他: [说明]
 
@@ -67,7 +67,7 @@
 
 #### 结论
 - ⚠️ 部分成立
-- 目标架构文档已自洽，但需要在 `wechat_rpa/session/chat_session.py` 实际落地后才能验证真实效果。
+- 目标架构文档已自洽，但需要在 `src/session/chat_session.py` 实际落地后才能验证真实效果。
 - 下一步: 按目标架构实现 `ChatSession.filter_new()`。
 
 ---

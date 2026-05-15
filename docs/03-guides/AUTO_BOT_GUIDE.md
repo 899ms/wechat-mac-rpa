@@ -30,4 +30,4 @@
 ---
 
 **废弃日期**：2026-04-15
-**替代方案**：Vision OCR 视觉识别（`wechat_rpa/bot/wechat_bot.py`）
+**替代方案**：Vision OCR 视觉识别（`src/bot/wechat_bot.py`）

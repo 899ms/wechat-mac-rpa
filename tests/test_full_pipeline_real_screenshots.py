@@ -16,10 +16,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
 
-from wechat_rpa.bot.wechat_bot import WeChatBot
-from wechat_rpa.layout.profile import PROFILE_WECHAT_MAC_1760X1280
-from wechat_rpa.models.base import ChatMessage, SenderType
-from wechat_rpa.perception.vision_pipeline import VisionPipeline
+from src.bot.wechat_bot import WeChatBot
+from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
+from src.models.base import ChatMessage, SenderType
+from src.perception.vision_pipeline import VisionPipeline
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -73,8 +73,8 @@ def run_fixture(name: str):
 
     pipeline = VisionPipeline(PROFILE_WECHAT_MAC_1760X1280)
     # Mock WindowCapture 直接返回 fixture 图片
-    from wechat_rpa.capture.window_capture import CaptureResult
-    from wechat_rpa.models.base import Rect
+    from src.capture.window_capture import CaptureResult
+    from src.models.base import Rect
 
     mock_capture = Mock()
     mock_capture.capture.return_value = CaptureResult(
@@ -549,7 +549,7 @@ class TestBotFullPipeline:
             m.sender = "自己"
 
         # 添加一个可切换的未读聊天（不在 no_reply_chats 中）
-        from wechat_rpa.models.base import ChatListItem, Rect
+        from src.models.base import ChatListItem, Rect
         perception.chat_list_items.append(
             ChatListItem(
                 nickname="测试未读群",
@@ -568,7 +568,7 @@ class TestBotFullPipeline:
         bot.sender = Mock()
 
         # Mock ChatListClicker 避免实际点击
-        with patch("wechat_rpa.bot.wechat_bot.ChatListClicker") as MockClicker:
+        with patch("src.bot.wechat_bot.ChatListClicker") as MockClicker:
             mock_clicker = Mock()
             mock_clicker.click_item.return_value = True
             MockClicker.return_value = mock_clicker
@@ -590,7 +590,7 @@ class TestBotFullPipeline:
             m.sender = "自己"
 
         # 添加一个可切换的未读聊天（不在 no_reply_chats 中）
-        from wechat_rpa.models.base import ChatListItem, Rect
+        from src.models.base import ChatListItem, Rect
         perception.chat_list_items.append(
             ChatListItem(
                 nickname="测试未读群",
@@ -630,13 +630,13 @@ class TestBotFullPipeline:
         bot.generator = Mock()
         bot.sender = Mock()
 
-        with patch("wechat_rpa.bot.wechat_bot.ChatListClicker") as MockClicker:
+        with patch("src.bot.wechat_bot.ChatListClicker") as MockClicker:
             mock_clicker = Mock()
             mock_clicker.click_item.return_value = True
             MockClicker.return_value = mock_clicker
 
             # Mock time.sleep 避免测试等待
-            with patch("wechat_rpa.bot.wechat_bot.time.sleep"):
+            with patch("src.bot.wechat_bot.time.sleep"):
                 bot.tick()
 
             # tick 中调用一次 perceive（切换后不再二次验证，避免递归复杂化）
@@ -662,7 +662,7 @@ class TestBotFullPipeline:
         bot.sender = Mock()
         bot.sender.send.return_value = Mock(success=True)
 
-        with patch("wechat_rpa.bot.wechat_bot.ChatListClicker") as MockClicker:
+        with patch("src.bot.wechat_bot.ChatListClicker") as MockClicker:
             bot.tick()
             # 有用户消息需要回复，不应切换
             MockClicker.assert_not_called()

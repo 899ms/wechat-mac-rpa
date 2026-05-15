@@ -1,0 +1,1024 @@
+#!/usr/bin/env python3
+"""Memory Engine - LLM Wiki based long-term memory with overrides support."""
+
+import json
+import logging
+import math
+import threading
+import time
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+try:
+    from httpx import Timeout
+except ImportError:
+    Timeout = None
+
+_logger = logging.getLogger("src.memory.engine")
+
+
+# 默认 wiki 模板
+_DEFAULT_USER_WIKI = """# {user_name}
+
+## 基本信息
+- 姓名/本名：
+- 别名/昵称：
+- 性别：
+- 出生年份/年龄：
+- 籍贯/家乡：
+- 现居城市：
+- 教育背景（学校、专业、学历）：
+- 职业/职位：
+- 当前公司：
+- 过往工作经历：
+- 婚姻状况：
+- 家庭成员：
+- 联系方式（手机尾号、微信号等）：
+
+## 别名
+（暂无）
+
+## 共同群聊
+（暂无）
+
+## 与 Bot 的关系
+（暂无）
+
+## 与其他人的关系
+（暂无）
+
+## MBTI
+（暂无）
+
+## 偏好 & 兴趣
+（暂无）
+
+## 近期动态
+（暂无）
+
+## 说过的话（短期）
+（暂无）
+
+## 交互风格
+（暂无）
+"""
+
+_UPDATE_PROMPT = """请根据以下对话记录，更新用户 {user_name} 的 wiki。
+
+【当前用户】
+主名：{user_name}
+别名：{user_aliases}
+
+【更新规则】
+1. 只记录**当前用户本人**的信息，严禁记录其他用户的信息
+2. 增量更新铁律（最重要）：
+   - 严禁删除现有 wiki 中的任何内容，除非明确超过 7 天且属于"近期动态"
+   - 保留现有 wiki 中的所有来源标注格式
+   - 对新增内容也必须标注来源
+   - "本次对话未提及" ≠ "信息已过期"，不要臆测删除
+3. 标注日期：时间敏感的信息必须带日期（格式：YYYY-MM-DD），日期必须严格来自对话记录开头的时间戳。禁止编造、推测、推断任何日期
+4. 信息来源标注：所有事实信息（姓名、职业、城市、日期、关系等）都必须标注信息来源，格式 `（来源：某群/私聊/某人提及/日期）`，没有例外
+5. 时间戳缺失：无法确定日期时不标注或用 [待验证] 标记
+6. 过期处理：超过 7 天的"近期动态"移到"说过的话"或删除
+7. 冲突处理：新信息覆盖旧信息
+8. 不确定的信息用 [待验证] 标记
+9. 多账号标注：如果对话来源包含不同账号标记，标注所属账号
+10. 共同群聊：记录当前用户和 Bot 共同所在的群聊（放在 wiki 靠前位置）
+11. 关系记录：记录当前用户与 Bot 的社会关系，如家人、大学同学、小公司同事等（需细分，如"大学同学"而非仅"同学"）。不要记录互动频率
+12. 与其他人的关系：记录当前用户与其他人的社会关系，不限于群成员，包括对话中出现的所有人
+13. **区分陈述和疑问（严格）**：以"吗"、"呢"、"?"结尾的句子是疑问，不是事实陈述，严禁当作事实提取。例如"周宇之前在上海吗？"是疑问，不能提取为"周宇之前在上海"。
+14. MBTI 推断：根据用户的说话风格、用词习惯、决策方式等，推断其可能的 MBTI 类型，并简要说明依据
+15. 控制长度：个人 wiki 不超过 4000 字
+16. 保持 Markdown 格式
+17. 别名发现（严格）：只记录当前用户本人的其他称呼。严禁记录其他人的名字。格式：`- 别名：xxx`
+
+【现有 wiki】
+{current_wiki}
+
+【新对话】
+聊天：{chat_name}
+时间：{current_time}
+
+对话内容：
+{conversation}
+
+【输出】
+直接输出更新后的完整 wiki markdown，不要加代码块标记。严禁添加任何开场白、前言、总结或解释性文字。"""
+
+_DEFAULT_GROUP_WIKI = """# {group_name}
+
+## 群基本信息
+（暂无）
+
+## 群成员画像
+（暂无）
+
+## 近期话题 & 动态
+（暂无）
+
+## 群内规则 & 文化
+（暂无）
+"""
+
+_UPDATE_GROUP_PROMPT = """请根据以下对话记录，更新群聊 {chat_name} 的 wiki。
+
+【更新规则】
+1. 只修改/新增变化的部分，保留未变动的内容
+2. 标注日期：时间敏感的信息必须带日期（格式：YYYY-MM-DD），日期必须严格来自对话记录开头的时间戳。禁止编造、推测、推断任何日期
+3. 时间戳缺失：无法确定日期时不标注或用 [待验证] 标记
+4. 过期处理：超过 7 天的"近期动态"移到历史记录或删除
+5. 冲突处理：新信息覆盖旧信息
+6. 重点记录：
+   - 群成员关系、身份、职业变化
+   - 群内热点话题、事件、约定
+   - 群内文化、梗、常用语
+   - 群规则、禁忌、注意事项
+7. 别名发现：在"群成员画像"中，如果某个成员有多个称呼，请一并记录。只记录该成员本人的称呼，严禁把其他成员的名字误记到此成员下。格式：`成员主名（别名1/别名2）`
+8. 多账号标注：如果对话来源包含不同账号标记，标注所属账号
+9. 不确定的信息用 [待验证] 标记
+10. 控制长度：群聊 wiki 不超过 4000 字
+11. 保持 Markdown 格式
+
+【现有 wiki】
+{current_wiki}
+
+【新对话】
+群聊：{chat_name}
+时间：{current_time}
+
+对话内容：
+{conversation}
+
+【输出】
+直接输出更新后的完整 wiki markdown，不要加代码块标记。"""
+
+
+class MemoryEngine:
+    """LLM Wiki 记忆引擎：管理用户/群聊/话题的 wiki 文件，支持外挂 overrides。"""
+
+    def __init__(self, llm_client=None):
+        self.llm_client = llm_client
+        self.wiki_dir = Path("data/memory/wiki")
+        self.wiki_dir.mkdir(parents=True, exist_ok=True)
+        (self.wiki_dir / "users").mkdir(exist_ok=True)
+        (self.wiki_dir / "groups").mkdir(exist_ok=True)
+        (self.wiki_dir / "topics").mkdir(exist_ok=True)
+
+        # 外挂配置
+        self.overrides_dir = Path("data/memory/overrides")
+        self.overrides_dir.mkdir(parents=True, exist_ok=True)
+        self._aliases: Dict[str, List[str]] = {}      # 用户名 -> [别名列表]
+        self._facts: Dict[str, List[dict]] = {}       # 用户名 -> [事实列表]
+        self._corrections: Dict[str, List[str]] = {}  # 群名 -> [纠正列表]
+        self._load_overrides()
+
+        # 异步更新队列
+        self._update_queue: List[dict] = []
+        self._queue_lock = threading.Lock()
+        self._aliases_lock = threading.Lock()
+        self._worker_thread: Optional[threading.Thread] = None
+        self._shutdown = False
+        self._start_worker()
+
+    # ── Overrides 加载 ──
+
+    def _load_overrides(self) -> None:
+        """加载外挂配置（aliases / facts / corrections）。"""
+        # aliases
+        aliases_path = self.overrides_dir / "aliases.json"
+        if aliases_path.exists():
+            try:
+                data = json.loads(aliases_path.read_text(encoding="utf-8"))
+                for user, cfg in data.get("users", {}).items():
+                    self._aliases[user] = cfg.get("aliases", [])
+            except Exception as e:
+                _logger.warning(f"加载 aliases 失败: {e}")
+
+        # facts
+        facts_path = self.overrides_dir / "facts.json"
+        if facts_path.exists():
+            try:
+                data = json.loads(facts_path.read_text(encoding="utf-8"))
+                for user, cfg in data.get("users", {}).items():
+                    self._facts[user] = cfg.get("facts", [])
+            except Exception as e:
+                _logger.warning(f"加载 facts 失败: {e}")
+
+        # corrections
+        corrections_path = self.overrides_dir / "corrections.json"
+        if corrections_path.exists():
+            try:
+                data = json.loads(corrections_path.read_text(encoding="utf-8"))
+                for group, cfg in data.get("groups", {}).items():
+                    self._corrections[group] = cfg.get("corrections", [])
+            except Exception as e:
+                _logger.warning(f"加载 corrections 失败: {e}")
+
+    def _resolve_alias(self, user_name: str) -> str:
+        """根据别名找到主用户名。"""
+        for main_name, aliases in self._aliases.items():
+            if user_name == main_name or user_name in aliases:
+                return main_name
+        return user_name
+
+    def _all_names_for(self, user_name: str) -> List[str]:
+        """获取一个用户的所有名字（主名 + 别名）。"""
+        resolved = self._resolve_alias(user_name)
+        names = [resolved]
+        names.extend(self._aliases.get(resolved, []))
+        return list(dict.fromkeys(names))  # 去重保序
+
+    # ── 读取接口 ──
+
+    def get_user_memory(self, user_name: str, max_chars: int = 2000) -> str:
+        """读取用户 wiki（含别名合并 + 外挂 facts），返回压缩后的摘要。facts 放在前面确保不被截断。"""
+        resolved = self._resolve_alias(user_name)
+        all_names = self._all_names_for(resolved)
+
+        # 合并所有别名的 wiki
+        wikis = []
+        for name in all_names:
+            path = self.wiki_dir / "users" / f"{name}.md"
+            if path.exists():
+                wikis.append(self._load_wiki(path))
+
+        # 先构建 facts（放在前面，确保截断时不丢失）
+        facts = self._facts.get(resolved, [])
+        facts_text = ""
+        if facts:
+            fact_lines = ["## 补充信息（人工标注）"]
+            for f in facts:
+                fact_lines.append(f"- {f.get('relation', '')}：{f.get('value', '')}")
+                if f.get("note"):
+                    fact_lines.append(f"  （{f['note']}）")
+            facts_text = "\n".join(fact_lines)
+
+        if not wikis and not facts_text:
+            return ""
+
+        # facts 放在 wiki 前面，确保即使截断也保留人工标注
+        wiki_text = "\n\n".join(wikis)
+        if facts_text and wiki_text:
+            wiki_text = facts_text + "\n\n" + wiki_text
+        elif facts_text:
+            wiki_text = facts_text
+
+        return self._compress_wiki(wiki_text, max_chars)
+
+    def get_group_memory(self, group_name: str, max_chars: int = 2000) -> str:
+        """读取群聊 wiki（含外挂 corrections），返回压缩后的摘要。"""
+        path = self.wiki_dir / "groups" / f"{group_name}.md"
+        wiki = self._load_wiki(path) if path.exists() else ""
+
+        # 注入纠正信息
+        corrections = self._corrections.get(group_name, [])
+        if corrections:
+            corr_text = "\n\n## 重要纠正（人工标注）\n" + "\n".join(f"- {c}" for c in corrections)
+            if wiki:
+                wiki = wiki + "\n" + corr_text
+            else:
+                wiki = corr_text
+
+        if not wiki:
+            return ""
+        return self._compress_wiki(wiki, max_chars)
+
+    # ── 更新接口 ──
+
+    def update_user_wiki(self, user_name: str, chat_name: str,
+                         messages: List, bot_replies: List[str]) -> None:
+        """把更新任务加入队列，后台异步执行。"""
+        if not user_name or self.llm_client is None:
+            return
+        resolved = self._resolve_alias(user_name)
+        with self._queue_lock:
+            self._update_queue.append({
+                "type": "user",
+                "user_name": resolved,  # 用主用户名更新
+                "chat_name": chat_name,
+                "messages": messages,
+                "bot_replies": bot_replies,
+                "timestamp": time.time(),
+            })
+
+    def update_group_wiki(self, group_name: str, chat_name: str,
+                          messages: List, bot_replies: List[str]) -> None:
+        """把群聊 wiki 更新任务加入队列，后台异步执行。"""
+        if not group_name or self.llm_client is None:
+            return
+        with self._queue_lock:
+            self._update_queue.append({
+                "type": "group",
+                "group_name": group_name,
+                "chat_name": chat_name,
+                "messages": messages,
+                "bot_replies": bot_replies,
+                "timestamp": time.time(),
+            })
+
+    def shutdown(self) -> None:
+        """关闭 worker 线程，等待队列清空。"""
+        self._shutdown = True
+        if self._worker_thread and self._worker_thread.is_alive():
+            self._worker_thread.join(timeout=10)
+
+    # ── 内部方法 ──
+
+    def _user_wiki_path(self, user_name: str) -> Path:
+        return self.wiki_dir / "users" / f"{user_name}.md"
+
+    def _group_wiki_path(self, group_name: str) -> Path:
+        return self.wiki_dir / "groups" / f"{group_name}.md"
+
+    def _load_wiki(self, path: Path) -> str:
+        try:
+            return path.read_text(encoding="utf-8")
+        except Exception as e:
+            _logger.warning(f"加载 wiki 失败 {path}: {e}")
+            return ""
+
+    def _save_wiki(self, path: Path, content: str) -> None:
+        try:
+            path.write_text(content, encoding="utf-8")
+        except Exception as e:
+            _logger.warning(f"保存 wiki 失败 {path}: {e}")
+
+    def _save_prompt(self, path: Path, prompt: str) -> None:
+        """保存生成该 wiki 使用的 prompt，方便排查。截断过长的 conversation 部分。"""
+        try:
+            prompt_dir = path.parent.parent / "prompts" / path.parent.name
+            prompt_dir.mkdir(parents=True, exist_ok=True)
+            prompt_path = prompt_dir / f"{path.stem}.md"
+            max_len = 80000
+            if len(prompt) > max_len:
+                truncated = f"{prompt[:40000]}\n\n... [中间部分截断，共 {len(prompt)} 字符] ...\n\n{prompt[-40000:]}"
+            else:
+                truncated = prompt
+            content = f"# Prompt for {path.stem}\n\n生成时间：{time.strftime('%Y-%m-%d %H:%M:%S')}\n\n```\n{truncated}\n```\n"
+            prompt_path.write_text(content, encoding="utf-8")
+        except Exception as e:
+            _logger.debug(f"保存 prompt 失败 {path}: {e}")
+
+    def _save_alias_suggestion(self, path: Path, aliases: List[str], is_group: bool = False) -> None:
+        """把 LLM 发现的别名保存为格式化的 JSON 建议文件，方便人工审核后导入 aliases.json。"""
+        try:
+            sugg_dir = path.parent.parent / "alias_suggestions" / path.parent.name
+            sugg_dir.mkdir(parents=True, exist_ok=True)
+            sugg_path = sugg_dir / f"{path.stem}.json"
+            data = {
+                "main_name": path.stem,
+                "aliases": aliases,
+                "source": "group" if is_group else "user",
+                "generated_at": time.strftime('%Y-%m-%d %H:%M:%S'),
+            }
+            sugg_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        except Exception as e:
+            _logger.debug(f"保存别名建议失败 {path}: {e}")
+
+    def _compress_wiki(self, wiki: str, max_chars: int) -> str:
+        """压缩 wiki 到指定长度。"""
+        wiki = wiki.strip()
+        if len(wiki) <= max_chars:
+            return wiki
+        truncated = wiki[:max_chars]
+        last_break = max(truncated.rfind("\n## "), truncated.rfind("\n- "), truncated.rfind("\n\n"))
+        if last_break > max_chars * 0.5:
+            truncated = truncated[:last_break]
+        return truncated.strip() + "\n（…记忆已截断）"
+
+    def _format_conversation(self, messages: List, bot_replies: List[str]) -> str:
+        lines = []
+        last_chat_name = None
+        for msg in messages:
+            chat_name = getattr(msg, "chat_name", "")
+            # 当聊天名称变化时插入分隔线
+            if chat_name and chat_name != last_chat_name:
+                lines.append(f"\n===== {chat_name} =====\n")
+                last_chat_name = chat_name
+
+            st = getattr(msg, "sender_type", None)
+            is_self = False
+            if st is not None:
+                if hasattr(st, "value"):
+                    is_self = st.value == "self"
+                else:
+                    is_self = str(st) == "self"
+            sender = "我" if is_self else getattr(msg, "sender", "")
+            text = getattr(msg, 'text', '')
+            account = getattr(msg, 'account', '')
+            # 时间戳（支持历史批量导入）
+            ts = getattr(msg, 'create_time', None)
+            ts_str = ""
+            if ts:
+                try:
+                    ts_str = time.strftime("%Y-%m-%d %H:%M", time.localtime(int(ts)))
+                except Exception:
+                    pass
+            # 组装前缀：[账号][时间]
+            prefix = ""
+            if account:
+                prefix += f"[{account}]"
+            if ts_str:
+                prefix += f"[{ts_str}]"
+            if prefix:
+                lines.append(f"{prefix}{sender}：{text}")
+            else:
+                lines.append(f"{sender}：{text}")
+        if bot_replies:
+            for reply in bot_replies:
+                lines.append(f"Bot：{reply}")
+        return "\n".join(lines)
+
+    def _do_update(self, task: dict) -> None:
+        """执行单次 wiki 更新。"""
+        task_type = task.get("type", "user")
+
+        if task_type == "group":
+            self._do_update_group(task)
+        else:
+            self._do_update_user(task)
+
+    def _try_generate_wiki(self, prompt: str, path: Path, is_group: bool = False) -> str:
+        """调用 LLM 生成 wiki，带重试逻辑（处理 400 超长 / 429 配额限制）。失败时抛异常。"""
+        last_error = None
+        for attempt in range(3):
+            current_prompt = prompt
+            if attempt > 0:
+                # 截断 conversation 后半部分（保留最近的消息）
+                marker = "对话内容：\n"
+                if marker in current_prompt:
+                    parts = current_prompt.split(marker, 1)
+                    if len(parts) == 2:
+                        header, conv = parts
+                        conv_lines = conv.strip().split("\n")
+                        truncated = "\n".join(conv_lines[len(conv_lines) // 2:])
+                        current_prompt = header + marker + truncated
+                        _logger.warning(f"输入超长，截断 conversation 后重试 ({attempt}/2)")
+
+            try:
+                response = self.llm_client.chat(
+                    messages=[{"role": "user", "content": current_prompt}],
+                    temperature=0.3,
+                    max_tokens=10000,
+                    timeout=Timeout(connect=10.0, read=300.0, write=10.0, pool=5.0) if Timeout else 300,
+                )
+                new_wiki = response if isinstance(response, str) else getattr(response, "content", str(response))
+                new_wiki = new_wiki.strip()
+                # 清理 LLM 常见开场白/前缀
+                new_wiki = self._strip_llm_prefix(new_wiki)
+                if new_wiki and len(new_wiki) > 50:
+                    self._save_wiki(path, new_wiki)
+                    self._save_prompt(path, current_prompt)
+                    return new_wiki
+                raise RuntimeError("LLM 返回内容过短或为空")
+            except Exception as e:
+                last_error = e
+                err_str = str(e)
+                if "429" in err_str or "quota" in err_str:
+                    if attempt < 2:
+                        wait = 5 * (attempt + 1)
+                        _logger.warning(f"配额限制，等待 {wait}s 后重试")
+                        time.sleep(wait)
+                        continue
+                elif "400" in err_str and "input length" in err_str:
+                    if attempt < 2:
+                        _logger.warning(f"输入超长，准备截断重试 ({attempt + 1}/2)")
+                        continue
+                break
+        raise RuntimeError(f"LLM 生成 wiki 失败（已重试 3 次）: {last_error}")
+
+    def _strip_llm_prefix(self, text: str) -> str:
+        """去掉 LLM 常见的开场白、前言等前缀。"""
+        import re
+        # 匹配 "好的，这是..." / "以下是..." / "根据..." 等开场白（直到第一个 # 标题）
+        patterns = [
+            r'^好的[，,].*?(?=#\s)',
+            r'^以下是.*?(?=#\s)',
+            r'^根据.*?(?=#\s)',
+            r'^这是.*?(?=#\s)',
+            r'^我来.*?(?=#\s)',
+        ]
+        for p in patterns:
+            text = re.sub(p, '', text, count=1, flags=re.DOTALL)
+        return text.strip()
+
+    def _do_update_user(self, task: dict) -> None:
+        """执行用户 wiki 更新。"""
+        user_name = task["user_name"]
+        chat_name = task["chat_name"]
+        messages = task["messages"]
+        bot_replies = task["bot_replies"]
+
+        path = self._user_wiki_path(user_name)
+        current_wiki = self._load_wiki(path) if path.exists() else _DEFAULT_USER_WIKI.format(user_name=user_name)
+
+        conversation = self._format_conversation(messages, bot_replies)
+        if not conversation.strip():
+            return
+
+        now = time.strftime("%Y-%m-%d %H:%M")
+        user_aliases = self._aliases.get(user_name, [])
+        prompt = _UPDATE_PROMPT.format(
+            user_name=user_name,
+            user_aliases="、".join(user_aliases) if user_aliases else "无",
+            current_wiki=current_wiki,
+            chat_name=chat_name,
+            current_time=now,
+            conversation=conversation,
+        )
+
+        new_wiki = self._try_generate_wiki(prompt, path, is_group=False)
+        if new_wiki:
+            try:
+                new_aliases = self._extract_aliases_from_user_wiki(new_wiki, user_name)
+                if new_aliases:
+                    self._merge_aliases(user_name, new_aliases)
+                    self._save_alias_suggestion(path, new_aliases, is_group=False)
+            except Exception as e:
+                _logger.debug(f"解析用户别名失败: {e}")
+
+    def _do_update_group(self, task: dict) -> None:
+        """执行群聊 wiki 更新。"""
+        group_name = task["group_name"]
+        chat_name = task["chat_name"]
+        messages = task["messages"]
+        bot_replies = task["bot_replies"]
+
+        path = self._group_wiki_path(group_name)
+        current_wiki = self._load_wiki(path) if path.exists() else _DEFAULT_GROUP_WIKI.format(group_name=group_name)
+
+        conversation = self._format_conversation(messages, bot_replies)
+        if not conversation.strip():
+            return
+
+        now = time.strftime("%Y-%m-%d %H:%M")
+        prompt = _UPDATE_GROUP_PROMPT.format(
+            current_wiki=current_wiki,
+            chat_name=chat_name,
+            current_time=now,
+            conversation=conversation,
+        )
+
+        new_wiki = self._try_generate_wiki(prompt, path, is_group=True)
+        if new_wiki:
+            try:
+                group_aliases = self._extract_aliases_from_group_wiki(new_wiki)
+                for main_name, aliases in group_aliases.items():
+                    if aliases:
+                        self._merge_aliases(main_name, aliases)
+                        self._save_alias_suggestion(path, aliases, is_group=True)
+            except Exception as e:
+                _logger.debug(f"解析群别名失败: {e}")
+
+    # ── 别名自动发现 ──
+
+    def _extract_aliases_from_user_wiki(self, wiki: str, user_name: str) -> List[str]:
+        """从用户 wiki 的 ## 别名 段落提取别名。严格过滤，排除他人名字和无效条目。"""
+        import re
+        aliases = []
+        marker = "## 别名"
+        if marker not in wiki:
+            return aliases
+        start = wiki.find(marker)
+        end = wiki.find("\n## ", start + 1)
+        if end < 0:
+            end = len(wiki)
+        section = wiki[start:end]
+
+        # 明显不是别名的关键词（通常是描述性语句）
+        invalid_keywords = ["说", "提到", "认为", "和", "与", "让", "叫", "是", "在", "觉得", "告诉", "问", "回答", "表示", "介绍", "@"]
+        # 已有主名集合（避免把其他用户的主名当成别名）
+        existing_mains = set(self._aliases.keys())
+
+        for line in section.split("\n"):
+            line = line.strip()
+            if line.startswith("- ") or line.startswith("* "):
+                alias_text = line[2:].strip()
+                # 去掉前缀 "别名："
+                if alias_text.startswith("别名：") or alias_text.startswith("别名:"):
+                    alias_text = alias_text[3:].strip()
+                # 去掉括号里的来源说明，如 "qian（发现来源：某群）"
+                alias_text = alias_text.split("（")[0].split("(")[0].strip()
+                # 基础过滤
+                if not alias_text or alias_text == user_name:
+                    continue
+                if alias_text in existing_mains and alias_text != user_name:
+                    continue  # 已经是其他人的主名，不采纳
+                if len(alias_text) > 30:
+                    continue  # 过长，不太可能是别名
+                if any(kw in alias_text for kw in invalid_keywords):
+                    continue  # 包含描述性关键词，可能是句子而非别名
+                if re.search(r'[。，；！？\.\,;!?]', alias_text):
+                    continue  # 包含标点，说明是句子
+                if alias_text.startswith("wxid_") or alias_text.endswith("@chatroom"):
+                    continue  # 微信 ID 模式，不是别名
+                if alias_text not in aliases:
+                    aliases.append(alias_text)
+        return aliases
+
+    def _extract_aliases_from_group_wiki(self, wiki: str) -> Dict[str, List[str]]:
+        """从群聊 wiki 的成员画像中提取别名。
+        匹配格式：**成员名（别名1/别名2）** 或 **成员名**：...
+        """
+        result = {}
+        if "## 群成员画像" not in wiki and "## 活跃成员" not in wiki:
+            return result
+        # 模式: **成员名（别名1/别名2）**
+        import re
+        existing_mains = set(self._aliases.keys())
+        invalid_keywords = ["说", "提到", "认为", "和", "与", "让", "叫", "是", "在", "觉得", "告诉", "问", "回答", "表示", "介绍", "@"]
+        for m in re.finditer(r'\*\*([^*（(]+)[（(]([^)）]+)[)）]\*\*', wiki):
+            main = m.group(1).strip()
+            alias_str = m.group(2).strip()
+            aliases = []
+            for a in alias_str.replace("、", "/").split("/"):
+                a = a.strip()
+                if not a or a == main:
+                    continue
+                if a in existing_mains and a != main:
+                    continue  # 已经是其他人的主名
+                if len(a) > 30:
+                    continue
+                if any(kw in a for kw in invalid_keywords):
+                    continue
+                if re.search(r'[。，；！？\.\,;!?]', a):
+                    continue
+                if a.startswith("wxid_") or a.endswith("@chatroom"):
+                    continue
+                aliases.append(a)
+            if main and aliases:
+                result[main] = aliases
+        return result
+
+    def _merge_aliases(self, user_name: str, new_aliases: List[str]) -> None:
+        """把 LLM 发现的别名合并到 aliases.json 和内存中。"""
+        with self._aliases_lock:
+            self._do_merge_aliases(user_name, new_aliases)
+
+    def _do_merge_aliases(self, user_name: str, new_aliases: List[str]) -> None:
+        """_merge_aliases 的无锁实现（内部使用）。"""
+        # 1. 更新内存中的 _aliases
+        resolved = self._resolve_alias(user_name)
+        if resolved not in self._aliases:
+            self._aliases[resolved] = []
+        existing = set(self._aliases[resolved])
+        existing_mains = set(self._aliases.keys())
+        added = []
+        for alias in new_aliases:
+            if alias != resolved and alias not in existing:
+                if alias in existing_mains and alias != resolved:
+                    continue  # 别名不能是其他人的主名
+                self._aliases[resolved].append(alias)
+                existing.add(alias)
+                added.append(alias)
+
+        if not added:
+            return
+
+        # 2. 持久化到文件
+        try:
+            aliases_path = self.overrides_dir / "aliases.json"
+            data = {"users": {}}
+            if aliases_path.exists():
+                data = json.loads(aliases_path.read_text(encoding="utf-8"))
+
+            users = data.setdefault("users", {})
+            if resolved not in users:
+                users[resolved] = {"aliases": [], "notes": ""}
+
+            current_aliases = set(users[resolved].get("aliases", []))
+            for alias in added:
+                if alias not in current_aliases:
+                    users[resolved]["aliases"].append(alias)
+                    current_aliases.add(alias)
+
+            aliases_path.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            _logger.info(f"别名发现: {resolved} <- {added}")
+        except Exception as e:
+            _logger.warning(f"保存别名失败: {e}")
+
+    def _expand_search_keywords(self, keyword: str) -> List[str]:
+        """把关键词扩展为包含主名和所有别名的搜索词列表。"""
+        keywords = {keyword}
+        resolved = self._resolve_alias(keyword)
+        keywords.add(resolved)
+        # 找到该用户对应的所有别名（双向：主名→别名，别名→主名）
+        for main_name, aliases in self._aliases.items():
+            if resolved == main_name or keyword == main_name:
+                keywords.update(aliases)
+                keywords.add(main_name)
+            elif keyword in aliases or resolved in aliases:
+                keywords.update(aliases)
+                keywords.add(main_name)
+        return list(keywords)
+
+    def _extract_all_snippets(self, content: str, keywords: List[str], max_snippets: int = 2) -> List[str]:
+        """从内容中提取所有包含关键词的片段，去重，限制数量。"""
+        snippets = []
+        seen_ranges = set()  # 避免重叠片段
+        hit_keywords = set()
+        for kw in keywords:
+            start = 0
+            kw_hits = 0
+            while True:
+                idx = content.find(kw, start)
+                if idx < 0:
+                    break
+                kw_hits += 1
+                # 检查是否与已有片段重叠（±50字范围内视为重叠）
+                overlap = False
+                for (s, e) in seen_ranges:
+                    if abs(idx - s) < 50 or abs(idx - e) < 50:
+                        overlap = True
+                        break
+                if not overlap:
+                    snippet_start = max(0, idx - 80)
+                    snippet_end = min(len(content), idx + 150)
+                    snippet = content[snippet_start:snippet_end].strip()
+                    if snippet_start > 0:
+                        snippet = "…" + snippet
+                    if snippet_end < len(content):
+                        snippet = snippet + "…"
+                    snippets.append(snippet)
+                    seen_ranges.add((snippet_start, snippet_end))
+                    hit_keywords.add(kw)
+                start = idx + len(kw)
+                if len(snippets) >= max_snippets:
+                    break
+            _logger.debug(f"[Snippet] keyword='{kw}' hits={kw_hits}, snippets_so_far={len(snippets)}")
+            if len(snippets) >= max_snippets:
+                break
+        _logger.info(f"[Snippet] extracted {len(snippets)} snippets, hit_keywords={hit_keywords}")
+        return snippets
+
+    def search_keyword(self, keyword: str, max_chars: int = 6000) -> str:
+        """BM25 搜索：召回 + 排序，返回最相关的 wiki 内容。
+
+        召回：遍历所有 wiki，找到包含任意关键词的文档。
+        排序：BM25 打分，按相关性排序，只返回 Top 10。
+        命中本人 → 返回完整 wiki；命中别人 → 返回片段。
+        """
+        if not keyword or len(keyword.strip()) < 2:
+            return ""
+        # 按空格分词（去掉太短的词）
+        raw_keywords = [kw.strip() for kw in keyword.split() if len(kw.strip()) >= 2]
+        if not raw_keywords:
+            raw_keywords = [keyword.strip()]
+        # 扩展每个关键词的别名
+        keywords = []
+        for kw in raw_keywords:
+            keywords.extend(self._expand_search_keywords(kw))
+        keywords = list(dict.fromkeys(keywords))
+
+        resolved_keyword = self._resolve_alias(raw_keywords[0] if raw_keywords else keyword.strip())
+        _logger.info(f"[Search] keyword='{keyword}' raw={raw_keywords} expanded={keywords} resolved='{resolved_keyword}'")
+
+        # ── 1. 召回：收集所有文档 ──
+        docs: List[Tuple[str, str, bool]] = []  # (name, content, is_group)
+        for path in (self.wiki_dir / "users").glob("*.md"):
+            user = path.stem
+            resolved_user = self._resolve_alias(user)
+            wiki = self._load_wiki(path)
+            facts = self._facts.get(resolved_user, [])
+            facts_text = ""
+            if facts:
+                facts_text = "\n".join([f"- {f.get('relation', '')}：{f.get('value', '')}" for f in facts])
+            content = facts_text + "\n\n" + wiki if facts_text and wiki else (facts_text or wiki)
+            if content:
+                docs.append((resolved_user, content, False))
+        for path in (self.wiki_dir / "groups").glob("*.md"):
+            group = path.stem
+            wiki = self._load_wiki(path)
+            corrections = self._corrections.get(group, [])
+            corr_text = ""
+            if corrections:
+                corr_text = "\n".join([f"- {c}" for c in corrections])
+            content = corr_text + "\n\n" + wiki if corr_text and wiki else (corr_text or wiki)
+            if content:
+                docs.append((group, content, True))
+
+        _logger.info(f"[Search] retrieved {len(docs)} docs")
+        if not docs:
+            return f"未在本地记忆中找到关于'{keyword}'的信息"
+
+        # ── 2. BM25 排序 ──
+        N = len(docs)
+
+        # 把关键词分为：原始搜索词 vs 扩展别名
+        original_keywords_set = set([resolved_keyword] + raw_keywords)
+        original_keywords = [q for q in keywords if q in original_keywords_set]
+        expanded_aliases = [q for q in keywords if q not in original_keywords_set]
+
+        # 计算 doc_has_q：原始搜索词单独计算，扩展别名合并为一组
+        doc_has_q = {}
+        for q in original_keywords:
+            doc_has_q[q] = sum(1 for _, c, _ in docs if q in c)
+        if expanded_aliases:
+            doc_has_q["__aliases__"] = sum(1 for _, c, _ in docs if any(q in c for q in expanded_aliases))
+
+        # 原始搜索词永远保留，扩展别名统一降权（不过滤）
+        filtered_original = list(original_keywords)
+        use_alias_group = bool(expanded_aliases)
+
+        # IDF：原始搜索词单独计算，扩展别名共享一组 idf
+        idf = {}
+        for q in filtered_original:
+            nq = doc_has_q[q]
+            idf[q] = max(math.log((N - nq + 0.5) / (nq + 0.5)), 0.01) if nq > 0 else 0
+        if use_alias_group:
+            nq = doc_has_q["__aliases__"]
+            idf["__aliases__"] = max(math.log((N - nq + 0.5) / (nq + 0.5)), 0.01) if nq > 0 else 0
+
+        # 平均文档长度
+        total_len = sum(len(c) for _, c, _ in docs)
+        avgdl = total_len / N if N > 0 else 1.0
+
+        k1, b = 1.5, 0.75
+        _logger.info(f"[Search] N={N} avgdl={avgdl:.1f} original_keywords={filtered_original} use_alias_group={use_alias_group} idf={ {k: round(v, 4) for k, v in idf.items()} }")
+
+        # 打分：原始搜索词正常计算，扩展别名合并计算并降权 0.3
+        scored = []  # (name, content, is_group, score, is_primary)
+        for name, content, is_group in docs:
+            score = 0.0
+            dl = len(content)
+            # 原始搜索词
+            for q in filtered_original:
+                f = content.count(q)
+                if f > 0 and idf[q] > 0.001:
+                    denom = f + k1 * (1 - b + b * dl / avgdl)
+                    score += idf[q] * f * (k1 + 1) / denom
+            # 扩展别名（合并 + 降权）
+            if use_alias_group and expanded_aliases:
+                alias_f = sum(content.count(q) for q in expanded_aliases)
+                if alias_f > 0 and idf["__aliases__"] > 0.001:
+                    denom = alias_f + k1 * (1 - b + b * dl / avgdl)
+                    score += 0.3 * idf["__aliases__"] * alias_f * (k1 + 1) / denom
+            if score > 0:
+                # 本人判断：只有别名精确一致才算 primary
+                name_match = (self._resolve_alias(name) == self._resolve_alias(resolved_keyword))
+                is_primary = (name_match and not is_group)
+                scored.append((name, content, is_group, score, is_primary))
+
+        _logger.info(f"[Search] {len(scored)} docs scored>0")
+        for name, _, _, score, is_primary in scored:
+            if is_primary:
+                _logger.info(f"[Search] primary doc: {name} score={score:.4f}")
+        # Log top 10 non-primary for diagnosis
+        non_primary = [(n, s) for n, _, _, s, ip in scored if not ip]
+        non_primary.sort(key=lambda x: -x[1])
+        for name, score in non_primary[:10]:
+            _logger.info(f"[Search] non-primary top: {name} score={score:.4f}")
+
+        if not scored:
+            return f"未在本地记忆中找到关于'{keyword}'的信息"
+
+        # 本人优先，然后按 BM25 分数排序
+        scored.sort(key=lambda x: (not x[4], -x[3]))
+
+        # 只保留 1 个分数最高的 primary，其余取消 primary 资格（按 BM25 正常竞争）
+        primary_seen = False
+        adjusted = []
+        for name, content, is_group, score, is_primary in scored:
+            if is_primary:
+                if primary_seen:
+                    adjusted.append((name, content, is_group, score, False))
+                    _logger.info(f"[Search] demote primary: {name} (score={score:.4f}), only 1 primary allowed")
+                else:
+                    primary_seen = True
+                    adjusted.append((name, content, is_group, score, True))
+            else:
+                adjusted.append((name, content, is_group, score, False))
+        scored = adjusted
+        scored.sort(key=lambda x: (not x[4], -x[3]))
+
+        # ── 3. 取 Top 10，组装结果 ──
+        results = []
+        primary_names = set()  # 记录本人的实际 wiki 名
+        selected = scored[:10]
+        _logger.info(f"[Search] selected top {len(selected)} docs")
+        for name, content, is_group, score, is_primary in selected:
+            _logger.info(f"[Search] select: {name} score={score:.4f} primary={is_primary} group={is_group}")
+            if is_primary:
+                primary_names.add(name)
+                results.append(f"【{name}的记忆】{content}")
+            else:
+                # snippet 提取：先用原始搜索词，提取不到再用别名回退
+                snippet_keywords = filtered_original if filtered_original else [resolved_keyword]
+                snippets = self._extract_all_snippets(content, snippet_keywords, max_snippets=2)
+                if not snippets and use_alias_group and expanded_aliases:
+                    snippets = self._extract_all_snippets(content, expanded_aliases, max_snippets=2)
+                _logger.info(f"[Search] snippets for {name}: {len(snippets)} extracted")
+                for snippet in snippets:
+                    tag = f"【{name}群记忆】" if is_group else f"【{name}的记忆】"
+                    results.append(tag + snippet)
+
+        if not results:
+            return f"未在本地记忆中找到关于'{keyword}'的信息"
+
+        text = "\n".join(results)
+        _logger.info(f"[Search] raw results length={len(text)} chars, max_chars={max_chars}")
+        if len(text) <= max_chars:
+            return text
+
+        # 优先保留本人的完整 wiki，其他人的 snippet 后截断
+        primary_snippets = []
+        other_snippets = []
+        for s in results:
+            if any(s.startswith(f"【{name}的记忆】") or s.startswith(f"【{name}群记忆】") for name in primary_names):
+                primary_snippets.append(s)
+            else:
+                other_snippets.append(s)
+
+        truncated = ""
+        # 先加本人的（完整保留）
+        for snippet in primary_snippets:
+            if len(truncated) + len(snippet) + 1 > max_chars:
+                if not truncated:
+                    truncated = snippet[:max_chars] + "\n（…内容截断）"
+                break
+            truncated = truncated + "\n" + snippet if truncated else snippet
+
+        # 再加其他人的（超长的截断）
+        for snippet in other_snippets:
+            if len(truncated) + len(snippet) + 1 > max_chars:
+                truncated += "\n（…更多结果省略）"
+                break
+            truncated = truncated + "\n" + snippet if truncated else snippet
+        _logger.info(f"[Search] truncated results length={len(truncated)} chars")
+        return truncated
+
+    def _start_worker(self) -> None:
+        """启动后台 worker 线程，定期处理更新队列。"""
+        def _worker():
+            while not self._shutdown:
+                time.sleep(5)
+                batch = []
+                with self._queue_lock:
+                    if len(self._update_queue) >= 3:
+                        batch = self._update_queue[:3]
+                        self._update_queue = self._update_queue[3:]
+                    elif self._update_queue:
+                        now = time.time()
+                        cutoff = [i for i, t in enumerate(self._update_queue) if now - t["timestamp"] > 300]
+                        if cutoff:
+                            batch = self._update_queue[:cutoff[-1] + 1]
+                            self._update_queue = self._update_queue[len(batch):]
+                for task in batch:
+                    self._do_update(task)
+                    time.sleep(1)
+
+        self._worker_thread = threading.Thread(target=_worker, daemon=True)
+        self._worker_thread.start()
+
+    def search_related_mentions(self, text: str, exclude_user: Optional[str] = None, max_files: int = 5) -> List[str]:
+        """扫描文本中提到的人名，只加载这些人自己的 wiki，不加载别人的 wiki 里提到他的情况。
+
+        wiki 文件本身很短，直接返回完整内容即可，不需要截断/去重。
+        """
+        if not text:
+            return []
+
+        # 1. 收集所有已知名字（主名 + 别名）
+        all_names = set()
+        for main_name, aliases in self._aliases.items():
+            all_names.add(main_name)
+            all_names.update(aliases)
+
+        # 2. 找出文本中提到的名字
+        mentioned = set()
+        for name in all_names:
+            if name in text:
+                mentioned.add(name)
+        if not mentioned:
+            return []
+
+        # 3. 对每个提到的名字 resolve 到主名，只加载该主名自己的 wiki
+        results: List[str] = []
+        seen_users: set = set()
+
+        for name in mentioned:
+            main_name = self._resolve_alias(name)
+            if main_name == exclude_user:
+                continue
+            if main_name in seen_users:
+                continue
+            seen_users.add(main_name)
+
+            path = self.wiki_dir / "users" / f"{main_name}.md"
+            if not path.exists():
+                continue
+            wiki_content = self._load_wiki(path)
+            facts = self._facts.get(main_name, [])
+            facts_text = "## 已知事实\n" + "\n".join(f"- {f}" for f in facts) if facts else ""
+            full_content = facts_text + "\n\n" + wiki_content if facts_text and wiki_content else (facts_text or wiki_content)
+            if not full_content:
+                continue
+            header = f"【{main_name} 相关】"
+            results.append(header + full_content)
+            if len(results) >= max_files:
+                break
+
+        return results

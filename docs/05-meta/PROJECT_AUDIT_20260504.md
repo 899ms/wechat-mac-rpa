@@ -43,7 +43,7 @@
 
 ### P0-1：8 个测试失败
 
-**文件**：`wechat_rpa/tests/test_reply.py`, `test_bot.py`, `test_global_store.py`, `test_action.py`
+**文件**：`src/tests/test_reply.py`, `test_bot.py`, `test_global_store.py`, `test_action.py`
 
 **根因**：`ReplyGenerator.generate()` 签名从 `(ChatMessage, List)` 改为 `(List, List)`，所有测试仍在传单个 `ChatMessage`，导致 `TypeError: 'ChatMessage' object is not subscriptable`。
 
@@ -51,13 +51,13 @@
 
 ### P0-2：`_msg_id()` 签名不匹配
 
-**文件**：`wechat_rpa/session/global_store.py:30` / `test_global_store.py:18`
+**文件**：`src/session/global_store.py:30` / `test_global_store.py:18`
 
 **根因**：函数签名 `_msg_id(chat_name, text, sender)` 接受 3 个字符串，测试调用 `_msg_id(msg)` 传 `ChatMessage` 对象。
 
 ### P0-3：ChatSession vs GlobalStore 双轨架构
 
-**文件**：`wechat_rpa/reply/policy.py` / `wechat_rpa/bot/wechat_bot.py`
+**文件**：`src/reply/policy.py` / `src/bot/wechat_bot.py`
 
 **根因**：`policy.py` 类型标注 `session: ChatSession`，但 `wechat_bot.py:234` 实际传入 `ChatState`（GlobalStore 的类型）。靠巧合运行——`should_reply()` 方法体没用 `session` 参数。添加任何 session 访问立刻崩溃。
 
@@ -69,25 +69,25 @@
 
 | 行 | 错误 | 正确 |
 |----|------|------|
-| 54,125 | `python3 tests/test_integration.py` | `python3 -m pytest wechat_rpa/tests/` |
+| 54,125 | `python3 tests/test_integration.py` | `python3 -m pytest src/tests/` |
 | 63 | 指向 `~/omni-bot-sdk-oss/.env` | 指向 `~/wechat-mac-rpa/.env` |
-| 47 | `python3 -m wechat_rpa.bot.wechat_bot` | `python3 run_bot.py` |
+| 47 | `python3 -m src.bot.wechat_bot` | `python3 run_bot.py` |
 
 ### P0-5：`test_fallback_when_llm_fails` 断言过期
 
-**文件**：`wechat_rpa/tests/test_reply.py:108`
+**文件**：`src/tests/test_reply.py:108`
 
 **根因**：断言 `reply == "收到"`，但 `_fallback_reply()` 已改为 `return ""`（这是正确设计——不回复比硬编兜底好）。
 
 ### P0-6：两份几乎相同的 `llm_client.py`
 
-**文件**：`wechat_rpa/utils/llm_client.py` (新版) / `utils/llm_client.py` (旧版)
+**文件**：`src/utils/llm_client.py` (新版) / `utils/llm_client.py` (旧版)
 
 **根因**：旧版指向 `omni-bot-sdk-oss/.env`（死路径），且缺少 `_chat_with_messages()` 支持。两处代码几乎逐字相同。
 
 ### P0-7：ChatMessage 拒绝图片消息的多余 kwarg —— 必崩
 
-**文件**：`wechat_rpa/perception/smart_pipeline.py:808-818`
+**文件**：`src/perception/smart_pipeline.py:808-818`
 
 **根因**：
 ```python
@@ -103,7 +103,7 @@ Python dataclass 严格拒绝未声明的 kwarg。API 路径遇到图片/表情�
 
 ### P0-8：`_build_debug_info` 访问不存在属性 —— 必崩
 
-**文件**：`wechat_rpa/perception/smart_pipeline.py:459-462`
+**文件**：`src/perception/smart_pipeline.py:459-462`
 
 **根因**：访问 `m.message_type`、`m.image_description`、`m.image_text`、`m.is_image_duplicate` —— ChatMessage 无这些属性。
 
@@ -181,7 +181,7 @@ Python dataclass 严格拒绝未声明的 kwarg。API 路径遇到图片/表情�
 
 | # | 问题 | 文件 |
 |---|------|------|
-| P2-1 | 两套测试目录 `wechat_rpa/tests/` + `tests/`，pytest 只发现前者 | 项目根目录 |
+| P2-1 | 两套测试目录 `src/tests/` + `tests/`，pytest 只发现前者 | 项目根目录 |
 | P2-2 | `tests/` 目录有 0 个 pytest 发现的测试文件 | `tests/` |
 | P2-3 | `test_fallback_when_llm_fails` 断言 `return "收到"` 过期 | `test_reply.py:108` |
 | P2-4 | `test_group_chat_without_at_returns_false` 断言错误类型 | `test_reply.py:44` |
@@ -225,7 +225,7 @@ Python dataclass 严格拒绝未声明的 kwarg。API 路径遇到图片/表情�
 | P2-27 | `tools/brute_key.py` 废弃 db_key 方案 | `tools/` |
 | P2-28 | `config/config.yaml` 引用 SIP、db_key、wechat-dump，与 README 矛盾 | `config/` |
 | P2-29 | `PyAutoGUIInteractor` 死代码，整个类未被调用 | `ui_interactor.py` |
-| P2-30 | `wechat_rpa/skills/` 空孤儿目录，generator 读的是 `skills/` | `wechat_rpa/skills/` |
+| P2-30 | `src/skills/` 空孤儿目录，generator 读的是 `skills/` | `src/skills/` |
 | P2-31 | `examples/` 只有一个 `simple_mac_bot.py` | `examples/` |
 | P2-32 | `db_decrypted/` 空目录 | `db_decrypted/` |
 | P2-33 | `multimodal_ocr_proto.py` 有被注释的 `API_KEY="***"` 模式 | `multimodal_ocr_proto.py:18` |
@@ -237,7 +237,7 @@ Python dataclass 严格拒绝未声明的 kwarg。API 路径遇到图片/表情�
 | P2-34 | LCS 相似度算法重复两份：`chat_session.py:21` + `smart_pipeline.py:671` | 两处 |
 | P2-35 | `.env` 加载逻辑重复：`smart_pipeline.py:43-51` + `qwen_client.py` + `run_bot.py:16-22` | 三处 |
 | P2-36 | `clean_chat_name` / `_clean_nickname` 时间戳正则重复 | `layout_parser.py:45-50,301` |
-| P2-37 | 两份 `llm_client.py`（KimiClient 类重复） | `utils/` + `wechat_rpa/utils/` |
+| P2-37 | 两份 `llm_client.py`（KimiClient 类重复） | `utils/` + `src/utils/` |
 
 ### 工程基础设施
 
@@ -331,8 +331,8 @@ ed5a56a fix: image dedup - preserve raw desc + 2-gram Jaccard + dup flag
 | R1 | P1 | `config/config.yaml` 废弃 db_key 方案鬼魂，零代码引用 | `config/config.yaml` |
 | R2 | P1 | 无 `requirements.txt`，新人无法一键安装 | 项目根 |
 | R3 | P2 | `load_env` 在 3 个文件中各定义一遍 | smart_pipeline.py / llm_client.py / run_bot.py |
-| R4 | P2 | 3 个空目录：`wechat_rpa/skills/`, `db_decrypted/`, `data/memory/wiki/topics/` | 三处 |
-| R5 | P2 | `wechat_rpa/reply/__init__.py` 空文件 | `reply/__init__.py` |
+| R4 | P2 | 3 个空目录：`src/skills/`, `db_decrypted/`, `data/memory/wiki/topics/` | 三处 |
+| R5 | P2 | `src/reply/__init__.py` 空文件 | `reply/__init__.py` |
 | R6 | P2 | 10 行行尾空白（4 个文件） | layout_parser.py / login_recovery.py / bot.py / smart_pipeline.py |
 | R7 | P2 | `test_common_keys.py` 遗留在根目录，废弃 db_key 方案残留 | 根目录 |
 | R8 | P3 | `storage/message_store.py` / `chat_history.py` / `logging/bot_logger.py` 硬编码 `~/wechat-mac-rpa/data` 路径 | 3 处 |

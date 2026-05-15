@@ -104,7 +104,7 @@ python3 -m pytest tests/ -q
 
 ```
 wechat-mac-rpa/
-├── wechat_rpa/
+├── src/
 │   ├── bot/wechat_bot.py              # L5: 主循环编排
 │   ├── perception/
 │   │   ├── smart_pipeline.py          # L3.5: 智能感知（本地预判 + API 兜底）

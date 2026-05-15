@@ -74,8 +74,8 @@ class RegressionReporter:
 def test_session_dedup(reporter):
     print("\n📦 L1: Session / Deduplication")
     try:
-        from wechat_rpa.session.global_store import GlobalStore
-        from wechat_rpa.models.base import ChatMessage, SenderType
+        from src.session.global_store import GlobalStore
+        from src.models.base import ChatMessage, SenderType
     except ImportError as e:
         reporter.skip(f"导入失败: {e}")
         return
@@ -125,9 +125,9 @@ def test_session_dedup(reporter):
 def test_layout_extraction(reporter):
     print("\n📦 L2: Layout / Message Extraction")
     try:
-        from wechat_rpa.layout.layout_parser import LayoutParser
-        from wechat_rpa.message.extractor import MessageExtractor
-        from wechat_rpa.layout.profile import PROFILE_WECHAT_MAC_1760X1280
+        from src.layout.layout_parser import LayoutParser
+        from src.message.extractor import MessageExtractor
+        from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
     except ImportError as e:
         reporter.skip(f"导入失败: {e}")
         return

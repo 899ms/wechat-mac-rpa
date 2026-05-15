@@ -2,7 +2,7 @@
 
 > ⚠️ **本文档描述的是目标重构架构（Target Architecture）的接口定义，当前实际代码结构与此存在差异。**
 > 
-> 当前实际实现请参考 `wechat_rpa/` 目录下的现有代码：
+> 当前实际实现请参考 `src/` 目录下的现有代码：
 > - 感知：`perception/smart_pipeline.py`（主力，双管道） + `perception/vision_pipeline.py`（备用回退）
 > - LLM：`reply/generator.py`（ReplyGenerator，支持双模型路由）
 > - 动作：`action/message_sender.py`、`action/chat_list_clicker.py`、`action/ui_interactor.py`、`action/login_recovery.py`

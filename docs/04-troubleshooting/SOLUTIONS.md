@@ -12,7 +12,7 @@
 
 ## 🚀 当前方案: 模块化 Vision OCR（唯一维护版本）
 
-代码位于 `wechat_rpa/`，按 L1-L5 分层：
+代码位于 `src/`，按 L1-L5 分层：
 - **L1 Domain**: `models/base.py`
 - **L2 Capture/OCR**: `capture/window_capture.py`, `ocr/vision_ocr.py`
 - **L3 Layout/Extract**: `layout/layout_parser.py`, `layout/profile.py`, `message/extractor.py`
@@ -129,15 +129,15 @@ python3 scripts/view_ocr_history.py raw 100
 ### 当前架构（唯一维护版本）
 | 文件 | 说明 |
 |------|------|
-| `wechat_rpa/bot/wechat_bot.py` | ⭐ L5 主循环编排 |
-| `wechat_rpa/perception/smart_pipeline.py` | L3.5 智能感知管道（主力：本地预判 + API 兜底） |
-| `wechat_rpa/perception/vision_pipeline.py` | L3.5 纯本地 OCR 管道（备用回退） |
-| `wechat_rpa/capture/window_capture.py` | 窗口捕获（含登录恢复） |
-| `wechat_rpa/ocr/vision_ocr.py` | Vision OCR 引擎 |
-| `wechat_rpa/layout/layout_parser.py` | UI 布局分组 |
-| `wechat_rpa/message/extractor.py` | 消息提取 |
-| `wechat_rpa/session/chat_session.py` | 会话与去重 |
-| `wechat_rpa/action/login_recovery.py` | 登录恢复处理 |
+| `src/bot/wechat_bot.py` | ⭐ L5 主循环编排 |
+| `src/perception/smart_pipeline.py` | L3.5 智能感知管道（主力：本地预判 + API 兜底） |
+| `src/perception/vision_pipeline.py` | L3.5 纯本地 OCR 管道（备用回退） |
+| `src/capture/window_capture.py` | 窗口捕获（含登录恢复） |
+| `src/ocr/vision_ocr.py` | Vision OCR 引擎 |
+| `src/layout/layout_parser.py` | UI 布局分组 |
+| `src/message/extractor.py` | 消息提取 |
+| `src/session/chat_session.py` | 会话与去重 |
+| `src/action/login_recovery.py` | 登录恢复处理 |
 | `tests/test_real_scene_extraction.py` | 真实场景回归测试 |
 | `docs/02-architecture/ARCHITECTURE.md` | 架构设计文档 |
 

@@ -18,14 +18,14 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 # 提前导入并定义常量
-from wechat_rpa.models.base import SenderType
+from src.models.base import SenderType
 USER_TYPE = SenderType.OTHER  # SenderType 没有 USER，用 OTHER 表示普通用户
 
 
 def test_hermes_client_connection():
     """测试 1: Hermes client 能连接并返回响应"""
     print("\n[测试 1] Hermes client 连接...")
-    from wechat_rpa.llm.openclaw_client import OpenClawClient
+    from src.llm.openclaw_client import OpenClawClient
 
     client = OpenClawClient(
         base_url="http://127.0.0.1:8642",
@@ -45,8 +45,8 @@ def test_hermes_client_connection():
 def test_generator_active_llm_switch():
     """测试 2: matched_skills 时 active_llm 正确切换"""
     print("\n[测试 2] active_llm 切换逻辑...")
-    from wechat_rpa.reply.generator import ReplyGenerator
-    from wechat_rpa.models.base import ChatMessage
+    from src.reply.generator import ReplyGenerator
+    from src.models.base import ChatMessage
 
     # Mock 两个 LLM
     mock_deepseek = MagicMock()
@@ -81,8 +81,8 @@ def test_generator_active_llm_switch():
 def test_use_hermes_fallback():
     """测试 3: deepseek 返回 use_hermes 时，切 Hermes 并保留 tool 结果"""
     print("\n[测试 3] use_hermes fallback 逻辑...")
-    from wechat_rpa.reply.generator import ReplyGenerator
-    from wechat_rpa.models.base import ChatMessage, SenderType
+    from src.reply.generator import ReplyGenerator
+    from src.models.base import ChatMessage, SenderType
 
     mock_deepseek = MagicMock()
     # 第一轮：deepseek 返回 use_hermes
@@ -148,8 +148,8 @@ def test_run_bot_creates_clients():
 def test_end_to_end_with_mock_tools():
     """测试 5: 端到端 - deepseek 调 tool → use_hermes → Hermes 生成"""
     print("\n[测试 5] 端到端 tool → use_hermes → Hermes...")
-    from wechat_rpa.reply.generator import ReplyGenerator
-    from wechat_rpa.models.base import ChatMessage, SenderType
+    from src.reply.generator import ReplyGenerator
+    from src.models.base import ChatMessage, SenderType
 
     # 模拟 deepseek 返回 tool_calls（stock_query）
     mock_deepseek = MagicMock()

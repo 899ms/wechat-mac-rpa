@@ -31,7 +31,7 @@ python3 tests/regression_suite.py --layer docs
 - 回声消息 → 自己刚发的消息在 10 秒窗口内出现 → 应被过滤
 - 上下文去重 → 上一条也匹配历史时 → 应被过滤（滚动场景）
 
-**状态**: 需要 `wechat_rpa/session/chat_session.py` 按目标架构实现后才会真正执行。
+**状态**: 需要 `src/session/chat_session.py` 按目标架构实现后才会真正执行。
 
 ---
 
@@ -92,12 +92,12 @@ python3 tests/regression_suite.py --layer docs
 ## 与 `run_tests.sh` 的关系
 
 - `run_tests.sh`: ⚠️ 已失效（依赖已删除的 V4 代码）
-- `regression_suite.py`: 针对**模块化目标架构**的分层回归，随着 `wechat_rpa/` 目录的实现逐步生效
+- `regression_suite.py`: 针对**模块化目标架构**的分层回归，随着 `src/` 目录的实现逐步生效
 
 **建议**:
 - 修改 `docs/02-architecture/ARCHITECTURE.md` / `docs/02-architecture/API_SURFACE.md` → 跑 `regression_suite.py --layer docs`
-- 修改 `wechat_rpa/session/` → 跑 `regression_suite.py --layer session`
-- 修改 `wechat_rpa/layout/` 或 `wechat_rpa/message/` → 跑 `regression_suite.py --layer layout`
+- 修改 `src/session/` → 跑 `regression_suite.py --layer session`
+- 修改 `src/layout/` 或 `src/message/` → 跑 `regression_suite.py --layer layout`
 - 发现/修复错误 → 跑 `regression_suite.py --layer errors`
 
 ---

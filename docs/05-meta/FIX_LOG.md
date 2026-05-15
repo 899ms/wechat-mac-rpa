@@ -12,7 +12,7 @@
 
 ### 代码变更
 ```python
-# wechat_rpa/parser/wechat_parser.py
+# src/parser/wechat_parser.py
 TITLE_Y_MAX = 50           # 收紧
 TITLE_X_MAX_RATIO = 0.70   # 新增
 

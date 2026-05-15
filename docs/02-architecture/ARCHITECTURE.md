@@ -2,7 +2,7 @@
 
 > **重要提示：本文档描述的是当前已落地的生产架构（Current Production Architecture）。**
 >
-> 当前实际代码位于 `wechat_rpa/` 目录下，模块化架构（L1-L5）已全部落地。
+> 当前实际代码位于 `src/` 目录下，模块化架构（L1-L5）已全部落地。
 >
 > **文档分类**：`ARCHITECTURE.md`、`API_SURFACE.md`、`MODULE_INDEX.md` 描述**当前生产架构**。其他文档（如 `PROJECT_STATUS.md`、`LESSONS_LEARNED.md`）主要描述**当前实现状态和经验教训**。
 >
@@ -24,7 +24,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Layer 5: Application                                       │
-│  wechat_rpa/bot/wechat_bot.py                               │
+│  src/bot/wechat_bot.py                               │
 │  主循环编排：perceive → session → policy → generate → action│
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -39,7 +39,7 @@
         ▼                     ▼                     ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  Layer 3.5: SmartPerceptionPipeline                         │
-│  wechat_rpa/perception/smart_pipeline.py                    │
+│  src/perception/smart_pipeline.py                    │
 │  智能感知管道：本地预判 + API兜底，对 Bot 层隐藏视觉细节    │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -92,7 +92,7 @@
 
 ### 2.1 Domain Models (L1)
 
-**文件**: `wechat_rpa/models/base.py`
+**文件**: `src/models/base.py`
 
 **职责**: 定义整个系统的基础数据结构。无业务逻辑，纯数据容器。
 
@@ -178,7 +178,7 @@ class PerceptionResult:
 
 ### 2.2 Capture (L2)
 
-**文件**: `wechat_rpa/capture/window_capture.py`
+**文件**: `src/capture/window_capture.py`
 
 **职责**: 找到微信窗口并截图。输出原始图片。
 
@@ -232,7 +232,7 @@ class CaptureResult:
 
 ### 2.3 OCR (L2)
 
-**文件**: `wechat_rpa/ocr/vision_ocr.py`
+**文件**: `src/ocr/vision_ocr.py`
 
 **职责**: 从图片中提取文本元素。不做任何过滤或解释。
 
@@ -271,7 +271,7 @@ class VisionOCREngine:
 
 ### 2.4 LayoutProfile (L2)
 
-**文件**: `wechat_rpa/layout/profile.py`
+**文件**: `src/layout/profile.py`
 
 **职责**: 把写死的布局常量提取为配置对象。
 
@@ -337,7 +337,7 @@ PROFILE_WECHAT_MAC_1760X1280 = LayoutProfile(
 
 ### 2.5 Layout Parser (L3)
 
-**文件**: `wechat_rpa/layout/layout_parser.py`
+**文件**: `src/layout/layout_parser.py`
 
 **职责**: 把 OCR 元素按 UI 区域分组。输出 `UILayout`。
 
@@ -409,7 +409,7 @@ TIMESTAMP_PATTERNS = [
 
 ### 2.6 Message Extractor (L3)
 
-**文件**: `wechat_rpa/message/extractor.py`
+**文件**: `src/message/extractor.py`
 
 **职责**: 从 `UILayout` 中提取结构化消息列表 `List[ChatMessage]`。
 
@@ -462,8 +462,8 @@ class MessageExtractor:
 ### 2.7 Perception Pipeline (L3.5)
 
 **文件**: 
-- `wechat_rpa/perception/smart_pipeline.py` — 主力感知管道（本地预判 + API 兜底）
-- `wechat_rpa/perception/vision_pipeline.py` — 纯本地 OCR 管道（备用回退）
+- `src/perception/smart_pipeline.py` — 主力感知管道（本地预判 + API 兜底）
+- `src/perception/vision_pipeline.py` — 纯本地 OCR 管道（备用回退）
 
 **职责**: 将 Capture → OCR → Layout → Extract 的完整视觉链路封装为单一接口。对 Bot 层完全隐藏视觉实现细节。
 
@@ -535,7 +535,7 @@ class VisionPipeline:
 
 ### 2.8 GlobalStore (L4)
 
-**文件**: `wechat_rpa/session/global_store.py`
+**文件**: `src/session/global_store.py`
 
 **职责**: 全局消息存储 —— 管理所有聊天的消息历史、去重、回复状态和持久化。**这是防止循环发送和消息重复处理的关键层。**
 
@@ -668,8 +668,8 @@ def merge_tick(self, chat_name, messages):
 ### 2.9 Reply Policy & Generator (L4)
 
 **文件**: 
-- `wechat_rpa/reply/policy.py` — 回复决策
-- `wechat_rpa/reply/generator.py` — 回复生成
+- `src/reply/policy.py` — 回复决策
+- `src/reply/generator.py` — 回复生成
 
 **职责**:
 - `policy`: 决定是否回复
@@ -728,7 +728,7 @@ class ReplyGenerator:
 
 ### 2.10 Action Layer (L4)
 
-**文件**: `wechat_rpa/action/message_sender.py`、`wechat_rpa/action/ui_interactor.py`
+**文件**: `src/action/message_sender.py`、`src/action/ui_interactor.py`
 
 **职责**: 执行所有与微信窗口的交互操作，分为两类：
 - `MessageSender`：内容输入（文本、图片、文件）
@@ -799,7 +799,7 @@ class UIInteractor:
 
 #### WeChatLoginHandler
 
-**文件**: `wechat_rpa/action/login_recovery.py`
+**文件**: `src/action/login_recovery.py`
 
 **职责**: 当 `WindowCapture` 检测到微信窗口尺寸异常（未登录/浮窗）时，尝试自动恢复。
 
@@ -837,7 +837,7 @@ class WeChatLoginHandler:
 
 ### 2.11 Bot Orchestrator (L5)
 
-**文件**: `wechat_rpa/bot/wechat_bot.py`
+**文件**: `src/bot/wechat_bot.py`
 
 **职责**: 主循环编排，把各层串起来。
 
@@ -938,7 +938,7 @@ def tick(self) -> None:
 
 ### 2.12 Logging (L4)
 
-**文件**: `wechat_rpa/logging/bot_logger.py`
+**文件**: `src/logging/bot_logger.py`
 
 **职责**: 记录 Bot 运行期事件，输出到 `execution.jsonl`。
 
@@ -971,7 +971,7 @@ class BotLogger:
 
 ### 2.13 Storage (L4)
 
-**文件**: `wechat_rpa/storage/chat_history.py`
+**文件**: `src/storage/chat_history.py`
 
 **职责**: 持久化聊天历史记录，按 `chat_name` 分片存储。
 
@@ -1128,7 +1128,7 @@ class ProfileSelector:
 
 ```
 wechat-mac-rpa/
-├── wechat_rpa/
+├── src/
 │   ├── __init__.py
 │   ├── models/
 │   │   ├── __init__.py

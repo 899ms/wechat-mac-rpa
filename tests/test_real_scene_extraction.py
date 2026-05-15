@@ -11,10 +11,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from wechat_rpa.ocr.vision_ocr import VisionOCREngine
-from wechat_rpa.layout.layout_parser import LayoutParser
-from wechat_rpa.layout.profile import PROFILE_WECHAT_MAC_1760X1280
-from wechat_rpa.message.extractor import MessageExtractor
+from src.ocr.vision_ocr import VisionOCREngine
+from src.layout.layout_parser import LayoutParser
+from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
+from src.message.extractor import MessageExtractor
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "real_login_recovered_scene.png"
 

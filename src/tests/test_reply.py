@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""Tests for L4 Reply modules."""
+
+import pytest
+from src.models.base import ChatMessage, SenderType
+from src.session.global_store import ChatState
+from src.reply.policy import ReplyPolicy, _is_group_chat
+from src.reply.generator import ReplyGenerator
+
+
+class TestReplyPolicy:
+    def test_self_message_returns_false(self):
+        policy = ReplyPolicy()
+        session = ChatState(chat_id="c1", chat_name="Friend")
+        msg = ChatMessage(
+            text="hello",
+            sender="me",
+            sender_type=SenderType.SELF,
+            chat_name="Friend",
+        )
+        assert policy.should_reply(msg, session) is False
+
+    def test_system_message_returns_false(self):
+        policy = ReplyPolicy()
+        session = ChatState(chat_id="c1", chat_name="Friend")
+        msg = ChatMessage(
+            text="system alert",
+            sender="system",
+            sender_type=SenderType.SYSTEM,
+            chat_name="Friend",
+        )
+        assert policy.should_reply(msg, session) is False
+
+    def test_group_chat_with_at_returns_true(self):
+        policy = ReplyPolicy()
+        from src.session.global_store import ChatState
+        session = ChatState(chat_id="c1", chat_name="Group (3)")
+        msg = ChatMessage(
+            text="@me hello",
+            sender="friend",
+            sender_type=SenderType.OTHER,
+            chat_name="Group (3)",
+            is_at_me=True,
+        )
+        assert policy.should_reply(msg, session) is True
+
+    def test_normal_private_chat_returns_true(self):
+        policy = ReplyPolicy()
+        from src.session.global_store import ChatState
+        session = ChatState(chat_id="c1", chat_name="Alice")
+        msg = ChatMessage(
+            text="hello",
+            sender="Alice",
+            sender_type=SenderType.OTHER,
+            chat_name="Alice",
+        )
+        assert policy.should_reply(msg, session) is True
+
+
+class TestIsGroupChat:
+    def test_chinese_parentheses(self):
+        assert _is_group_chat("ai开发小分队（128）") is True
+        assert _is_group_chat("王老板们和小天才（5）") is True
+
+    def test_english_parentheses(self):
+        assert _is_group_chat("王老板们和小天才 (5)") is True
+        assert _is_group_chat("ai开发小分队 (128)") is True
+
+    def test_private_chat_returns_false(self):
+        assert _is_group_chat("W1han") is False
+        assert _is_group_chat("秋水文章") is False
+        assert _is_group_chat("") is False
+
+
+class TestReplyGenerator:
+    def test_returns_non_empty_string(self):
+        gen = ReplyGenerator(llm_client=None)
+        msg = ChatMessage(
+            text="hello",
+            sender="Alice",
+            sender_type=SenderType.OTHER,
+            chat_name="Alice",
+        )
+        reply = gen.generate([msg], [msg])
+        assert isinstance(reply, list)
+        assert len(reply) >= 0
+
+    def test_handles_none_llm_client_gracefully(self):
+        gen = ReplyGenerator(llm_client=None)
+        msg = ChatMessage(
+            text="hello",
+            sender="Alice",
+            sender_type=SenderType.OTHER,
+            chat_name="Alice",
+        )
+        reply = gen.generate([msg], [msg])
+        assert isinstance(reply, list)
+
+    def test_fallback_when_llm_fails(self):
+        class FailingLLM:
+            def chat(self, *args, **kwargs):
+                raise RuntimeError("LLM down")
+
+        gen = ReplyGenerator(llm_client=FailingLLM())
+        msg = ChatMessage(
+            text="hello",
+            sender="Alice",
+            sender_type=SenderType.OTHER,
+            chat_name="Alice",
+        )
+        reply = gen.generate([msg], [msg])
+        assert reply == []

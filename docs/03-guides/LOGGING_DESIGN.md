@@ -283,7 +283,7 @@ tail -n 10 ~/wechat-mac-rpa/data/history/测试群.jsonl | jq .
 
 # 查看最近 1 小时的消息
 python3 -c "
-from wechat_rpa.storage.chat_history import ChatHistory
+from src.storage.chat_history import ChatHistory
 from datetime import datetime, timedelta
 h = ChatHistory()
 msgs = h.get_messages('测试群', since=datetime.now()-timedelta(hours=1))
@@ -310,12 +310,12 @@ for m in msgs:
 
 ## 六、与现有 MessageStore 的关系
 
-**现状**：`wechat_rpa/storage/message_store.py` 和 `wechat_rpa/storage/chat_history.py` 并存。`MessageStore` 是较早的实现，`ChatHistory` 是按本设计文档的 JSON Lines 分片方案。
+**现状**：`src/storage/message_store.py` 和 `src/storage/chat_history.py` 并存。`MessageStore` 是较早的实现，`ChatHistory` 是按本设计文档的 JSON Lines 分片方案。
 
 **迁移策略**：
 1. 新代码优先使用 `ChatHistory` + `BotLogger`
 2. `MessageStore` 保留作为兼容层，内部可委托给 `ChatHistory`
-3. `wechat_rpa/bot/wechat_bot.py` 已使用 `ChatHistory`，`MessageStore` 仅作历史兼容
+3. `src/bot/wechat_bot.py` 已使用 `ChatHistory`，`MessageStore` 仅作历史兼容
 
 ---
 
@@ -324,8 +324,8 @@ for m in msgs:
 - [x] `BotLogger` 设计文档与接口定义
 - [x] `ChatHistory` 设计文档与接口定义
 - [x] `HistoryRecord` 数据模型
-- [x] 将 `BotLogger` 集成到 `wechat_rpa/bot/wechat_bot.py`（重构时）
-- [x] 将 `ChatHistory` 集成到 `wechat_rpa/bot/wechat_bot.py` 主循环（在 tick 结束后持久化消息，而非集成到 `ChatSession`）
+- [x] 将 `BotLogger` 集成到 `src/bot/wechat_bot.py`（重构时）
+- [x] 将 `ChatHistory` 集成到 `src/bot/wechat_bot.py` 主循环（在 tick 结束后持久化消息，而非集成到 `ChatSession`）
 - [x] 编写 `test_logging.py` 和 `test_chat_history.py`
 - [ ] 增加日志清理/归档策略（如 execution.jsonl 超过 100MB 时压缩归档）
 

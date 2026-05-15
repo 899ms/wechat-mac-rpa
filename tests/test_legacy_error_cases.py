@@ -15,10 +15,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
 
-from wechat_rpa.capture.window_capture import CaptureResult
-from wechat_rpa.layout.profile import PROFILE_WECHAT_MAC_1760X1280
-from wechat_rpa.models.base import Rect
-from wechat_rpa.perception.vision_pipeline import VisionPipeline
+from src.capture.window_capture import CaptureResult
+from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
+from src.models.base import Rect
+from src.perception.vision_pipeline import VisionPipeline
 
 ERRORS_DIR = Path(__file__).parent / "fixtures" / "legacy" / "errors"
 

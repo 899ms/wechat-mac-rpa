@@ -131,7 +131,7 @@ no_reply_chats = {"腾讯新闻", "文件传输助手"}
 如果根因是 **Profile 绝对坐标在窗口尺寸变化时失效**，检查所有使用绝对坐标的字段：
 
 ```python
-from wechat_rpa.layout.profile import PROFILE_WECHAT_MAC_1760X1280
+from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
 p = PROFILE_WECHAT_MAC_1760X1280
 
 # 截图实际尺寸
@@ -161,7 +161,7 @@ for name, value, actual, profile in fields:
 如果根因是 **debug JSON 中某字段与真实逻辑不符**（如 `bot_chat_name=''` 但 `switch_reason` 显示有当前聊天），检查所有 `log_bot_decision` 调用是否传齐了参数：
 
 ```bash
-grep -n "log_bot_decision" wechat_rpa/bot/wechat_bot.py
+grep -n "log_bot_decision" src/bot/wechat_bot.py
 ```
 
 **判断标准：**
@@ -172,7 +172,7 @@ grep -n "log_bot_decision" wechat_rpa/bot/wechat_bot.py
 如果根因是 **session 消息未持久化**（`data/sessions.json` 中 `messages=0`），检查 `save_sessions` / `load_sessions` 是否遗漏了 `seen_messages`：
 
 ```bash
-grep -n "_msg_ids\|_is_fuzzy_duplicate\|_match_single\|_lcs_match" wechat_rpa/session/global_store.py
+grep -n "_msg_ids\|_is_fuzzy_duplicate\|_match_single\|_lcs_match" src/session/global_store.py
 ```
 
 ---
@@ -194,7 +194,7 @@ for e in d['ocr_elements']:
 # 若 y > title_y_max（默认 95），则会被过滤
 ```
 
-**修复：** 调整 `wechat_rpa/layout/profile.py` 中的 `title_y_max`。
+**修复：** 调整 `src/layout/profile.py` 中的 `title_y_max`。
 
 ### 3.2 messages 为空但 clusters 有数据
 

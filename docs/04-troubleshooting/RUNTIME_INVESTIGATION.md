@@ -90,9 +90,9 @@ for name, n in sorted(counts.items(), key=lambda x: -x[1]):
 python3 -c "
 import os
 os.environ['DASHSCOPE_API_KEY'] = 'dummy'
-from wechat_rpa.bot.wechat_bot import WeChatBot
-from wechat_rpa.layout.profile import PROFILE_WECHAT_MAC_1760X1280
-from wechat_rpa.tools import get_registry
+from src.bot.wechat_bot import WeChatBot
+from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
+from src.tools import get_registry
 
 class MockLLM:
     calls = []

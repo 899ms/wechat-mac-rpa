@@ -10,7 +10,7 @@
 - ✅ LLM 连接正常（OpenClaw/Kimi 用于回复生成，qwen3.6-flash 用于感知 API 兜底）
 - ✅ 消息发送正常
 - ✅ 登录恢复：支持自动点击登录按钮并恢复主窗口
-- ✅ 模块化实现（`wechat_rpa/`）全部完成
+- ✅ 模块化实现（`src/`）全部完成
 - ✅ 真实场景回归测试已建立
 - ✅ 智能感知管道已上线（`SmartPerceptionPipeline`：本地预判 + API 兜底，92.6% tick 无需调用 API）
 - ✅ Memory 引擎集成完成
@@ -40,7 +40,7 @@
   - User prompt 改为 `[会话]` / `[对方信息]` / `[历史消息]` / `[未读消息]` 结构化格式
   - 新增 `[已缓存数据]` 段落，注入 SessionMemory 工具缓存
 - **SessionMemory 跨 tick 缓存**
-  - `wechat_rpa/reply/session_memory.py`
+  - `src/reply/session_memory.py`
   - web_search 5min / stock_query 1min / get_weather 30min / search_memory 10min
 - **新增 browse_url 工具**
   - 支持提取网页正文（含微信公众号文章特殊处理）
@@ -85,7 +85,7 @@
 cd ~/wechat-mac-rpa
 python3 run_bot.py
 ```
-- L1-L5 模块化架构（`wechat_rpa/`）
+- L1-L5 模块化架构（`src/`）
 - 双感知管道：SmartPerceptionPipeline（主力，本地预判 + qwen3.6-flash API 兜底） + VisionPipeline（纯本地 OCR 备用回退）
 - 环境变量 `USE_MULTIMODAL_OCR=false` 可切换回纯本地模式
 - 支持自动登录恢复（`WeChatLoginHandler`）
@@ -110,24 +110,24 @@ python3 run_bot.py
 ### 可直接运行版本
 | 文件 | 说明 |
 |------|------|
-| `wechat_rpa/bot/wechat_bot.py` | ⭐ 模块化架构机器人（当前唯一版本） |
+| `src/bot/wechat_bot.py` | ⭐ 模块化架构机器人（当前唯一版本） |
 | `run_bot.py` | 一键启动脚本（双管道自动选择） |
 | `scripts/view_ocr_history.py` | 查看识别历史 |
 
 ### 模块化架构（按 `ARCHITECTURE.md` 拆分）
 | 文件 | 说明 |
 |------|------|
-| `wechat_rpa/perception/smart_pipeline.py` | ⭐ L3.5 智能感知管道（主力：本地预判 + qwen3.6-flash API 兜底） |
-| `wechat_rpa/perception/vision_pipeline.py` | L3.5 纯本地 OCR 管道（备用回退） |
-| `wechat_rpa/session/chat_session.py` | L4 会话与去重 |
-| `wechat_rpa/reply/policy.py` | L4 回复决策 |
-| `wechat_rpa/reply/generator.py` | L4 回复生成（支持双模型：OpenClaw/Kimi + Hermes） |
-| `wechat_rpa/action/message_sender.py` | L4 消息发送 |
-| `wechat_rpa/bot/wechat_bot.py` | ⭐ L5 主循环编排 |
-| `wechat_rpa/logging/bot_logger.py` | 运行时日志 |
-| `wechat_rpa/storage/chat_history.py` | 聊天记录持久化 |
-| `wechat_rpa/memory/engine.py` | Memory 引擎 |
-| `wechat_rpa/tools/` | Tool Registry & Built-in Tools |
+| `src/perception/smart_pipeline.py` | ⭐ L3.5 智能感知管道（主力：本地预判 + qwen3.6-flash API 兜底） |
+| `src/perception/vision_pipeline.py` | L3.5 纯本地 OCR 管道（备用回退） |
+| `src/session/chat_session.py` | L4 会话与去重 |
+| `src/reply/policy.py` | L4 回复决策 |
+| `src/reply/generator.py` | L4 回复生成（支持双模型：OpenClaw/Kimi + Hermes） |
+| `src/action/message_sender.py` | L4 消息发送 |
+| `src/bot/wechat_bot.py` | ⭐ L5 主循环编排 |
+| `src/logging/bot_logger.py` | 运行时日志 |
+| `src/storage/chat_history.py` | 聊天记录持久化 |
+| `src/memory/engine.py` | Memory 引擎 |
+| `src/tools/` | Tool Registry & Built-in Tools |
 
 ---
 

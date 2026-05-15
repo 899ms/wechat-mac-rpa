@@ -5,10 +5,10 @@ import pytest
 from unittest.mock import Mock, patch
 from pathlib import Path
 
-from wechat_rpa.capture.window_capture import WeChatNotReadyError
-from wechat_rpa.perception.vision_pipeline import VisionPipeline
-from wechat_rpa.layout.profile import PROFILE_WECHAT_MAC_1760X1280
-from wechat_rpa.bot.wechat_bot import WeChatBot
+from src.capture.window_capture import WeChatNotReadyError
+from src.perception.vision_pipeline import VisionPipeline
+from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
+from src.bot.wechat_bot import WeChatBot
 
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -29,9 +29,9 @@ class TestVisionPipelineNotReady:
 
     def test_perceive_with_login_handler_success(self):
         """login_handler 恢复成功后应正常返回 PerceptionResult"""
-        from wechat_rpa.models.base import Rect, ChatMessage, ChatListItem, PerceptionResult
-        from wechat_rpa.capture.window_capture import CaptureResult
-        from wechat_rpa.layout.layout_parser import UILayout
+        from src.models.base import Rect, ChatMessage, ChatListItem, PerceptionResult
+        from src.capture.window_capture import CaptureResult
+        from src.layout.layout_parser import UILayout
 
         pipeline = VisionPipeline(PROFILE_WECHAT_MAC_1760X1280)
 
@@ -85,8 +85,8 @@ class TestRealSmallWindowFixture:
 
     def test_small_window_parsed_without_crash(self):
         """560x760 小窗口 fixture 应被解析且不崩溃"""
-        from wechat_rpa.ocr.vision_ocr import VisionOCREngine
-        from wechat_rpa.layout.layout_parser import LayoutParser
+        from src.ocr.vision_ocr import VisionOCREngine
+        from src.layout.layout_parser import LayoutParser
 
         img_path = FIXTURES_DIR / "wechat_not_ready_small_window.png"
         if not img_path.exists():

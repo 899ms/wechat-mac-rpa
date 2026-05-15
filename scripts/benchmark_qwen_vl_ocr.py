@@ -43,10 +43,10 @@ def _load_env():
 
 _load_env()
 
-from wechat_rpa.ocr.vision_ocr import VisionOCREngine
-from wechat_rpa.layout.layout_parser import LayoutParser
-from wechat_rpa.message.extractor import MessageExtractor
-from wechat_rpa.layout.profile import PROFILE_WECHAT_MAC_1760X1280
+from src.ocr.vision_ocr import VisionOCREngine
+from src.layout.layout_parser import LayoutParser
+from src.message.extractor import MessageExtractor
+from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
 
 try:
     from openai import OpenAI

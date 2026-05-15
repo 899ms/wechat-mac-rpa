@@ -13,10 +13,10 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from wechat_rpa.perception.vision_pipeline import VisionPipeline
-from wechat_rpa.layout.profile import PROFILE_WECHAT_MAC_1760X1280
-from wechat_rpa.bot.wechat_bot import WeChatBot
-from wechat_rpa.models.base import ChatMessage, SenderType
+from src.perception.vision_pipeline import VisionPipeline
+from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
+from src.bot.wechat_bot import WeChatBot
+from src.models.base import ChatMessage, SenderType
 
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -38,8 +38,8 @@ class TestVisionPipelineIntegration:
 
     def _mock_capture(self, pipeline, image_path: str):
         """将 WindowCapture mock 为返回指定图片"""
-        from wechat_rpa.models.base import Rect
-        from wechat_rpa.capture.window_capture import CaptureResult
+        from src.models.base import Rect
+        from src.capture.window_capture import CaptureResult
         mock_capture = Mock()
         mock_capture.capture.return_value = CaptureResult(
             image_path=image_path,

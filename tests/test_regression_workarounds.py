@@ -17,11 +17,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
 
-from wechat_rpa.layout.layout_parser import LayoutParser, UILayout
-from wechat_rpa.layout.profile import PROFILE_WECHAT_MAC_1760X1280
-from wechat_rpa.message.extractor import MessageExtractor
-from wechat_rpa.models.base import OCRTextElement, Point, Rect
-from wechat_rpa.reply.generator import ReplyGenerator
+from src.layout.layout_parser import LayoutParser, UILayout
+from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
+from src.message.extractor import MessageExtractor
+from src.models.base import OCRTextElement, Point, Rect
+from src.reply.generator import ReplyGenerator
 
 
 # ═══════════════════════════════════════════════════════════

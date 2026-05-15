@@ -142,7 +142,7 @@ data/memory/
 
 ## 5. SessionMemory（超短期记忆）
 
-`wechat_rpa/reply/session_memory.py`
+`src/reply/session_memory.py`
 
 ### 5.1 作用
 跨 tick 缓存工具执行结果，避免同个聊天中短时间内重复调用相同工具。

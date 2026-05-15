@@ -6,9 +6,9 @@
 
 ## P0 — 核心流程缺失
 
-### 1. `wechat_rpa/llm/openclaw_client.py` — OpenClaw LLM 客户端 ✅ 已实现
+### 1. `src/llm/openclaw_client.py` — OpenClaw LLM 客户端 ✅ 已实现
 - **引用位置**: `wechat_bot.py` L4 → LLM
-- **文件**: `wechat_rpa/llm/openclaw_client.py`（144 行）
+- **文件**: `src/llm/openclaw_client.py`（144 行）
 - **功能**:
   - 接口与 `qwen_client.py` 兼容（`chat(messages, tools, temperature)` → str）
   - 连接 `http://127.0.0.1:18790`，模型 `kimi-for-coding`
@@ -19,9 +19,9 @@
   - `from_openclaw_config()` 类方法：从 `~/.openclaw/openclaw.json` 自动读取配置
 - **状态**: ✅ 已完成
 
-### 2. `wechat_rpa/session/global_store.py` — 全局消息存储 ✅ 已实现
+### 2. `src/session/global_store.py` — 全局消息存储 ✅ 已实现
 - **引用位置**: `wechat_bot.py` tick → store → merge
-- **文件**: `wechat_rpa/session/global_store.py`
+- **文件**: `src/session/global_store.py`
 - **功能**:
   - 每个聊天一个 `ChatState`（消息列表 + 会话状态）
   - `merge_tick(tick_msgs)` → 未回复消息列表（含新消息 + 历史遗留未回复）
@@ -47,9 +47,9 @@
 
 ## P1 — 工具与增强
 
-### 3. `wechat_rpa/tools/tool_registry.py` — 工具注册表 ✅ 已实现
+### 3. `src/tools/tool_registry.py` — 工具注册表 ✅ 已实现
 - **引用位置**: `wechat_bot.py` L4 → tools
-- **文件**: `wechat_rpa/tools/tool_registry.py`（81 行）
+- **文件**: `src/tools/tool_registry.py`（81 行）
 - **功能**:
   - `Tool` 类：name, description, parameters, func
   - `to_openai_schema()` → OpenAI function calling 格式
@@ -57,9 +57,9 @@
   - 全局单例 `_registry`，通过 `get_registry()` 获取
 - **状态**: ✅ 已完成
 
-### 4. `wechat_rpa/tools/builtin_tools.py` — 内置工具 ✅ 已实现
+### 4. `src/tools/builtin_tools.py` — 内置工具 ✅ 已实现
 - **引用位置**: `wechat_bot.py` L4 → tools
-- **文件**: `wechat_rpa/tools/builtin_tools.py`（163 行）
+- **文件**: `src/tools/builtin_tools.py`（163 行）
 - **功能**:
   - `_get_current_time()` — 当前时间
   - `_get_weather(city, date)` — wttr.in 天气查询
@@ -68,8 +68,8 @@
   - 注册到全局 ToolRegistry
 - **状态**: ⚠️ 基本完成，但 `stock_tools.py` 缺失
 
-### 5. `wechat_rpa/tools/stock_tools.py` — 股票查询工具 ⚠️ 未实现
-- **引用位置**: `wechat_rpa/tools/builtin_tools.py` line 12: `from .stock_tools import stock_query`
+### 5. `src/tools/stock_tools.py` — 股票查询工具 ⚠️ 未实现
+- **引用位置**: `src/tools/builtin_tools.py` line 12: `from .stock_tools import stock_query`
 - **状态**: 🔴 **文件不存在** — builtin_tools.py 引用了该模块但未创建
 - **影响**: 导入 builtin_tools.py 时会崩溃（ModuleNotFoundError）
 - **建议**: 要么创建 stock_tools.py，要么从 builtin_tools.py 移除该导入
@@ -78,9 +78,9 @@
 
 ## P2 — Action / Memory 模块
 
-### 6. `wechat_rpa/action/chat_list_clicker.py` — 聊天列表点击器 ✅ 已实现
+### 6. `src/action/chat_list_clicker.py` — 聊天列表点击器 ✅ 已实现
 - **引用位置**: 架构图 L5 Action
-- **文件**: `wechat_rpa/action/chat_list_clicker.py`（91 行）
+- **文件**: `src/action/chat_list_clicker.py`（91 行）
 - **功能**:
   - 将 OCR/Layouter 识别的 ChatListItem 转换为屏幕点击
   - 坐标计算：`window_rect + item_rect / scale_factor`
@@ -88,9 +88,9 @@
   - 先激活微信窗口确保焦点
 - **状态**: ✅ 已完成
 
-### 7. `wechat_rpa/action/login_recovery.py` — 登录恢复 ✅ 已实现
+### 7. `src/action/login_recovery.py` — 登录恢复 ✅ 已实现
 - **引用位置**: 架构图 L5 Action
-- **文件**: `wechat_rpa/action/login_recovery.py`（201 行）
+- **文件**: `src/action/login_recovery.py`（201 行）
 - **功能**:
   - 处理微信未登录状态下的自动恢复
   - 检测窗口尺寸异常 → 尝试自动点击登录按钮
@@ -98,9 +98,9 @@
   - 使用 VisionOCREngine 识别登录按钮
 - **状态**: ✅ 已完成
 
-### 8. `wechat_rpa/memory/engine.py` — LLM Wiki 长期记忆 ✅ 已实现
+### 8. `src/memory/engine.py` — LLM Wiki 长期记忆 ✅ 已实现
 - **引用位置**: 架构图 Memory
-- **文件**: `wechat_rpa/memory/engine.py`（441 行）
+- **文件**: `src/memory/engine.py`（441 行）
 - **功能**:
   - 基于 LLM Wiki 的长期记忆系统
   - 支持 overrides 配置
@@ -112,9 +112,9 @@
 
 ## P3 — 存储模块
 
-### 9. `wechat_rpa/storage/message_store.py` — 消息存储管理 ✅ 已实现
+### 9. `src/storage/message_store.py` — 消息存储管理 ✅ 已实现
 - **引用位置**: 架构图 Storage
-- **文件**: `wechat_rpa/storage/message_store.py`（178 行）
+- **文件**: `src/storage/message_store.py`（178 行）
 - **功能**:
   - `StoredMessage` dataclass：text, sender, sender_type, chat_name, is_at_me, timestamp, message_hash, confidence
   - `MessageStore`：内存缓存 + 磁盘持久化（JSON）
@@ -140,6 +140,6 @@
 | P2 | memory/engine.py | 441 | ✅ 完成 |
 | P3 | message_store.py | 178 | ✅ 完成 |
 
-**唯一未实现模块**: `wechat_rpa/tools/stock_tools.py`（股票查询工具）
+**唯一未实现模块**: `src/tools/stock_tools.py`（股票查询工具）
 - 被 `builtin_tools.py` 导入，会导致 `ModuleNotFoundError`
 - 其他所有架构图中引用的模块均已实现
