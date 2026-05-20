@@ -206,9 +206,10 @@ class WindowCapture:
             WeChatNotReadyError: 窗口尺寸异常，可能需要扫码登录
             CaptureValidationError: 截图内容验证失败
         """
+        t_capture_start = time.time()
         # 清理旧截图（超过1小时的临时文件，避免 /tmp 无限累积）
         try:
-            import glob, time
+            import glob
             cutoff = time.time() - 3600
             for old in glob.glob("/tmp/wechat_capture_*.png"):
                 try:
@@ -227,7 +228,9 @@ class WindowCapture:
         pid = os.getpid()
         self.output_path = f"/tmp/wechat_capture_{ts}_{pid}.png"
 
+        t_find_start = time.time()
         result = self._find_window()
+        t_find_ms = (time.time() - t_find_start) * 1000
         if result is None:
             raise WindowNotFoundError("WeChat window not found")
 
@@ -260,15 +263,26 @@ class WindowCapture:
                     "可能需要扫码登录或主窗口未展开"
                 )
 
+        t_screenshot_start = time.time()
         self._do_capture(window_rect, window_id)
+        t_screenshot_ms = (time.time() - t_screenshot_start) * 1000
 
         # 验证截图内容
-        if not self._validate_wechat_screenshot(self.output_path):
+        t_validate_start = time.time()
+        is_valid = self._validate_wechat_screenshot(self.output_path)
+        t_validate_ms = (time.time() - t_validate_start) * 1000
+        if not is_valid:
             raise CaptureValidationError(
                 "截图验证失败：截到的内容不像微信窗口，可能有其他窗口覆盖"
             )
 
         scale_factor = self._get_scale_factor()
+        t_total_ms = (time.time() - t_capture_start) * 1000
+        _logger.info(
+            f"[Perf][Capture] total={t_total_ms:.0f}ms "
+            f"find_window={t_find_ms:.0f}ms screenshot={t_screenshot_ms:.0f}ms "
+            f"validate={t_validate_ms:.0f}ms"
+        )
 
         return CaptureResult(
             image_path=self.output_path,

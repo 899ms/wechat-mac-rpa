@@ -1,0 +1,14 @@
+{
+  "tool_calls": [
+    {
+      "id": "call_268d508fb5b94289b453710d",
+      "type": "function",
+      "function": {
+        "name": "search_memory",
+        "arguments": "{\"query\": \"王芊 地址\"}"
+      }
+    }
+  ],
+  "content": "",
+  "timestamp": 1779235073.16303
+}

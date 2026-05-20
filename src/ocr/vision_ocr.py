@@ -39,6 +39,8 @@ class VisionOCREngine:
         Raises:
             FileNotFoundError: 图片路径不存在
         """
+        import time
+        t0 = time.time()
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image not found: {image_path}")
 
@@ -105,6 +107,8 @@ class VisionOCREngine:
 
         # 按 center.y 升序排列（从上到下）
         elements.sort(key=lambda e: e.center.y)
+        t_ms = (time.time() - t0) * 1000
+        _logger.info(f"[Perf][OCR] recognize: {t_ms:.0f}ms, elements={len(elements)}")
         return elements
 
     @property

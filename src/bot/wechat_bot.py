@@ -12,7 +12,8 @@ from src.models.base import ActionResult, ChatMessage, PerceptionResult, SenderT
 from src.perception.vision_pipeline import VisionPipeline
 from src.layout.profile import LayoutProfile
 from src.session.global_store import GlobalStore
-from src.reply.policy import ReplyPolicy, _is_group_chat
+from src.reply.policy import ReplyPolicy
+from src.utils.chat_utils import _is_group_chat_name, _normalize_chat_name
 from src.reply.generator import ReplyGenerator
 from src.action.message_sender import WeChatMessageSender
 from src.action.chat_list_clicker import ChatListClicker
@@ -28,23 +29,6 @@ def _try_create_openclaw_client():
         return OpenClawClient.from_openclaw_config()
     except Exception:
         return None
-
-
-def _normalize_chat_name(name: str) -> str:
-    """对聊天名称进行 Unicode 归一化，防止 OCR 差异导致 session 分裂.
-    
-    群聊名通常以 群人数 结尾（如 'ai开发小分队（128）'），
-    去掉后缀得到稳定的群聊标识。
-    """
-    if not name:
-        return ""
-    name = name.replace("(", "（").replace(")", "）")
-    name = name.replace("—", "—").replace("–", "—")
-    name = name.replace(" ", "").replace("\u00a0", "").replace("\t", "")
-    name = re.sub(r'^\d+[\.\、\s]*', '', name)
-    # 去掉群人数后缀（如 'ai开发小分队（128）' → 'ai开发小分队'）
-    name = re.sub(r'（\d+）$', '', name)
-    return name.strip()
 
 
 class WeChatBot:
@@ -142,7 +126,8 @@ class WeChatBot:
                     continue
                 # 用第一条消息的 chat_name 作为 key
                 chat_name = messages[0].chat_name or talker
-                injected = self.global_store.inject_history(chat_name, messages, mode="weflow")
+                is_group = _is_group_chat_name(chat_name)
+                injected = self.global_store.inject_history(chat_name, messages, mode="weflow", is_group=is_group)
                 total += injected
             print(f"[WeFlow] 历史注入完成: {total} 条消息注入 GlobalStore")
         except Exception as e:
@@ -203,7 +188,9 @@ class WeChatBot:
                     pass
 
             messages = result.messages
-            chat_name = _normalize_chat_name(result.chat_name)
+            raw_chat_name = result.chat_name or ""
+            chat_name = _normalize_chat_name(raw_chat_name)
+            is_group = _is_group_chat_name(raw_chat_name)
 
             if not chat_name:
                 if messages:
@@ -230,7 +217,7 @@ class WeChatBot:
             )
 
             state, unreplied = self.global_store.merge_tick(
-                chat_name, messages, mode=self._weflow_mode
+                chat_name, messages, mode=self._weflow_mode, is_group=is_group
             )
 
             # 记录 Session 层输入输出
@@ -319,7 +306,7 @@ class WeChatBot:
             all_messages = getattr(state, "messages", [])
             if not isinstance(all_messages, list):
                 all_messages = []
-            replies = self.generator.generate(to_reply, all_messages)
+            replies = self.generator.generate(to_reply, all_messages, is_group=is_group, tick_id=tick_id)
             reply_text = " | ".join(replies) if replies else ""
             self.logger.log_decision(
                 tick_id, should_reply=True,
@@ -376,13 +363,17 @@ class WeChatBot:
                 if action_result.success:
                     self.logger.log_send(tick_id, success=True, text=reply)
                     self.debug_logger.log_action("send", action_input=reply, success=True)
-                    # 立即将 Bot 自己的回复注入 GlobalStore，避免 WeFlow API 延迟导致当前 tick 看不到上下文
+                    # Bot 自己发的消息不直接进 history，放入 pending 等感知层确认
                     self_msg = ChatMessage(
                         text=reply, sender="bot", sender_type=SenderType.SELF,
                         chat_name=chat_name, replied=True, reply_text=reply,
                         reply_time=time.time(), message_type="text"
                     )
-                    self.global_store.merge_tick(chat_name, [self_msg], mode=self._weflow_mode)
+                    state = self.global_store.chats.get(chat_name)
+                    if state is not None:
+                        state.pending_self_messages.append(self_msg)
+                        self.logger.info("[Pending] %s 记录 pending self 消息 (pending 队列长度=%d): %.60s",
+                                             chat_name, len(state.pending_self_messages), reply)
                 else:
                     self.logger.log_send(tick_id, success=False, text=reply, error=action_result.error)
                     self.debug_logger.log_action("send", action_input=reply, success=False, error=action_result.error)
@@ -396,7 +387,6 @@ class WeChatBot:
 
             # 触发记忆更新（异步，不阻塞）
             if self.memory_engine is not None:
-                is_group = _is_group_chat(chat_name)
                 if is_group:
                     # 群聊：同时更新群 wiki 和最后发言者 wiki
                     self.memory_engine.update_group_wiki(
@@ -599,11 +589,16 @@ class WeChatBot:
         result = self.sender.send(text)
         if result.success:
             norm = _normalize_chat_name(chat_name)
-            # 创建一条虚拟的已回复消息记录
+            is_group = _is_group_chat_name(chat_name)
+            # 创建一条虚拟的已回复消息记录，放入 pending 等感知层确认
             from src.models.base import ChatMessage, SenderType
             msg = ChatMessage(
                 text=text, sender="bot", sender_type=SenderType.SELF,
                 chat_name=norm, replied=True, reply_text=text, reply_time=time.time()
             )
-            self.global_store.merge_tick(norm, [msg], mode=self._weflow_mode)
+            state = self.global_store.chats.get(norm)
+            if state is not None:
+                state.pending_self_messages.append(msg)
+                self.logger.info("[Pending] %s 记录 pending self 消息 (pending 队列长度=%d): %.60s",
+                                     norm, len(state.pending_self_messages), text)
         return result

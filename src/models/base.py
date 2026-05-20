@@ -94,6 +94,7 @@ class PerceptionResult:
     messages: List[ChatMessage]
     chat_list_items: List[ChatListItem]
     screenshot_path: str
+    is_group: bool = False  # 感知层统一判断，下游只读不再判断
     window_rect: Optional[Rect] = None  # 窗口屏幕逻辑坐标
     scale_factor: float = 1.0  # Retina 缩放因子
     debug_info: Optional[Dict] = None  # 完整调试信息（tick 级）

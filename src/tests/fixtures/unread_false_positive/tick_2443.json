@@ -1,0 +1,241 @@
+{
+  "tick_id": 2443,
+  "timestamp": "2026-05-17T07:00:56.288812",
+  "screenshot_path": "data/screenshots/wechat_2443_20260517_070059_726.png",
+  "perception_screenshot_path": "",
+  "perception_chat_name": "",
+  "perception_messages_count": 0,
+  "perception_chat_list_count": 12,
+  "ocr_elements": [],
+  "layout_left_elements": [],
+  "layout_right_elements": [],
+  "layout_title_elements": [
+    {
+      "text": "十",
+      "x": 538,
+      "y": 49,
+      "w": 17,
+      "h": 17,
+      "cx": 547,
+      "cy": 58,
+      "confidence": 0.30000001192092896
+    }
+  ],
+  "layout_input_elements": [
+    {
+      "text": "05/06",
+      "x": 516,
+      "y": 1418,
+      "w": 62,
+      "h": 20,
+      "cx": 547,
+      "cy": 1428,
+      "confidence": 1.0
+    },
+    {
+      "text": "05/06",
+      "x": 516,
+      "y": 1545,
+      "w": 59,
+      "h": 20,
+      "cx": 546,
+      "cy": 1555,
+      "confidence": 1.0
+    }
+  ],
+  "layout_timestamp_elements": [
+    {
+      "text": "07:00",
+      "x": 521,
+      "y": 138,
+      "w": 57,
+      "h": 20,
+      "cx": 549,
+      "cy": 148,
+      "confidence": 1.0
+    },
+    {
+      "text": "22:49",
+      "x": 518,
+      "y": 393,
+      "w": 57,
+      "h": 20,
+      "cx": 547,
+      "cy": 404,
+      "confidence": 1.0
+    },
+    {
+      "text": "21:45",
+      "x": 521,
+      "y": 649,
+      "w": 57,
+      "h": 20,
+      "cx": 549,
+      "cy": 659,
+      "confidence": 1.0
+    },
+    {
+      "text": "昨天 19:18",
+      "x": 479,
+      "y": 776,
+      "w": 99,
+      "h": 23,
+      "cx": 528,
+      "cy": 787,
+      "confidence": 0.5
+    },
+    {
+      "text": "星期四",
+      "x": 516,
+      "y": 905,
+      "w": 59,
+      "h": 22,
+      "cx": 546,
+      "cy": 916,
+      "confidence": 0.30000001192092896
+    },
+    {
+      "text": "星期二",
+      "x": 516,
+      "y": 1160,
+      "w": 59,
+      "h": 22,
+      "cx": 546,
+      "cy": 1171,
+      "confidence": 1.0
+    }
+  ],
+  "layout_chat_list_groups": [],
+  "layout_chat_list_nicknames": [
+    "W1han、王芊、…",
+    "王芊 @ai开发小⋯",
+    "W1han",
+    "文件传输助手",
+    "腾讯新闻",
+    "王老板们和小天才",
+    "我爱我家",
+    "W1han、秋水文章⋯. 星期三",
+    "秋水文章",
+    "W1han、王芊",
+    "打工人和退休干部们",
+    "CowAgent交流.."
+  ],
+  "layout_chat_list_unread": [
+    "1",
+    "1",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "layout_message_candidates": [
+    {
+      "text": "04/18",
+      "x": 518,
+      "y": 522,
+      "w": 57,
+      "h": 21,
+      "cx": 547,
+      "cy": 533,
+      "confidence": 1.0
+    },
+    {
+      "text": "05/08",
+      "x": 516,
+      "y": 1289,
+      "w": 62,
+      "h": 20,
+      "cx": 547,
+      "cy": 1299,
+      "confidence": 1.0
+    }
+  ],
+  "layout_self_bubbles": [],
+  "extraction_clusters": [],
+  "extraction_messages": [],
+  "api_prompt": "你是一位专精 UI 截图文字识别的 OCR 引擎。请仔细识别这张微信 Mac 版截图中的文字信息，并输出为 JSON。\n\n截图包含以下区域：\n1. 左侧聊天列表：每个条目包含头像、昵称、最后一条消息预览时间、未读角标数字（红色圆形背景）\n2. 中间上方标题栏：当前聊天名称\n3. 中间消息区域：消息按对话顺序从上到下排列\n\n请严格按以下 JSON 格式输出（不要加 markdown 代码块，直接输出纯 JSON）：\n\n{\n  \"chat_name\": \"当前聊天名称，如果没有则空字符串\",\n  \"chat_list\": [\n    {\"nickname\": \"昵称1\", \"unread_count\": \"未读数量，没有则为空字符串\"},\n    {\"nickname\": \"昵称2\", \"unread_count\": \"3\"}\n  ],\n  \"messages\": [\n    {\"sender\": \"自己\", \"text\": \"消息内容\", \"type\": \"text\"},\n    {\"sender\": \"对方\", \"text\": \"私聊中对方的消息\", \"type\": \"text\"},\n    {\"sender\": \"群成员昵称\", \"text\": \"群聊中对方的消息\", \"type\": \"text\"},\n    {\"sender\": \"对方\", \"text\": \"\", \"type\": \"image\", \"image_description\": \"一只橘猫趴在键盘上\", \"image_text\": \"不想上班\"},\n    {\"sender\": \"对方\", \"text\": \"\", \"type\": \"sticker\", \"image_description\": \"熊猫头流泪的表情包\", \"image_text\": \"\"}\n  ]\n}\n\n【关键识别规则 - 必须严格遵守】\n\n1. 未读角标（unread_count）：\n   - 必须是红色圆形背景中的白色/黑色数字，位于头像右上角\n   - 预览消息右侧的时间戳（如\"09:31\"、\"昨天\"、\"00:57\"）是消息时间，不是未读角标，unread_count 必须设为空字符串\"\"\n   - 如果没有红色圆形数字，unread_count 为空字符串\"\"\n\n2. 聊天列表（chat_list）：\n   - 【重要】chat_list 必须严格按照截图中左侧列表从上到下的顺序排列，第一个就是截图中最顶部的条目\n   - 左侧每个条目提取昵称，忽略头像区域的所有数字（除非是红色圆形未读角标）\n   - 当前高亮选中的聊天条目也必须包含\n   - 预览消息文字不要放入 nickname\n\n3. 消息 sender 判断（这是最容易出错的地方，请仔细看气泡颜色和布局）：\n   - 【最重要】对齐方向是判断 sender 的第一依据，气泡颜色仅作交叉验证：\n     - 右侧对齐的气泡 = \"自己\" 发送的消息，sender 必须填 \"自己\"\n     - 左侧对齐的气泡 = 对方发送的消息，sender 填 \"对方\"（私聊）或群成员昵称（群聊）\n   - 【绝对不能搞反】左侧对齐的消息绝对不可能是自己发的，右侧对齐的消息绝对不可能是对方发的\n   - 【颜色与方向矛盾时】对齐方向优先于颜色：\n     - 如果左侧对齐但颜色偏绿 → 仍然是对方发的（标\"对方\"或群成员昵称）\n     - 如果右侧对齐但颜色偏白 → 仍然是自己发的（标\"自己\"）\n   - 【兜底规则】如果看不清对齐方向，也看不清气泡颜色 → 优先标为\"对方\"，绝不要默认标为\"自己\"\n   - 【短消息特别注意】1-10 个字的短消息最容易误判，必须同时检查对齐方向和气泡颜色，不要因消息短就默认当成自己发的\n   - 【群聊 vs 私聊区分】\n     - 群聊：消息气泡上方会显示发送者昵称 → sender 必须填这个实际昵称\n     - 私聊：只有两个人，消息气泡上方不显示发送者昵称 → sender 必须填 \"对方\"\n     - 【重要】群聊中同一人连续发多条消息时，只有第一条上方显示昵称，后续消息不显示。此时请根据对齐方向推断：左侧气泡 → 与上方最近一条左侧气泡的 sender 相同\n   - 绝对不能把私聊中的对方消息填成群成员昵称或具体人名\n   - 时间戳（如\"昨天 21:58\"、\"11:34\"、\"00:22\"）不是消息，不要输出\n   - 【常见错误】不要把白色气泡的对方消息错标为 \"自己\"，也不要把短消息默认当成自己发的\n\n4. 消息 type 分类（重要新增，最容易出错）：\n   - \"text\"：气泡内的所有内容。包括纯文字、emoji、气泡内的小表情符号\n   - \"image\"：图片、照片、截图等非表情类的图像内容\n   - \"sticker\"：仅指不在气泡内的独立大表情文件（微信表情商店下载的大表情、GIF 动图、熊猫头等）\n   - \"mixed\"：图文混排（消息同时包含图片和文字）\n   - \"link_card\"：链接卡片、文章分享、小程序卡片\n   - 【绝对规则】白色/灰色/绿色气泡内的任何内容，一律识别为 text。sticker 只可能是脱离气泡的独立图像\n   - 【常见错误】不要把气泡内的 emoji 或小表情错标为 sticker。例如\"哈哈😂\"、气泡内的\"🐶\"都是 text\n   - 【常见错误】不要把对方发送的纯文字消息（即使很短或只含 emoji）错标为 image/sticker\n   - 判断标准：先看消息是否有气泡包裹。有气泡 → text；无气泡的独立图像 → image/sticker\n   - 区分 image 和 sticker：表情包通常尺寸较小、风格卡通、配简短文字；照片/截图通常尺寸较大、内容写实\n\n5. 图片/表情识别（重要新增）：\n   - 如果消息是图片或表情包，text 字段放图片上的文字（如有），没有则空字符串\n   - image_description：详细描述图片/表情包的内容。例如：\n     - 照片：\"夕阳下的海滩，天空呈现橙红色，有几只海鸥\"\n     - 表情包：\"一只熊猫头流泪，配文'我太难了'\"\n     - 截图：\"手机截图，显示微信聊天界面\"\n   - image_text：图片上叠加的文字（如表情包配字、截图中的文字、照片上的水印文字）\n   - 【隐私保护】如果图片包含身份证、银行卡、地址、电话号码等隐私信息，image_description 简化为\"[图片-包含隐私信息]\"\n   - 【隐私保护】如果图片包含裸露、暴力等不适宜内容，image_description 简化为\"[图片]\"\n   - 链接卡片（link_card）的 image_description 描述卡片外观（如\"分享了一篇公众号文章，标题为xxx\"），image_text 提取卡片上的标题和摘要\n\n6. 消息（messages）：\n   - 包含所有消息：文字、图片、表情包、链接卡片\n   - 排除所有时间戳\n   - 按截图中从上到下顺序排列\n\n7. 输入框过滤（重要）：\n   - 截图最底部是输入框区域（有表情😊、文件📎、截图✂️、语音🎤按钮）\n   - 输入框中的文字是未发送的草稿，不是已发送的消息，必须排除\n   - 不要输出输入框中的任何内容\n\n8. 只输出 JSON，不要任何解释文字。\n",
+  "api_response": "{\n  \"chat_name\": \"\",\n  \"chat_list\": [\n    {\"nickname\": \"W1han、王芊、...\", \"unread_count\": \"1\"},\n    {\"nickname\": \"王芊 @ai开发小...\", \"unread_count\": \"\"},\n    {\"nickname\": \"W1han\", \"unread_count\": \"\"},\n    {\"nickname\": \"文件传输助手\", \"unread_count\": \"\"},\n    {\"nickname\": \"腾讯新闻\", \"unread_count\": \"\"},\n    {\"nickname\": \"王老板们和小天才\", \"unread_count\": \"\"},\n    {\"nickname\": \"我爱我家\", \"unread_count\": \"\"},\n    {\"nickname\": \"W1han、秋水文章...\", \"unread_count\": \"\"},\n    {\"nickname\": \"秋水文章\", \"unread_count\": \"\"},\n    {\"nickname\": \"W1han、王芊\", \"unread_count\": \"\"},\n    {\"nickname\": \"打工人和退休干部们\", \"unread_count\": \"\"},\n    {\"nickname\": \"CowAgent交流...\", \"unread_count\": \"\"}\n  ],\n  \"messages\": []\n}",
+  "api_chat_list": [
+    {
+      "nickname": "W1han、王芊、...",
+      "unread_count": "1"
+    },
+    {
+      "nickname": "王芊 @ai开发小...",
+      "unread_count": ""
+    },
+    {
+      "nickname": "W1han",
+      "unread_count": ""
+    },
+    {
+      "nickname": "文件传输助手",
+      "unread_count": ""
+    },
+    {
+      "nickname": "腾讯新闻",
+      "unread_count": ""
+    },
+    {
+      "nickname": "王老板们和小天才",
+      "unread_count": ""
+    },
+    {
+      "nickname": "我爱我家",
+      "unread_count": ""
+    },
+    {
+      "nickname": "W1han、秋水文章...",
+      "unread_count": ""
+    },
+    {
+      "nickname": "秋水文章",
+      "unread_count": ""
+    },
+    {
+      "nickname": "W1han、王芊",
+      "unread_count": ""
+    },
+    {
+      "nickname": "打工人和退休干部们",
+      "unread_count": ""
+    },
+    {
+      "nickname": "CowAgent交流...",
+      "unread_count": ""
+    }
+  ],
+  "reply_system_prompt": "",
+  "reply_user_prompt": "",
+  "reply_raw_response": "",
+  "reply_llm_calls": [],
+  "reply_tool_calls": [],
+  "reply_generation_trace": [],
+  "loaded_skills": [],
+  "skill_injected_content": "",
+  "active_llm": "",
+  "hermes_fallback_triggered": false,
+  "hermes_messages": [],
+  "hermes_response": "",
+  "session_input_chat_name": "",
+  "session_input_messages": [],
+  "session_output_unreplied": [],
+  "session_total_stored": 0,
+  "bot_chat_name": "",
+  "bot_new_messages_count": 0,
+  "bot_should_reply": false,
+  "bot_reply_target": "",
+  "bot_reply_text": "",
+  "bot_switch_target": "W1han、王芊、...",
+  "bot_switch_reason": "未读 1",
+  "action": "switch",
+  "action_input": "W1han、王芊、...",
+  "action_result_success": true,
+  "action_result_error": ""
+}

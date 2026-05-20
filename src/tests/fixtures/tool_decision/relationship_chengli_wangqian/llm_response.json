@@ -1,0 +1,22 @@
+{
+  "tool_calls": [
+    {
+      "id": "call_639012927f60401c8f801bbb",
+      "type": "function",
+      "function": {
+        "name": "search_memory",
+        "arguments": "{\"query\": \"程立\"}"
+      }
+    },
+    {
+      "id": "call_6aceb908c26e405bbdeb4aa1",
+      "type": "function",
+      "function": {
+        "name": "search_memory",
+        "arguments": "{\"query\": \"王芊\"}"
+      }
+    }
+  ],
+  "content": "",
+  "timestamp": 1779235071.0805702
+}

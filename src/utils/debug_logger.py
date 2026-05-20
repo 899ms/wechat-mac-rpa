@@ -124,6 +124,7 @@ class DebugLogger:
         """保存完整 prompt 到 markdown 文件，不截断。按实际发生顺序：OCR → 对话回复（多轮）。
         
         如果没有任何实质性内容（无 OCR、无对话、无 Bot 回复），跳过生成空文件。
+        只保留最近 50 个 prompt 文件，防止磁盘无限增长。
         """
         if self.current is None:
             return
@@ -299,6 +300,15 @@ class DebugLogger:
 
         with open(md_path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
+
+        # 清理旧文件：只保留最近 50 个
+        try:
+            all_files = sorted(prompts_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+            for old_file in all_files[50:]:
+                old_file.unlink()
+        except Exception:
+            pass
+
         return
 
     def log_ocr(self, elements: List[Any]) -> None:

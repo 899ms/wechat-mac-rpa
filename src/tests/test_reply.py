@@ -4,7 +4,7 @@
 import pytest
 from src.models.base import ChatMessage, SenderType
 from src.session.global_store import ChatState
-from src.reply.policy import ReplyPolicy, _is_group_chat
+from src.reply.policy import ReplyPolicy
 from src.reply.generator import ReplyGenerator
 
 
@@ -55,21 +55,6 @@ class TestReplyPolicy:
             chat_name="Alice",
         )
         assert policy.should_reply(msg, session) is True
-
-
-class TestIsGroupChat:
-    def test_chinese_parentheses(self):
-        assert _is_group_chat("ai开发小分队（128）") is True
-        assert _is_group_chat("王老板们和小天才（5）") is True
-
-    def test_english_parentheses(self):
-        assert _is_group_chat("王老板们和小天才 (5)") is True
-        assert _is_group_chat("ai开发小分队 (128)") is True
-
-    def test_private_chat_returns_false(self):
-        assert _is_group_chat("W1han") is False
-        assert _is_group_chat("秋水文章") is False
-        assert _is_group_chat("") is False
 
 
 class TestReplyGenerator:

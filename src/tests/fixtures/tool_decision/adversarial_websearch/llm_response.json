@@ -1,0 +1,14 @@
+{
+  "tool_calls": [
+    {
+      "id": "call_3f1a06273f1c4b6b92194e11",
+      "type": "function",
+      "function": {
+        "name": "search_memory",
+        "arguments": "{\"query\": \"王芊\"}"
+      }
+    }
+  ],
+  "content": "",
+  "timestamp": 1779235107.777917
+}

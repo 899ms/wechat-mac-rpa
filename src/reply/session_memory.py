@@ -45,6 +45,7 @@ class CachedToolResult:
 class SessionSnapshot:
     """单次聊天的完整上下文快照."""
     chat_name: str
+    is_group: bool = False
     last_active: float = field(default_factory=time.time)
     tool_cache: List[CachedToolResult] = field(default_factory=list)
     bot_replies: List[str] = field(default_factory=list)
@@ -110,10 +111,13 @@ class SessionMemory:
     def __init__(self):
         self._sessions: Dict[str, SessionSnapshot] = {}
 
-    def get_or_create(self, chat_name: str) -> SessionSnapshot:
+    def get_or_create(self, chat_name: str, is_group: bool = False) -> SessionSnapshot:
         if chat_name not in self._sessions:
-            self._sessions[chat_name] = SessionSnapshot(chat_name=chat_name)
+            self._sessions[chat_name] = SessionSnapshot(chat_name=chat_name, is_group=is_group)
         else:
+            # 如果传入的 is_group 与当前不同，更新它
+            if self._sessions[chat_name].is_group != is_group:
+                self._sessions[chat_name].is_group = is_group
             self._sessions[chat_name].last_active = time.time()
         return self._sessions[chat_name]
 

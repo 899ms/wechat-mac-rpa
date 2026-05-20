@@ -1,0 +1,14 @@
+{
+  "tool_calls": [
+    {
+      "id": "call_96b570d4f4de4a3ba06ac103",
+      "type": "function",
+      "function": {
+        "name": "search_memory",
+        "arguments": "{\"query\": \"王艺涵\"}"
+      }
+    }
+  ],
+  "content": "",
+  "timestamp": 1779235130.5897899
+}

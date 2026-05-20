@@ -54,30 +54,34 @@ class BotLogger:
         self.logs_dir = Path(logs_dir)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
 
+        date_str = datetime.now().strftime("%Y%m%d")
+        runtime_path = self.logs_dir / f"runtime_{date_str}.log"
+        file_fmt = logging.Formatter(
+            "%(asctime)s [%(levelname)s] [%(funcName)s:%(lineno)d] %(message)s"
+        )
+
         # --- 1. 人类可读的运行日志 ---
         self.runtime_logger = logging.getLogger("src.runtime")
         self.runtime_logger.setLevel(logging.DEBUG)
         # 避免重复添加 handler（重复实例化时）
         self.runtime_logger.handlers = []
 
-        # Console handler
+        # Console handler（带 emoji，仅 src.runtime）
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(_EmojiFormatter())
         self.runtime_logger.addHandler(console_handler)
 
-        # File handler（按日期命名，但用 RotatingFileHandler 控制大小）
-        date_str = datetime.now().strftime("%Y%m%d")
-        runtime_path = self.logs_dir / f"runtime_{date_str}.log"
+        # --- 2. 根 logger 统一文件输出（捕获所有 src.* 子模块）---
+        src_root = logging.getLogger("src")
+        src_root.setLevel(logging.DEBUG)
+        src_root.handlers = []
         file_handler = RotatingFileHandler(
             runtime_path, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
         )
         file_handler.setLevel(logging.DEBUG)
-        file_fmt = logging.Formatter(
-            "%(asctime)s [%(levelname)s] [%(funcName)s:%(lineno)d] %(message)s"
-        )
         file_handler.setFormatter(file_fmt)
-        self.runtime_logger.addHandler(file_handler)
+        src_root.addHandler(file_handler)
 
         # --- 2. 机器可解析的执行流水 ---
         self.execution_path = self.logs_dir / "execution.jsonl"

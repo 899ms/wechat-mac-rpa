@@ -2,19 +2,8 @@
 """L4 Reply Policy - 回复决策."""
 
 from src.models.base import ChatMessage, SenderType
+from src.utils.chat_utils import _is_group_chat_name as _is_group_chat
 from typing import Any
-
-
-import re
-
-
-def _is_group_chat(chat_name: str) -> bool:
-    """通过聊天名称判断是否为群聊.
-    
-    群聊名以 群人数 结尾，如 'ai开发小分队（128）' 或 'xxx (5)'。
-    括号前的部分才是稳定的群聊标识，括号内的数字可能变化。
-    """
-    return bool(re.search(r'[（(]\d+[）)]$', chat_name))
 
 
 class ReplyPolicy:

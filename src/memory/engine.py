@@ -376,7 +376,12 @@ class MemoryEngine:
             _logger.debug(f"保存别名建议失败 {path}: {e}")
 
     def _compress_wiki(self, wiki: str, max_chars: int) -> str:
-        """压缩 wiki 到指定长度。"""
+        """压缩 wiki 到指定长度。
+
+        注意：此函数按 markdown 标题/列表断点截断，策略与通用
+        text_utils._compress_text 不同（后者保留头尾），因此保留
+        独立实现。未来如需通用文本压缩，优先使用 text_utils。
+        """
         wiki = wiki.strip()
         if len(wiki) <= max_chars:
             return wiki

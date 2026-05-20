@@ -1,0 +1,14 @@
+{
+  "tool_calls": [
+    {
+      "id": "call_c53b694d5ee94c27a3c88094",
+      "type": "function",
+      "function": {
+        "name": "search_memory",
+        "arguments": "{\"query\": \"王海\"}"
+      }
+    }
+  ],
+  "content": "",
+  "timestamp": 1779235068.4992719
+}

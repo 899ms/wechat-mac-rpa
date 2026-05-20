@@ -1,7 +1,7 @@
 # 微信 Mac RPA 项目进度
 
 ## 更新时间
-2026-05-04
+2026-05-15
 
 ## 当前状态
 - ✅ 项目架构：双感知管道（SmartPerceptionPipeline 主力 + VisionPipeline 备用）
@@ -19,6 +19,10 @@
 - ✅ **browse_url 工具**（用户分享链接时自动提取正文）
 - ✅ **web_search 结果带链接**（支持 browse_url 二次打开）
 - ✅ **Hermes 深度分析路径**（skill 匹配时走 Hermes，支持 300 字/5 条回复）
+- ✅ **评估体系全面重建**（LLM-as-a-Judge + Rubric，5 个 benchmark 覆盖核心能力）
+- ⏳ Tool Decision 对抗性 case 条件反射查 wiki（5/5 失败）
+- ⏳ OCR 私聊场景系统性消息错位（15/18 失败）
+- ⏳ Memory Search alias_wangzong("王总")召回失败
 - ⏳ 昵称识别准确率仍需优化
 - ⏳ 多显示器场景支持
 - ⏳ GitHub 推送（网络超时，待手动 push）
@@ -58,6 +62,57 @@
   - debug JSON 中 Hermes 字段残留问题（generate() 开头未重置）
   - 标题栏 OCR 失败时盲目切换导致误点单聊框
   - 聊天列表点击位置偏左，改为正中心 + 更长等待时间
+
+### 2026-05-15 评估体系重建 ✅ 已完成
+- **P2 评估体系重构**
+  - 从关键词匹配升级为 LLM-as-a-Judge + Rubric 评估
+  - 使用 deepseek-v4-pro 做 Judge
+  - 18 个自定义 Rubric 覆盖 24 个 case
+- **Prompt 优化**
+  - 规则 8: 承认错误优先于调侃（correction case 通过）
+  - 规则 12: 禁止编造具体事实（self_msg_hallucination/unknown_info 通过）
+- **删除审计 case**: 移除 7 个 audit_* 历史审计 case，只测当前系统实时表现
+- **全量真实 API 重跑**: 清除缓存后重新调用，Reply Quality 100%，Tool Decision 81.5%
+- **新增 OCR Quality Benchmark**: 33 个 case（10 现有 + 23 legacy），覆盖 sender/text/chat_name/chat_list
+- **Judge 缓存重建**: Reply Quality 24/24 通过，Tool Decision 对抗性 case Judge 评估已缓存
+
+---
+
+## 评估体系（2026-05-15 重建）
+
+### Benchmark 全景
+
+| Benchmark | Cases | 通过 | 准确率 | 核心指标 |
+|-----------|-------|------|--------|----------|
+| **Reply Quality** | 24 | **24/24** | **100%** | Rubric 评估（18 个自定义 rubric） |
+| **Tool Decision** | 27 | **22/27** | **81.5%** | Precision 70.6% / Recall 100% |
+| **Memory Search** | 29 | **28/29** | **96.6%** | Precision/Recall/F1 |
+| **Chat List Unread** | 23 | **23/23** | **100%** | Precision/Recall |
+| **OCR Quality** | 33 | **8/33** | **24.2%** | Sender/ChatName/Text/Count |
+
+### 评估模式
+- **LLM-as-a-Judge**: Reply Quality + Tool Decision 对抗性 case 使用 deepseek-v4-pro 做 Rubric 评估
+- **结构化 Rubric**: 18 个自定义 rubric 覆盖 24 个 case（basic 12 + correction 6 + tool 4 + group 2）
+- **缓存策略**: Judge 结果按内容哈希缓存，`judge_{hash}.json`
+
+### 活跃问题
+
+#### 1. Tool Decision - 对抗性 case 条件反射（🔴 P0）
+- **症状**: 5/5 对抗性 case 因"看到人名/关键词就查 wiki"失败
+- **失败 case**: `adversarial_link`, `adversarial_websearch`, `adversarial_stock`, `adversarial_statement`, `adversarial_vague`
+- **根因**: Bot 对 search_memory 的条件反射调用，缺乏对查询意图的判断
+- **Judge 诊断**: "未过度调用 search_memory"维度全部失败
+
+#### 2. OCR Quality - 私聊场景系统性错位（🔴 P0）
+- **症状**: private_chat + legacy_private 共 18 个 case，15 个失败
+- **表现**: API 返回消息数 > 预期数（6→7 或 5→7），sender/text 整体偏移
+- **根因**: qwen3.6-flash 在私聊截图中把输入框/时间戳/UI 元素误判为消息
+- **影响**: 消息序列错位 → sender 污染 → 消息被过滤为 0 条 → Bot 漏消息
+- **典型**: `real_private_w1han_20260413` (6→7), `error_20260414_006~016` (11 个 case 全部 6→7)
+
+#### 3. Memory Search - alias_wangzong 召回失败（🟡 P1）
+- **症状**: 查询"王总"召回失败（P=0% R=0% F1=0%）
+- **可能原因**: wiki 中没有"王总"别名映射
 
 ---
 

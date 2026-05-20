@@ -1,0 +1,9 @@
+{
+  "description": "腾讯新闻有红色未读角标1",
+  "target_nickname": "腾讯新闻",
+  "has_unread": true,
+  "unread_count": "1",
+  "category": "true_positive",
+  "avatar_type": "single_icon",
+  "notes": "微信官方服务号，圆形彩色图标，右上角有红色圆形白色数字1"
+}

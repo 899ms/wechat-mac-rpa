@@ -206,6 +206,147 @@ for i, m in enumerate(messages):
 
 ---
 
+## 红线 10：统一入口原则 —— 同一逻辑只能有一个实现
+
+**禁止同一业务逻辑（如群聊判断、名称归一化、XML 解析）在多个文件中各自实现。**
+
+❌ 错误：
+```python
+# policy.py
+def _is_group_chat(name): return re.search(r'（\d+）$', name)
+
+# global_store.py  
+def _is_group_chat_name(name): return re.search(r'（\d+）$', name)
+
+# smart_pipeline.py
+is_group = re.search(r'（\d+）$', chat_name)
+```
+
+✅ 正确：
+```python
+# utils/chat_utils.py（唯一实现）
+def _is_group_chat_name(name): return re.search(r'[（(]\d+[）)]$', name)
+
+# 其他模块统一 import
+from src.utils.chat_utils import _is_group_chat_name
+```
+
+**Checklist**：
+1. 写新函数前，先在 `utils/` 目录 `grep` 是否有同名/同功能函数
+2. 修改涉及 `chat_name`/`sender`/`is_group` 的代码时，必须全局搜索所有引用点
+3. 通用工具（XML 解析、文本截断、名称归一化）优先放 `utils/`，禁止各写各的
+
+**本次重构记录**：
+- 新建 `utils/chat_utils.py`：`_is_group_chat_name` + `_normalize_chat_name`
+- 新建 `utils/xml_utils.py`：`_extract_xml_text`
+- 新建 `utils/text_utils.py`：`_truncate_text` + `_compress_text`
+- 删除的重复：`smart_pipeline._extract_xml_text`、`weflow_pipeline._extract_xml_text`、`weflow_client._extract_xml_text`、`global_store._is_group_chat_name`、`wechat_bot._normalize_chat_name`、`llm_client.load_env`
+
+---
+
+## 红线 11：感知层是"世界模型"的唯一作者
+
+**下游只消费感知结论，禁止二次判断/二次解释。**
+
+不仅限于群聊判断。感知层对"外部世界状态"的所有结论（是不是群聊、sender 是谁、未读数多少、窗口在哪），都应该是下游的只读输入。
+
+❌ 错误：
+```python
+# smart_pipeline.py 判断一次
+is_group = re.search(r'（\d+）$', chat_name)
+
+# wechat_bot.py 又判断一次
+is_group = _is_group_chat(raw_chat_name)
+
+# global_store.py 还判断一次
+if not _is_group_chat_name(chat_name):
+    sender = chat_name
+```
+
+✅ 正确：
+```python
+# 感知层（唯一判断）
+result = perceive(screenshot)
+# result.is_group = True
+
+# 下游只读
+if result.is_group:
+    ...
+```
+
+**覆盖范围**：`is_group`、`sender`、`unread_count`、`window_rect`、`chat_list_items`
+
+---
+
+## 红线 12：跨层数据字段必须标注只读/可写
+
+**禁止下游回写上游数据。**
+
+不仅限于 `msg.chat_name`。任何跨层传递的数据结构，字段必须分两类：感知层写入的只读字段 vs 下游可补充的元数据字段。
+
+❌ 错误：
+```python
+# merge_tick 里存储层修改了感知层创建的消息
+def merge_tick(chat_name, messages):
+    for msg in messages:
+        msg.chat_name = chat_name  # 回写！
+```
+
+✅ 正确：
+```python
+# 感知层创建时写死，下游不再修改
+msg = ChatMessage(chat_name=raw_chat_name, sender=original_sender)
+
+# 存储层用 session_key 查 session，不修改 msg
+state = chats[session_key]
+state.messages.append(msg)
+```
+
+---
+
+## 红线 13：业务规则必须单点定义
+
+**同一规则（判断/标准化/解析/格式化）只能有一个实现。**
+
+不仅限于 `_is_group_chat_name`。任何被多个模块依赖的业务规则，必须放在 `utils/` 或 `models/` 中，禁止各写各的。
+
+| 规则类型 | 反例 | 正例 |
+|---|---|---|
+| 判断规则 | 5 个文件各自写群聊正则 | `utils/chat_utils.py` 唯一实现 |
+| 标准化规则 | 3 个文件各自截断 chat_name | `utils/chat_utils.py` 唯一实现 |
+| 解析规则 | 3 个文件各自解析 XML | `utils/xml_utils.py` 唯一实现 |
+| 格式化规则 | 2 个文件各自拼接 sender | `utils/chat_utils.py` 唯一实现 |
+
+**Checklist**：
+1. 写新函数前，先在 `utils/` 目录 `grep` 是否有同名/同功能函数
+2. 发现两个函数做同一件事，必须合并为一个
+
+---
+
+## 红线 14：核心字段变更必须全仓库影响面分析
+
+**修改核心数据结构或核心函数的 commit，必须全局搜索所有引用点。**
+
+不仅限于 `_normalize_chat_name` 截断后缀。任何修改影响面可能跨文件的变更，commit 前必须执行：
+
+```bash
+# 1. 找出所有直接引用
+grep -rn "chat_name\|sender\|is_group" src/ --include="*.py"
+
+# 2. 找出所有正则匹配（容易被漏掉的独立实现）
+grep -rn "re.search\|re.match\|re.sub" src/ --include="*.py" -B 2 -A 2
+
+# 3. 找出所有字段赋值（回写）
+grep -rn "\.chat_name =\|\.sender =" src/ --include="*.py"
+
+# 4. 运行全量测试
+python -m pytest src/tests/
+```
+
+**反例**：`eef109f` 改了 `_normalize_chat_name`（截断后缀），但没有搜 `smart_pipeline.py` 里的独立正则，导致群聊判断失效。
+
+---
+
 ## 历史教训
 
 ### 教训 1：`_is_likely_nickname` 误杀短消息

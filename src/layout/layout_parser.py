@@ -56,6 +56,8 @@ class LayoutParser:
         Returns:
             UILayout: 包含各区域元素的完整布局描述
         """
+        import time
+        t_parse_start = time.time()
         img = Image.open(image_path).convert("RGB")
         arr = np.array(img)
         width, height = img.size
@@ -101,10 +103,14 @@ class LayoutParser:
                 timestamp_elements.append(e)
 
         # 5. 绿色气泡检测
+        t_bubble_start = time.time()
         self_bubbles = self._detect_self_bubbles(arr)
+        t_bubble_ms = (time.time() - t_bubble_start) * 1000
 
         # 6. 聊天列表解析
+        t_chatlist_start = time.time()
         chat_list_items = self._parse_chat_list(left_elements, image_path)
+        t_chatlist_ms = (time.time() - t_chatlist_start) * 1000
 
         # 7. 消息候选区：右侧排除已分类的元素
         excluded = set(id(e) for e in title_elements + input_elements + timestamp_elements)
@@ -112,6 +118,11 @@ class LayoutParser:
 
         # 提取 chat_name
         chat_name = self._extract_chat_name(title_elements, width)
+
+        t_parse_ms = (time.time() - t_parse_start) * 1000
+        print(f"[Perf][Layout] parse: {t_parse_ms:.0f}ms "
+              f"bubbles={t_bubble_ms:.0f}ms chat_list={t_chatlist_ms:.0f}ms "
+              f"elements={len(elements)} items={len(chat_list_items)}")
 
         self.debug_info = {
             "left_elements": [{"text": e.text, "x": e.bbox.x, "y": e.bbox.y} for e in left_elements],

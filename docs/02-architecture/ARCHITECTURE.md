@@ -1,10 +1,13 @@
 # 微信 Mac RPA 架构设计文档
 
-> **重要提示：本文档描述的是当前已落地的生产架构（Current Production Architecture）。**
+> **重要提示：本文档描述当前生产架构的设计理念和分层结构。具体公共接口以 `API_SURFACE.md` 为准，模块索引以 `MODULE_INDEX.md` 为准。**
 >
 > 当前实际代码位于 `src/` 目录下，模块化架构（L1-L5）已全部落地。
 >
-> **文档分类**：`ARCHITECTURE.md`、`API_SURFACE.md`、`MODULE_INDEX.md` 描述**当前生产架构**。其他文档（如 `PROJECT_STATUS.md`、`LESSONS_LEARNED.md`）主要描述**当前实现状态和经验教训**。
+> **文档分类**：
+> - `API_SURFACE.md` — 当前实际代码的公共接口（可直接复制粘贴）
+> - `MODULE_INDEX.md` — 按问题/文件索引（改代码前先看这个）
+> - `ARCHITECTURE.md` — 架构设计理念、分层规则、设计决策（本文档）
 >
 > 目标：让任何 AI Agent 在 5 分钟内理解系统结构，并能独立修改任一模块。
 
@@ -63,7 +66,7 @@
 ┌─────────────────────────────────────────────────────────────┐
 │  Layer 1: Domain Models                                     │
 │  基础数据类型：Point, Rect, OCRTextElement,                 │
-│  ChatMessage, SentMessage, ActionResult, PerceptionResult   │
+│  ChatMessage, ActionResult, PerceptionResult                │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -172,7 +175,7 @@ class PerceptionResult:
 **设计要点**:
 - `OCRTextElement` 是 OCR 层和 Layout 层的通用接口
 - `ChatMessage.source_elements` 保留溯源能力，方便 debug
-- `SentMessage` 记录 Bot 自己发送的消息，用于回声检测
+- `ActionResult` 记录发送动作的结果（成功/失败）
 
 ---
 
@@ -679,7 +682,7 @@ def merge_tick(self, chat_name, messages):
 
 ```python
 class ReplyPolicy:
-    def should_reply(self, msg: ChatMessage, session: ChatSession) -> bool:
+    def should_reply(self, msg: ChatMessage, session: ChatState) -> bool:
         """
         决策逻辑：
         1. 自己消息 → False
@@ -702,7 +705,7 @@ class ReplyGenerator:
         self.complex_llm_client = complex_llm_client
         self.memory_engine = memory_engine
     
-    def generate(self, msg: ChatMessage, session: ChatSession) -> List[str]:
+    def generate(self, msg: ChatMessage, session: ChatState) -> List[str]:
         """
         调用 LLM 生成回复。
         
@@ -869,7 +872,7 @@ class WeChatBot:
             self.tick()
             time.sleep(interval)
     
-    def _get_session(self, chat_name: str) -> ChatSession:
+    def _get_session(self, chat_name: str) -> ChatState:
         """获取或创建指定聊天的会话对象。"""
         pass
     
@@ -971,7 +974,9 @@ class BotLogger:
 
 ### 2.13 Storage (L4)
 
-**文件**: `src/storage/chat_history.py`
+> ⚠️ **当前状态**: `src/storage/` 目录尚未创建，持久化功能由 `GlobalStore`（`src/session/global_store.py`）统一承担。以下接口为设计目标，实际实现以 `GlobalStore` 为准。
+
+**目标文件**: `src/storage/chat_history.py`（待拆分）
 
 **职责**: 持久化聊天历史记录，按 `chat_name` 分片存储。
 
@@ -1005,7 +1010,7 @@ class ChatHistory:
 
 **设计要点**:
 - 按 `chat_name` 分片为独立 jsonl 文件，避免单文件过大
-- 不实现去重逻辑，去重由 `ChatSession` 负责
+- 不实现去重逻辑，去重由 `ChatState` 负责
 - 详细设计见 `LOGGING_DESIGN.md`
 
 ---
@@ -1024,12 +1029,12 @@ class ChatHistory:
 - Layout 只负责"这是时间戳元素"，不决定"要不要忽略"
 - 这样 MessageExtractor 可以灵活处理（比如某些场景需要保留时间戳）
 
-### 4.3 为什么用 `SentMessage` 而不是 `last_reply_content` 字符串？
+### 4.3 为什么用 `ActionResult` 而不是 `last_reply_content` 字符串？
 
 - 字符串匹配只能判断内容是否相同，无法记录发送时间和上下文
-- `SentMessage` 包含 `sent_at`，支持基于时间窗口的回声检测
+- `ActionResult` 包含 `sent_at`，支持基于时间窗口的回声检测
 - 聊天滚动时 Y 坐标不可靠，因此去重放弃了坐标匹配，改用**窗口指纹 + 上下文序列**判断重复视图
-- `SentMessage` 列表支持连续发送多条消息后的回声检测
+- `ActionResult` 列表支持连续发送多条消息后的回声检测
 
 ### 4.4 为什么当前只支持单聊天循环？
 

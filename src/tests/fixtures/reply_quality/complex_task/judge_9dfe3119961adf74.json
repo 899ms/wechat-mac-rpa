@@ -1,0 +1,6 @@
+{
+  "error": "JSON 解析失败: Expecting ',' delimiter: line 11 column 25 (char 203)\n原始响应:\n{\n  \"dimensions\": [\n    {\n      \"name\": \"回复数量\",\n      \"score\": \"PASS\",\n      \"reason\": \"Bot 回复共3条消息，数量在[1, 5]范围内，符合标准。\"\n    },\n    {\n      \"name\": \"禁忌词检查\",\n      \"score\": \"PASS\",\n      \"reason\": \"回复中未出现\"收到\"、\"好的\"、\"嗯\"等禁忌词。\"\n    }\n  ],\n  \"overall\": \"PASS\",\n  \"explanation\": \"回复数量合规，无禁忌词，全部必须通过维度均通过。\"\n}",
+  "dimensions": [],
+  "overall": "FAIL",
+  "explanation": "解析失败"
+}

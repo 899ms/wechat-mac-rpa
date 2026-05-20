@@ -1,0 +1,14 @@
+{
+  "tool_calls": [
+    {
+      "id": "call_7100b15baa2a4d2ca2472126",
+      "type": "function",
+      "function": {
+        "name": "search_memory",
+        "arguments": "{\"query\": \"王芊 家庭 几口人\"}"
+      }
+    }
+  ],
+  "content": "",
+  "timestamp": 1779235132.9681668
+}

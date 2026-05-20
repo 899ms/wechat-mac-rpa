@@ -16,7 +16,8 @@ from pathlib import Path
 from typing import Optional
 
 from src.models.base import ChatListItem, ChatMessage, OCRTextElement, PerceptionResult, Rect, SenderType
-from src.session.global_store import _is_group_chat_name
+from src.utils.chat_utils import _is_group_chat_name
+from src.utils.xml_utils import _extract_xml_text
 from src.capture.window_capture import WindowCapture, WeChatNotReadyError
 from src.ocr.vision_ocr import VisionOCREngine
 from src.layout.layout_parser import LayoutParser
@@ -427,8 +428,8 @@ class WeFlowPipeline:
                 sender_type = SenderType.SELF
             else:
                 if is_group:
-                    # 群聊：尝试用 wxid 查昵称
-                    sender = member_names.get(m.sender_username, m.sender_username)
+                    # 群聊：优先用 WeFlow 返回的 senderDisplayName，没有再用 wxid 映射
+                    sender = m.sender_display_name or member_names.get(m.sender_username, m.sender_username)
                 else:
                     # 私聊：统一为对方昵称
                     sender = chat_name
@@ -437,7 +438,7 @@ class WeFlowPipeline:
             # 内容处理：XML 消息提取摘要
             content = m.content
             if m.local_type != 1 and content.startswith("<"):
-                extracted = self._extract_xml_text(content)
+                extracted = _extract_xml_text(content)
                 if extracted:
                     content = extracted
 
@@ -458,19 +459,6 @@ class WeFlowPipeline:
             results.append(msg)
 
         return results
-
-    @staticmethod
-    def _extract_xml_text(xml: str) -> Optional[str]:
-        """从 XML 消息中提取可读文本。"""
-        import re
-        parts = []
-        title = re.search(r"<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</title>", xml)
-        des = re.search(r"<des>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</des>", xml)
-        if title:
-            parts.append(title.group(1))
-        if des:
-            parts.append(des.group(1))
-        return " — ".join(parts) if parts else None
 
     # ------------------------------------------------------------------
     # 公共接口

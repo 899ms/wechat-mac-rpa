@@ -1,0 +1,14 @@
+{
+  "tool_calls": [
+    {
+      "id": "call_ec6bed724a744b7f87d1d8fe",
+      "type": "function",
+      "function": {
+        "name": "search_memory",
+        "arguments": "{\"query\": \"ai开发小分队\"}"
+      }
+    }
+  ],
+  "content": "",
+  "timestamp": 1779235078.156074
+}

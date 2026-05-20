@@ -5,7 +5,9 @@
 默认连接本地代理 http://127.0.0.1:18790，模型 kimi-for-coding。
 """
 
+import logging
 import os
+import time
 from typing import List, Dict, Any, Optional
 
 
@@ -88,7 +90,14 @@ class OpenClawClient:
             if timeout is not None:
                 kwargs["timeout"] = timeout
 
+            _logger = logging.getLogger("src.llm.openclaw")
+            _logger.info("[OpenClaw] request start: model=%s tools=%s timeout=%s",
+                         kwargs.get("model"), bool(kwargs.get("tools")), kwargs.get("timeout"))
+            t_req_start = time.time()
             resp = self.client.chat.completions.create(**kwargs)
+            t_req_ms = (time.time() - t_req_start) * 1000
+            _logger.info("[OpenClaw] request end: duration=%.0fms model=%s",
+                         t_req_ms, kwargs.get("model"))
             choice = resp.choices[0]
             msg = choice.message
 
@@ -106,7 +115,6 @@ class OpenClawClient:
                 reasoning = getattr(msg, "reasoning_content", "")
                 if reasoning:
                     # 记录诊断信息，便于排查 token 是否足够
-                    import logging
                     logging.getLogger("src.openclaw").warning(
                         f"LLM content 为空 (finish_reason={finish_reason!r}, "
                         f"reasoning_len={len(reasoning)}, max_tokens={kwargs['max_tokens']})"

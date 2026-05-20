@@ -3,7 +3,9 @@ Qwen LLM 客户端 - 用于回复生成
 接口与 KimiClient 兼容
 """
 
+import logging
 import os
+import time
 from typing import List
 
 try:
@@ -59,7 +61,14 @@ class QwenClient:
             # DeepSeek 官方平台：wiki 生成开启 thinking 以提升提取能力
             if self.is_deepseek_official:
                 kwargs["extra_body"] = {"thinking": {"type": "enabled"}}
+            _logger = logging.getLogger("src.llm.qwen")
+            _logger.info("[Qwen] request start: model=%s tools=%s timeout=%s",
+                         kwargs.get("model"), bool(kwargs.get("tools")), kwargs.get("timeout"))
+            t_req_start = time.time()
             response = self.client.chat.completions.create(**kwargs)
+            t_req_ms = (time.time() - t_req_start) * 1000
+            _logger.info("[Qwen] request end: duration=%.0fms model=%s",
+                         t_req_ms, kwargs.get("model"))
             msg = response.choices[0].message
             # 如果模型返回 tool_calls，也返回（让上层处理）
             if getattr(msg, "tool_calls", None):

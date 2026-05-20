@@ -25,9 +25,11 @@ from PIL import Image
 from src.models.base import ChatListItem, ChatMessage, PerceptionResult, Rect, SenderType
 from src.capture.window_capture import WindowCapture, WeChatNotReadyError
 from src.ocr.vision_ocr import VisionOCREngine
-from src.layout.layout_parser import LayoutParser
+from src.layout.layout_parser import TIMESTAMP_PATTERNS, LayoutParser, UILayout
 from src.layout.profile import LayoutProfile
 from src.action.login_recovery import WeChatLoginHandler
+from src.utils.chat_utils import _is_group_chat_name
+from src.utils.xml_utils import _extract_xml_text
 
 _logger = logging.getLogger("src.runtime.smart_pipeline")
 
@@ -40,18 +42,7 @@ import json as _json
 import time
 
 
-def _load_env():
-    env_file = Path(__file__).parent.parent.parent / ".env"
-    if env_file.exists():
-        with open(env_file, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    key, value = line.split("=", 1)
-                    os.environ.setdefault(key.strip(), value.strip())
 
-
-_load_env()
 
 QWEN_SYSTEM_PROMPT = """你是一位专精 UI 截图文字识别的 OCR 引擎。请仔细识别这张微信 Mac 版截图中的文字信息，并输出为 JSON。
 
@@ -80,8 +71,13 @@ QWEN_SYSTEM_PROMPT = """你是一位专精 UI 截图文字识别的 OCR 引擎�
 【关键识别规则 - 必须严格遵守】
 
 1. 未读角标（unread_count）：
-   - 必须是红色圆形背景中的白色/黑色数字，位于头像右上角
-   - 预览消息右侧的时间戳（如"09:31"、"昨天"、"00:57"）是消息时间，不是未读角标，unread_count 必须设为空字符串""
+   - 【铁律】只有同时满足以下所有条件才是未读角标：
+     a) 红色纯色圆形背景（无照片纹理、无头像内容）
+     b) 白色数字居中
+     c) 位于头像边界之外，浮在头像右上角
+   - 【严禁 - 违反则识别失败】白底黑字、头像上的文字/数字、拼贴头像中的小头像，都不是未读角标。把这些误判为未读角标会导致整个识别结果作废，必须避免
+   - 【严禁】左侧边栏（如微信图标）上的总未读数是全局的，绝不能把它当成某个具体聊天的未读角标
+   - 预览消息右侧的时间戳（如"09:31"、"昨天"、"00:57"）不是未读角标
    - 如果没有红色圆形数字，unread_count 为空字符串""
 
 2. 聊天列表（chat_list）：
@@ -91,16 +87,20 @@ QWEN_SYSTEM_PROMPT = """你是一位专精 UI 截图文字识别的 OCR 引擎�
    - 预览消息文字不要放入 nickname
 
 3. 消息 sender 判断（这是最容易出错的地方，请仔细看气泡颜色和布局）：
-   - 【最重要】气泡颜色是判断 sender 的第一依据：
-     - 绿色背景的气泡 = "自己" 发送的消息，sender 必须填 "自己"
-     - 白色或浅灰色背景的气泡 = 对方发送的消息，sender 填 "对方"（私聊）或群成员昵称（群聊）
-   - 【绝对不能搞反】白色气泡绝对不是自己发的，绿色气泡绝对不是对方发的
+   - 【最重要】对齐方向是判断 sender 的第一依据，气泡颜色仅作交叉验证：
+     - 右侧对齐的气泡 = "自己" 发送的消息，sender 必须填 "自己"
+     - 左侧对齐的气泡 = 对方发送的消息，sender 填 "对方"（私聊）或群成员昵称（群聊）
+   - 【绝对不能搞反】左侧对齐的消息绝对不可能是自己发的，右侧对齐的消息绝对不可能是对方发的
+   - 【颜色与方向矛盾时】对齐方向优先于颜色：
+     - 如果左侧对齐但颜色偏绿 → 仍然是对方发的（标"对方"或群成员昵称）
+     - 如果右侧对齐但颜色偏白 → 仍然是自己发的（标"自己"）
+   - 【兜底规则】如果看不清对齐方向，也看不清气泡颜色 → 优先标为"对方"，绝不要默认标为"自己"
+   - 【短消息特别注意】1-10 个字的短消息最容易误判，必须同时检查对齐方向和气泡颜色，不要因消息短就默认当成自己发的
    - 【群聊 vs 私聊区分】
      - 群聊：消息气泡上方会显示发送者昵称 → sender 必须填这个实际昵称
      - 私聊：只有两个人，消息气泡上方不显示发送者昵称 → sender 必须填 "对方"
-     - 【重要】群聊中同一人连续发多条消息时，只有第一条上方显示昵称，后续消息不显示。此时请根据气泡颜色和对齐方向推断：左侧白色气泡 → 与上方最近一条左侧白色气泡的 sender 相同
+     - 【重要】群聊中同一人连续发多条消息时，只有第一条上方显示昵称，后续消息不显示。此时请根据对齐方向推断：左侧气泡 → 与上方最近一条左侧气泡的 sender 相同
    - 绝对不能把私聊中的对方消息填成群成员昵称或具体人名
-   - 辅助判断（颜色看不清时用）：右侧对齐的气泡是自己，左侧对齐的气泡是对方
    - 时间戳（如"昨天 21:58"、"11:34"、"00:22"）不是消息，不要输出
    - 【常见错误】不要把白色气泡的对方消息错标为 "自己"，也不要把短消息默认当成自己发的
 
@@ -225,7 +225,7 @@ class SmartPerceptionPipeline:
     # 原值 0.005 导致大量无实质变化的截图触发 API，烧钱过快
     DEFAULT_PIXEL_DIFF_THRESHOLD = 0.001
     # 消息区域 ROI（相对坐标 x1, y1, x2, y2），排除左侧列表和底部输入框
-    DEFAULT_MESSAGE_REGION = (0.35, 0.12, 0.95, 0.85)
+    DEFAULT_MESSAGE_REGION = (0.35, 0.12, 0.95, 0.97)
     # 窗口最小有效尺寸（小于此值视为异常，如登录浮窗）
     MIN_WINDOW_WIDTH = 800
     MIN_WINDOW_HEIGHT = 600
@@ -309,8 +309,10 @@ class SmartPerceptionPipeline:
                     return None
 
         # 1. 截图
+        t_capture_start = time.time()
         try:
             capture_result = self.capture.capture()
+            t_capture_ms = (time.time() - t_capture_start) * 1000
         except WeChatNotReadyError as e:
             _logger.warning(f"[SmartPipeline] 窗口捕获失败: {e}")
             return None
@@ -323,7 +325,8 @@ class SmartPerceptionPipeline:
         scale_factor = getattr(capture_result, "scale_factor", 1.0)
         _logger.info(
             f"[SmartPipeline] 截图成功: {Path(image_path).name}, "
-            f"窗口={window_rect.width}x{window_rect.height}, scale={scale_factor}"
+            f"窗口={window_rect.width}x{window_rect.height}, scale={scale_factor}, "
+            f"capture={t_capture_ms:.0f}ms"
         )
 
         # 2. 窗口尺寸检查（过滤登录浮窗等异常窗口）
@@ -460,20 +463,76 @@ class SmartPerceptionPipeline:
             ]
         return info
 
+    def _extract_local_messages(
+        self, layout: UILayout, chat_name: str
+    ) -> list[ChatMessage]:
+        """从本地 Layout 结果中粗略提取消息，用于本地路径检测变化。
+        只做基本分类（self/other），不做复杂的群聊 sender 识别。"""
+        import re
+
+        messages: list[ChatMessage] = []
+        input_texts = {e.text.strip() for e in layout.input_elements}
+
+        for elem in layout.message_candidates:
+            text = elem.text.strip()
+            if not text:
+                continue
+            # 跳过时间戳
+            if any(re.match(p, text) for p in TIMESTAMP_PATTERNS):
+                continue
+            # 跳过输入框内容
+            if text in input_texts:
+                continue
+
+            # 判断 sender：中心点是否在 self_bubble 内
+            is_self = False
+            for bubble in layout.self_bubbles:
+                if (
+                    bubble.x <= elem.center.x <= bubble.x + bubble.width
+                    and bubble.y <= elem.center.y <= bubble.y + bubble.height
+                ):
+                    is_self = True
+                    break
+
+            sender_type = SenderType.SELF if is_self else SenderType.OTHER
+            sender = "自己" if is_self else chat_name
+
+            messages.append(
+                ChatMessage(
+                    text=text,
+                    sender=sender,
+                    sender_type=sender_type,
+                    chat_name=chat_name,
+                    message_type="text",
+                    source_elements=[elem],
+                )
+            )
+
+        # 按 y 坐标排序（从上到下）
+        messages.sort(
+            key=lambda m: m.source_elements[0].center.y if m.source_elements else 0
+        )
+        return messages
+
     def _run_local_only(
         self, image_path: str, window_rect: Rect, scale_factor: float
     ) -> PerceptionResult:
-        """无变化时：只跑本地 LayoutParser，messages 为空。"""
+        """无显著变化时：只跑本地 LayoutParser，messages 为空。
+        session 会沿用上一次 API 路径提取的完整消息，本地 OCR 结果不混入上文。"""
         _logger.info("[SmartPipeline] 进入本地路径(跳过API)")
         t0 = time.time()
+        t_ocr_start = time.time()
         elements = self.ocr.recognize(image_path)
+        t_ocr_ms = (time.time() - t_ocr_start) * 1000
+        t_layout_start = time.time()
         layout = self.layout.parse(elements, image_path)
+        t_layout_ms = (time.time() - t_layout_start) * 1000
         local_ms = (time.time() - t0) * 1000
         _logger.info(
             f"[SmartPipeline] 本地处理完成: chat_name='{layout.chat_name}', "
             f"chat_list={len(layout.chat_list_items)}项, "
             f"messages=0条(跳过), "
-            f"耗时={local_ms:.0f}ms"
+            f"耗时={local_ms:.0f}ms ocr={t_ocr_ms:.0f}ms layout={t_layout_ms:.0f}ms"
         )
         debug_info = self._build_debug_info(layout)
         return PerceptionResult(
@@ -481,6 +540,7 @@ class SmartPerceptionPipeline:
             messages=[],
             chat_list_items=layout.chat_list_items,
             screenshot_path=image_path,
+            is_group=_is_group_chat_name(layout.chat_name or ""),
             window_rect=window_rect,
             scale_factor=scale_factor,
             debug_info=debug_info,
@@ -535,7 +595,8 @@ class SmartPerceptionPipeline:
             layout = local_result["layout"]
             local_chat_list = layout.chat_list_items
             local_ms = (time.time() - local_t0) * 1000
-            _logger.info(f"[SmartPipeline] 本地Layout完成: chat_list={len(local_chat_list)}项, 耗时={local_ms:.0f}ms")
+            _logger.info(f"[SmartPipeline] 本地Layout完成: chat_list={len(local_chat_list)}项, "
+                         f"耗时={local_ms:.0f}ms (ocr+layout)")
         except Exception as e:
             _logger.warning(f"[SmartPipeline] 本地Layout失败: {e}")
             layout = None
@@ -573,15 +634,16 @@ class SmartPerceptionPipeline:
                 continue
 
         # 3. 结合：本地 Layout 提供准确 rect，API 提供准确 nickname/unread_count
+        t_merge_start = time.time()
         chat_list_items = self._merge_chat_list(local_chat_list, api_chat_list)
-
         messages = self._convert_api_messages(api_messages, api_chat_name)
+        t_merge_ms = (time.time() - t_merge_start) * 1000
 
         total_ms = (time.time() - t0) * 1000
         _logger.info(
             f"[SmartPipeline] 完成: chat_name='{api_chat_name}', "
             f"messages={len(messages)}条, chat_list={len(chat_list_items)}项, "
-            f"耗时={total_ms:.0f}ms"
+            f"耗时={total_ms:.0f}ms merge={t_merge_ms:.0f}ms"
         )
         if messages:
             for i, m in enumerate(messages):
@@ -595,6 +657,7 @@ class SmartPerceptionPipeline:
             messages=messages,
             chat_list_items=chat_list_items,
             screenshot_path=image_path,
+            is_group=_is_group_chat_name(api_chat_name),
             window_rect=window_rect,
             scale_factor=scale_factor,
             debug_info=debug_info,
@@ -772,7 +835,7 @@ class SmartPerceptionPipeline:
         私聊 sender 统一为 chat_name；群聊 sender 做校验防错。
         """
         import re
-        is_group = bool(re.search(r'（\d+）$', chat_name))
+        is_group = _is_group_chat_name(chat_name)
 
         messages = []
         last_left_sender = "对方"  # 群聊中上一个左侧白色气泡的 sender

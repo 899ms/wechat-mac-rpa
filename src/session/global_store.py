@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from src.models.base import ChatMessage, SenderType
+from src.utils.chat_utils import _is_group_chat_name
 
 _logger = logging.getLogger("src.global_store")
 
@@ -24,8 +25,10 @@ class ChatState:
     """单个聊天的完整状态（消息历史 + 会话状态）"""
     chat_id: str
     chat_name: str
+    is_group: bool = False
     messages: List[ChatMessage] = field(default_factory=list)
     _msg_ids: set = field(default_factory=set)  # 去重集合（不序列化）
+    pending_self_messages: List[ChatMessage] = field(default_factory=list)  # Bot 发送成功但尚未被感知层确认的消息（诊断用，不序列化）
 
 
 def _normalize_text(text: str) -> str:
@@ -55,12 +58,7 @@ def _jaccard_2gram(a: str, b: str) -> float:
     return inter / union if union else 0.0
 
 
-def _is_group_chat_name(chat_name: str) -> bool:
-    """判断聊天名称是否为群聊（以 群人数 结尾，如 'ai开发小分队（128）' 或 'xxx (5)'）。"""
-    return bool(re.search(r'[（(]\d+[）)]$', chat_name))
-
-
-def _normalize_sender(chat_name: str, msg: ChatMessage) -> str:
+def _normalize_sender(chat_name: str, msg: ChatMessage, is_group: bool = False) -> str:
     """标准化 sender 用于去重匹配。
 
     规则：
@@ -70,14 +68,14 @@ def _normalize_sender(chat_name: str, msg: ChatMessage) -> str:
     """
     if msg.sender_type == SenderType.SELF:
         return "自己"
-    if not _is_group_chat_name(chat_name):
+    if not is_group and not _is_group_chat_name(chat_name):
         # 私聊：对方 sender 统一为 chat_name，避免 API 昵称识别不稳定导致去重失效
         return chat_name
     # 群聊：保留原始 sender（具体昵称或"对方"）
     return msg.sender
 
 
-def _msg_id(chat_name: str, msg: ChatMessage) -> str:
+def _msg_id(chat_name: str, msg: ChatMessage, is_group: bool = False) -> str:
     """消息唯一ID：用 chat_name + 标准化 sender + 内容指纹。
 
     文字消息：基于 text。
@@ -90,7 +88,7 @@ def _msg_id(chat_name: str, msg: ChatMessage) -> str:
         content = msg.text
     normalized = _normalize_text(content)
     text_hash = hashlib.md5(normalized.encode()).hexdigest()[:16]
-    normalized_sender = _normalize_sender(chat_name, msg)
+    normalized_sender = _normalize_sender(chat_name, msg, is_group)
     return f"{chat_name}|{normalized_sender}|{text_hash}"
 
 
@@ -155,14 +153,14 @@ def _is_fuzzy_duplicate(state, msg: ChatMessage, lookback: int = 10) -> bool:
     return False
 
 
-def _match_single(a: ChatMessage, b: ChatMessage, chat_name: str) -> bool:
+def _match_single(a: ChatMessage, b: ChatMessage, chat_name: str, is_group: bool = False) -> bool:
     """直接比较两条消息是否匹配（用于对齐）。
 
     文字：SequenceMatcher >= 0.80
     图片：2-gram Jaccard >= 0.001（容错极大，应对 qwen 描述不稳定）
     """
     # 精确匹配（使用标准化 sender）
-    if _msg_id(chat_name, a) == _msg_id(chat_name, b):
+    if _msg_id(chat_name, a, is_group) == _msg_id(chat_name, b, is_group):
         return True
     # sender_type 不同直接不匹配（避免自己消息和对方消息误匹配）
     if a.sender_type != b.sender_type:
@@ -186,7 +184,7 @@ def _match_single(a: ChatMessage, b: ChatMessage, chat_name: str) -> bool:
     return sim >= 0.08
 
 
-def _lcs_match(history: List[ChatMessage], tick: List[ChatMessage], chat_name: str) -> set:
+def _lcs_match(history: List[ChatMessage], tick: List[ChatMessage], chat_name: str, is_group: bool = False) -> set:
     """LCS 序列对齐：返回 tick 中匹配 history 的索引集合。
 
     使用二值 match_score：_match_single 返回 True → 得 1 分，否则 0 分。
@@ -200,7 +198,7 @@ def _lcs_match(history: List[ChatMessage], tick: List[ChatMessage], chat_name: s
     dp = [[0] * (n + 1) for _ in range(m + 1)]
     for i in range(1, m + 1):
         for j in range(1, n + 1):
-            if _match_single(history[i - 1], tick[j - 1], chat_name):
+            if _match_single(history[i - 1], tick[j - 1], chat_name, is_group):
                 dp[i][j] = dp[i - 1][j - 1] + 1
             else:
                 dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
@@ -209,7 +207,7 @@ def _lcs_match(history: List[ChatMessage], tick: List[ChatMessage], chat_name: s
     matched = set()
     i, j = m, n
     while i > 0 and j > 0:
-        if _match_single(history[i - 1], tick[j - 1], chat_name):
+        if _match_single(history[i - 1], tick[j - 1], chat_name, is_group):
             # match 时 dp[i][j] 一定等于 dp[i-1][j-1]+1（单调性保证）
             matched.add(j - 1)
             i -= 1
@@ -236,12 +234,12 @@ class GlobalStore:
         self._dirty: set = set()  # 有变化的聊天名，增量保存用
         self._load()
 
-    def _merge_tick_legacy(self, chat_name: str, messages: List[ChatMessage]) -> List[ChatMessage]:
+    def _merge_tick_legacy(self, chat_name: str, messages: List[ChatMessage], is_group: bool = False) -> List[ChatMessage]:
         """旧算法：滑动前缀匹配（保留用于 A/B 对比测试）。"""
         state = self.chats[chat_name]
 
         def _in_history(msg: ChatMessage) -> bool:
-            return _msg_id(chat_name, msg) in state._msg_ids or _is_fuzzy_duplicate(
+            return _msg_id(chat_name, msg, is_group) in state._msg_ids or _is_fuzzy_duplicate(
                 state, msg, lookback=len(state.messages)
             )
 
@@ -249,7 +247,7 @@ class GlobalStore:
         seen_ids = set()
         unique_messages = []
         for msg in messages:
-            mid = _msg_id(chat_name, msg)
+            mid = _msg_id(chat_name, msg, is_group)
             if mid not in seen_ids:
                 seen_ids.add(mid)
                 unique_messages.append(msg)
@@ -268,7 +266,7 @@ class GlobalStore:
             for j in range(len(messages)):
                 if i + j >= len(history_window):
                     break
-                if _match_single(history_window[i + j], messages[j], chat_name):
+                if _match_single(history_window[i + j], messages[j], chat_name, is_group):
                     match_len += 1
                 else:
                     break
@@ -287,12 +285,12 @@ class GlobalStore:
         else:
             return [msg for msg in messages if not _in_history(msg)]
 
-    def _merge_tick_lcs(self, chat_name: str, messages: List[ChatMessage]) -> List[ChatMessage]:
+    def _merge_tick_lcs(self, chat_name: str, messages: List[ChatMessage], is_group: bool = False) -> List[ChatMessage]:
         """新算法：LCS 序列对齐（独立出来用于 A/B 对比测试）。"""
         state = self.chats[chat_name]
 
         def _in_history(msg: ChatMessage) -> bool:
-            return _msg_id(chat_name, msg) in state._msg_ids or _is_fuzzy_duplicate(
+            return _msg_id(chat_name, msg, is_group) in state._msg_ids or _is_fuzzy_duplicate(
                 state, msg, lookback=len(state.messages)
             )
 
@@ -300,34 +298,72 @@ class GlobalStore:
         seen_ids = set()
         unique_messages = []
         for msg in messages:
-            mid = _msg_id(chat_name, msg)
+            mid = _msg_id(chat_name, msg, is_group)
             if mid not in seen_ids:
                 seen_ids.add(mid)
                 unique_messages.append(msg)
         messages = unique_messages
 
         if not messages or not state.messages:
+            if not state.messages:
+                _logger.debug("[LCS] %s history 为空，全部 %d 条视为新消息", chat_name, len(messages))
             return messages if not state.messages else []
 
         search_window = min(len(state.messages), 50)
         history_window = state.messages[-search_window:]
-        matched = _lcs_match(history_window, messages, chat_name)
+        matched = _lcs_match(history_window, messages, chat_name, is_group)
+
+        # --- 诊断日志：LCS 匹配全过程 ---
+        _logger.debug("[LCS] %s tick=%d条 history_window=%d条 matched=%s",
+                      chat_name, len(messages), len(history_window), matched)
+        for i, msg in enumerate(history_window[-10:]):
+            _logger.debug("[LCS] history[-%d] %s(%s): %.40s",
+                          len(history_window) - i, msg.sender, msg.sender_type.value, msg.text or "")
+        for i, msg in enumerate(messages):
+            match_flag = "✓" if i in matched else "✗"
+            _logger.debug("[LCS] tick[%d] %s %s(%s): %.40s",
+                          i, match_flag, msg.sender, msg.sender_type.value, msg.text or "")
 
         if not matched:
-            return [msg for msg in messages if not _in_history(msg)]
+            new_messages = [msg for msg in messages if not _in_history(msg)]
+            _logger.debug("[LCS] %s 无 LCS 匹配，_in_history 过滤后新消息=%d条", chat_name, len(new_messages))
+            return new_messages
 
         max_matched = max(matched)
-        return [
-            messages[i]
-            for i in range(len(messages))
-            if i not in matched and i > max_matched
-        ]
+
+        # 分类统计
+        discarded = []
+        new_messages = []
+        for i in range(len(messages)):
+            if i not in matched:
+                if i > max_matched:
+                    new_messages.append(messages[i])
+                else:
+                    discarded.append(messages[i])
+
+        # 告警：被丢弃的消息
+        for msg in discarded:
+            _logger.debug("[LCS] %s DISCARDED %s(%s): %.60s",
+                          chat_name, msg.sender, msg.sender_type.value, msg.text or "")
+            if msg.sender_type == SenderType.SELF:
+                _logger.warning("[LCS] %s 未匹配的 self 消息（发送疑似失败或 OCR 误识别）: %.60s",
+                                chat_name, msg.text or "")
+            else:
+                _logger.warning("[LCS] %s 被 i>max_matched 规则丢弃的真实消息: %.60s",
+                                chat_name, msg.text or "")
+
+        _logger.debug("[LCS] %s max_matched=%d discarded=%d new=%d",
+                      chat_name, max_matched, len(discarded), len(new_messages))
+        # --- 诊断日志结束 ---
+
+        return new_messages
 
     def merge_tick(
         self,
         chat_name: str,
         messages: List[ChatMessage],
         mode: str = "ocr",
+        is_group: bool = False,
     ) -> Tuple[ChatState, List[ChatMessage]]:
         """
         合并 tick 检测到的消息，返回 (state, 未回复的消息列表).
@@ -340,16 +376,21 @@ class GlobalStore:
             self.chats[chat_name] = ChatState(
                 chat_id=f"chat_{len(self.chats)}",
                 chat_name=chat_name,
+                is_group=is_group,
             )
 
         state = self.chats[chat_name]
+        # 如果传入的 is_group 与当前状态不同，更新状态
+        if state.is_group != is_group:
+            state.is_group = is_group
+            self._dirty.add(chat_name)
 
         # 选择去重策略
         if mode in ("weflow", "hybrid") and messages and hasattr(messages[0], "local_id"):
             _logger.info("[GlobalStore] %s 使用 WeFlow 精确去重 (%d 条)", chat_name, len(messages))
             new_messages = self._merge_tick_weflow(chat_name, messages)
         else:
-            new_messages = self._merge_tick_lcs(chat_name, messages)
+            new_messages = self._merge_tick_lcs(chat_name, messages, is_group)
 
         # 添加新消息到历史
         if new_messages:
@@ -357,14 +398,14 @@ class GlobalStore:
         for msg in new_messages:
             msg.chat_name = chat_name
             state.messages.append(msg)
-            state._msg_ids.add(_msg_id(chat_name, msg))
+            state._msg_ids.add(_msg_id(chat_name, msg, is_group))
 
         # 裁剪旧消息
         if len(state.messages) > self.max_messages:
             removed = state.messages[:-self.max_messages]
             state.messages = state.messages[-self.max_messages:]
             for msg in removed:
-                state._msg_ids.discard(_msg_id(chat_name, msg))
+                state._msg_ids.discard(_msg_id(chat_name, msg, is_group))
 
         # 收集所有未回复的消息（按时间顺序）
         unreplied = [
@@ -446,6 +487,7 @@ class GlobalStore:
         chat_name: str,
         messages: List[ChatMessage],
         mode: str = "weflow",
+        is_group: bool = False,
     ) -> int:
         """批量注入历史消息（WeFlow 全量初始化时使用）。
 
@@ -466,9 +508,14 @@ class GlobalStore:
             self.chats[chat_name] = ChatState(
                 chat_id=f"chat_{len(self.chats)}",
                 chat_name=chat_name,
+                is_group=is_group,
             )
 
         state = self.chats[chat_name]
+        # 如果传入的 is_group 与当前状态不同，更新状态
+        if state.is_group != is_group:
+            state.is_group = is_group
+            self._dirty.add(chat_name)
         count = 0
 
         if mode in ("weflow", "hybrid") and messages and hasattr(messages[0], "local_id"):
@@ -491,7 +538,7 @@ class GlobalStore:
         else:
             # OCR 模式：基于原有去重键注入
             for msg in messages:
-                mid = _msg_id(chat_name, msg)
+                mid = _msg_id(chat_name, msg, is_group)
                 if mid in state._msg_ids:
                     continue
                 msg.chat_name = chat_name
@@ -556,11 +603,12 @@ class GlobalStore:
                 state = ChatState(
                     chat_id=chat_data.get("chat_id", ""),
                     chat_name=chat_data.get("chat_name", chat_name),
+                    is_group=chat_data.get("is_group", False),
                 )
                 for m in chat_data.get("messages", []):
                     msg = self._dict_to_msg(m, chat_name)
                     state.messages.append(msg)
-                    state._msg_ids.add(_msg_id(chat_name, msg))
+                    state._msg_ids.add(_msg_id(chat_name, msg, state.is_group))
                 self.chats[chat_name] = state
             _logger.info("[GlobalStore] 加载旧格式: %d 个聊天", len(self.chats))
         except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
@@ -611,11 +659,12 @@ class GlobalStore:
                 state = ChatState(
                     chat_id=data.get("chat_id", meta.get("chat_id", "")),
                     chat_name=data.get("chat_name", chat_name),
+                    is_group=data.get("is_group", False),
                 )
                 for m in data.get("messages", []):
                     msg = self._dict_to_msg(m, chat_name)
                     state.messages.append(msg)
-                    state._msg_ids.add(_msg_id(chat_name, msg))
+                    state._msg_ids.add(_msg_id(chat_name, msg, state.is_group))
                 self.chats[chat_name] = state
             _logger.info("[GlobalStore] 加载分片格式: %d 个聊天", len(self.chats))
         except Exception as e:
@@ -667,6 +716,7 @@ class GlobalStore:
                         data = {
                             "chat_id": state.chat_id,
                             "chat_name": state.chat_name,
+                            "is_group": state.is_group,
                             "messages": [self._msg_to_dict(m) for m in state.messages],
                         }
                         tmp = shard_file.with_suffix(".tmp")
@@ -684,6 +734,7 @@ class GlobalStore:
                         name: {
                             "chat_id": s.chat_id,
                             "chat_name": s.chat_name,
+                            "is_group": s.is_group,
                             "msg_count": len(s.messages),
                             "file": f"chats/{_safe_filename(name)}.json",
                         }

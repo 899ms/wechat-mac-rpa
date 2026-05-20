@@ -1,12 +1,29 @@
 #!/usr/bin/env python3
 """L4 Reply Generator - 回复内容生成."""
 
+import logging
 import time
 from typing import Any, Dict, List
 
 from src.models.base import ChatMessage, SenderType
 from src.tools import get_registry, register_builtin_tools
 from src.reply.session_memory import SessionMemory, _extract_query_key
+
+_logger = logging.getLogger("src.reply.generator")
+
+# Badcase JudgeWorker（可选，默认不启用）
+_judge_worker = None
+
+def _get_judge_worker():
+    global _judge_worker
+    if _judge_worker is None:
+        try:
+            from src.badcase.judge_worker import JudgeWorker
+            _judge_worker = JudgeWorker()
+            _logger.info("JudgeWorker initialized")
+        except Exception as e:
+            _logger.warning("JudgeWorker init failed: %s", e)
+    return _judge_worker
 
 
 class ReplyGenerator:
@@ -32,6 +49,8 @@ class ReplyGenerator:
         self.last_hermes_fallback_triggered: bool = False
         self.last_hermes_messages: List[Dict] = []
         self.last_hermes_response: str = ""
+        # 传给 Judge 的完整 LLM 上下文
+        self.last_llm_messages: List[Dict] = []
         # 注册内置工具
         self.tool_registry = get_registry()
         register_builtin_tools()
@@ -59,17 +78,54 @@ class ReplyGenerator:
                 func=_search_memory_adapter,
             )
 
-    def generate(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage]) -> List[str]:
+    def _submit_to_judge(self, tick_id: int, replies: List[str], unreplied: List[ChatMessage], all_messages: List[ChatMessage], is_group: bool):
+        """把当前 tick 的数据提交给 JudgeWorker 异步判定"""
+        try:
+            worker = _get_judge_worker()
+            if worker is None:
+                return
+            tick_data = {
+                "tick_id": tick_id,
+                "chat_name": unreplied[-1].chat_name if unreplied else "",
+                "session_input_messages": [
+                    {
+                        "sender": m.sender,
+                        "sender_type": m.sender_type.value,
+                        "text": m.text or "",
+                        "chat_name": m.chat_name,
+                    }
+                    for m in all_messages
+                ],
+                "bot_reply_text": " | ".join(replies) if replies else "",
+                "reply_text": " | ".join(replies) if replies else "",
+                "tool_calls": self.last_tool_calls,
+                "memory_injected": self.last_user_prompt,
+                "full_user_prompt": self.last_user_prompt,
+                "reply_raw_response": self.last_raw_response,
+                "reply_generation_trace": self.last_generation_trace,
+                "full_system_prompt": self.last_system_prompt,
+                "full_tools_context": self.last_tools_context,
+                "full_llm_messages": self.last_llm_messages,
+            }
+            worker.submit(tick_data)
+        except Exception as e:
+            _logger.debug("JudgeWorker submit failed: %s", e)
+
+    def generate(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage], is_group: bool = False, tick_id: int = 0) -> List[str]:
         """
         生成回复内容，返回多条回复列表（最多3条）。
         支持多轮工具调用，但总工具时间不超过 max_tool_seconds，超时后强制生成文本回复。
         """
+        import time
+        t_generate_start = time.time()
         if not unreplied:
+            self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
             return []
 
         fallback_msg = unreplied[-1]
 
         if self.llm_client is None:
+            self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
             return []
 
         # 重置 debug 状态
@@ -85,16 +141,28 @@ class ReplyGenerator:
         self.last_hermes_fallback_triggered = False
         self.last_hermes_messages = []
         self.last_hermes_response = ""
+        self.last_llm_messages = []
 
         chat_name = unreplied[-1].chat_name if unreplied else ""
+
+        t_sp_start = time.time()
         system_prompt = self._system_prompt()
+        t_sp_ms = (time.time() - t_sp_start) * 1000
+
+        t_tc_start = time.time()
         tools_context = self._build_tools_context(chat_name)
-        user_prompt = self._build_user_prompt(unreplied, all_messages)
+        t_tc_ms = (time.time() - t_tc_start) * 1000
+
+        t_up_start = time.time()
+        user_prompt = self._build_user_prompt(unreplied, all_messages, is_group)
+        t_up_ms = (time.time() - t_up_start) * 1000
 
         # 模型辅助路由：按需加载匹配的 skill 正文到 user prompt
         last_msg = unreplied[-1]
         route_text = last_msg.text or last_msg.image_description or ""
+        t_route_start = time.time()
         matched_skills = self._route_skills(route_text)
+        t_route_ms = (time.time() - t_route_start) * 1000
         self.last_loaded_skills = matched_skills
 
         # 模型选择：加载了 skill 的复杂任务优先走 complex_llm_client（hermes）
@@ -166,9 +234,17 @@ class ReplyGenerator:
                     # 调用 LLM（matched_skills 时走 active_llm=hermes）
                     actual_tools = None if (force_no_tools or is_hermes) else (tools if tools else None)
                     llm_timeout = 600 if is_hermes else 30
+                    _logger.info("[LLM] attempt=%d round=%d force_no_tools=%s tools=%s timeout=%s msg_count=%d",
+                                 attempt + 1, tool_round_count, force_no_tools, bool(actual_tools), llm_timeout, len(messages))
+                    t_llm_start = time.time()
                     raw = active_llm.chat(messages=messages, tools=actual_tools, max_tokens=2000, timeout=llm_timeout)
+                    self.last_llm_messages = [dict(m) for m in messages]
+                    t_llm_ms = (time.time() - t_llm_start) * 1000
                     raw_content = raw if isinstance(raw, str) else getattr(raw, "content", str(raw))
                     raw_tool_calls = getattr(raw, "tool_calls", None)
+                    _logger.info("[LLM] attempt=%d round=%d 完成 耗时=%.0fms type=%s",
+                                 attempt + 1, tool_round_count, t_llm_ms,
+                                 "tool_calls" if raw_tool_calls else "text")
 
                     # 记录 LLM 调用（summary）
                     llm_calls.append({
@@ -229,10 +305,14 @@ class ReplyGenerator:
                         for tc in raw_tool_calls:
                             tool_name = tc.function.name
                             tool_args = tc.function.arguments
+                            _logger.info("[Tool] 执行开始: %s(%s)", tool_name, tool_args[:100] if isinstance(tool_args, str) else str(tool_args)[:100])
+                            t_tool_start = time.time()
                             if self.tool_registry.has(tool_name):
                                 result = self.tool_registry.get(tool_name).execute(tool_args)
                             else:
                                 result = f"工具 {tool_name} 不存在"
+                            t_tool_ms = (time.time() - t_tool_start) * 1000
+                            _logger.info("[Tool] 执行完成: %s 耗时=%.0fms result_len=%d", tool_name, t_tool_ms, len(str(result)) if result else 0)
 
                             # 保存到 session memory（跨 tick 缓存）
                             try:
@@ -274,9 +354,16 @@ class ReplyGenerator:
                     # 文本回复（或强制无 tools 后的回复）
                     text = raw_content
                     self.last_raw_response = text
+                    t_parse_start = time.time()
                     replies = self._parse_replies(text)
+                    t_parse_ms = (time.time() - t_parse_start) * 1000
                     if replies:
                         model_name = "hermes" if active_llm is self.complex_llm_client else "deepseek"
+                        t_total_ms = (time.time() - t_generate_start) * 1000
+                        print(f"[Perf][Generate] total={t_total_ms:.0f}ms "
+                              f"sp={t_sp_ms:.0f}ms tc={t_tc_ms:.0f}ms up={t_up_ms:.0f}ms "
+                              f"route={t_route_ms:.0f}ms llm={sum(c.get('elapsed',0) for c in llm_calls)*1000:.0f}ms "
+                              f"parse={t_parse_ms:.0f}ms replies={len(replies)}")
                         print(f"[Hermes] {model_name} 直接生成 replies={len(replies)} 条")
                         # 直接走 Hermes 时也记录 hermes debug 字段
                         if active_llm is self.complex_llm_client:
@@ -287,6 +374,7 @@ class ReplyGenerator:
                         self.last_llm_calls = llm_calls
                         self.last_tool_calls = tool_calls
                         self.last_generation_trace.extend(trace)
+                        self._submit_to_judge(tick_id, replies, unreplied, all_messages, is_group)
                         return replies
 
                     # deepseek 请求切换 hermes → 保留 tool 结果上下文，只换 system prompt
@@ -310,6 +398,7 @@ class ReplyGenerator:
                         })
                         print(f"[Hermes] 请求: messages={len(hermes_messages)} 条, 含 tool={any(m.get('role')=='tool' for m in hermes_messages)}")
                         hermes_raw = self.complex_llm_client.chat(messages=hermes_messages, tools=None, max_tokens=2000)
+                        self.last_llm_messages = [dict(m) for m in hermes_messages]
                         hermes_text = hermes_raw if isinstance(hermes_raw, str) else getattr(hermes_raw, "content", str(hermes_raw))
                         print(f"[Hermes] 响应预览: {hermes_text[:100] if hermes_text else '(空)'}...")
                         self.last_hermes_messages = hermes_messages
@@ -329,12 +418,14 @@ class ReplyGenerator:
                             self.last_tool_calls = tool_calls
                             self.last_raw_response = hermes_text
                             self.last_generation_trace.extend(trace)
+                            self._submit_to_judge(tick_id, hermes_replies, unreplied, all_messages, is_group)
                             return hermes_replies
                         # hermes 也返回空 → fallback 到不回复
                         print(f"[Hermes] 返回空 replies")
                         self.last_llm_calls = llm_calls
                         self.last_tool_calls = tool_calls
                         self.last_generation_trace.extend(trace)
+                        self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
                         return []
 
                     # LLM 明确输出了 {"replies": []} → 正确决策（不想回复），不 retry
@@ -343,6 +434,7 @@ class ReplyGenerator:
                         self.last_llm_calls = llm_calls
                         self.last_tool_calls = tool_calls
                         self.last_generation_trace.extend(trace)
+                        self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
                         return []
 
                     # 空回复处理（LLM 返回空字符串或无效内容）
@@ -375,11 +467,16 @@ class ReplyGenerator:
         self.last_llm_calls = llm_calls
         self.last_tool_calls = tool_calls
         self.last_generation_trace.extend(trace)
-
+        self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
         return []
 
     def _truncate_messages(self, messages: List[Dict]) -> List[Dict]:
-        """截断 messages 内容，防止 debug JSON 过大。阈值设高些，markdown 会单独保存完整版。"""
+        """截断 OpenAI message 数组，防止 debug JSON 过大。
+
+        注意：此函数处理的是 List[Dict] 结构（含 content + tool_calls），
+        与通用 text_utils._truncate_text（处理 str）不同，因此保留独立实现。
+        阈值设高些，markdown 会单独保存完整版。
+        """
         truncated = []
         for m in messages:
             cm = dict(m)
@@ -628,15 +725,15 @@ class ReplyGenerator:
             "规则",
             "1. 每条回复简洁自然，不超过50字",
             "2. 【强制】私聊必须回复，不得空 replies []",
-            "3. 【强制】群聊中被@时必须回复，不得空 replies []",
-            "4. 群聊中没被@时不回复，空 replies []",
+            "3. 群聊视情况回复，被@时必须回复",
             "5. 禁止敷衍词：收到、好的、嗯、OK、1",
             "6. 不要重复之前的内容",
             "7. 【重要】历史消息中标记为'我：'的内容是你自己之前说的，**可能存在严重错误或幻觉，严禁当作事实引用**。如果你之前说的和 wiki 记忆冲突，**必须以 wiki 记忆为准，承认自己之前的错误**。",
-            "8. 如果用户指出你前后矛盾或在纠正你，直接承认错误并修正，不要嘴硬",
+            "8. 【强制】如果用户指出你前后矛盾或在纠正你，**必须首先明确承认错误**（如'错了'、'记错了'、'是我瞎编的'），然后修正。**承认错误优先于调侃和傲娇**，不能嘴硬、不能转移话题、不能用玩笑回避",
             "9. 对方发图片/表情包时，可以针对图片内容调侃或评价",
             "10. 对方发重复图片/表情包时，不要重复之前的评价",
             "11. 不知道就说不知道：如果 prompt 中的记忆没有你要的信息，必须先调用 search_memory 搜索；搜索后 wiki 中仍没有明确记录，才回答'这个我没记到'或'不知道'。严禁跳过搜索直接说不知道，严禁猜测、推断或编造。",
+            "12. 【禁止编造】即使是以王芊/第一人称视角说话，关于任何具体事实（生日、日期、数字、金额、身高、年龄等），如果 wiki 记忆中没有明确记录，你也不知道。绝对不能为了调侃或接梗而编造具体事实。"
         ]
         if skill_hint:
             lines_local.append("")
@@ -676,8 +773,7 @@ class ReplyGenerator:
             "规则\n"
             "1. 每条回复简洁自然，不超过300字\n"
             "2. 【强制】私聊必须回复，不得空 replies []\n"
-            "3. 【强制】群聊中被@时必须回复，不得空 replies []\n"
-            "4. 群聊中没被@时不回复，空 replies []\n"
+            "3. 群聊视情况回复，被@时必须回复\n"
             "5. 禁止敷衍词：收到、好的、嗯、OK、1\n"
             "6. 参照对方语气回复，不要延续自己的风格\n"
             "7. 【重要】历史消息中标记为'我：'的内容是你自己之前说的，**可能存在严重错误或幻觉，严禁当作事实引用**。如果你之前说的和 wiki 记忆冲突，**必须以 wiki 记忆为准，承认自己之前的错误**。\n"
@@ -728,7 +824,7 @@ class ReplyGenerator:
             # text 或默认
             return f"{sender_name}：{m.text}"
 
-    def _build_user_prompt(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage]) -> str:
+    def _build_user_prompt(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage], is_group: bool = False) -> str:
         """构建结构化 user prompt：会话信息 + 记忆 + 历史 + 未读。"""
         from datetime import datetime
         chat_name = unreplied[-1].chat_name if unreplied else ""
@@ -736,8 +832,6 @@ class ReplyGenerator:
         lines_local = []
 
         # 会话信息
-        from src.reply.policy import _is_group_chat
-        is_group = _is_group_chat(chat_name)
         is_at = any(getattr(m, "is_at_me", False) for m in unreplied)
         chat_type = "群聊" if is_group else "私聊"
         lines_local.append("[会话]")
@@ -748,18 +842,32 @@ class ReplyGenerator:
         lines_local.append("")
 
         # wiki 记忆
+        t_mem_ms = {}
         if self.memory_engine is not None and unreplied:
+            # 固定注入 Bot 自己的 wiki，避免 LLM 被对方的 wiki 淹没后混淆身份
+            t_m1 = time.time()
+            self_memory = self.memory_engine.get_user_memory("王芊", max_chars=1200)
+            t_mem_ms["self"] = (time.time() - t_m1) * 1000
+            if self_memory and "（暂无）" not in self_memory:
+                lines_local.append("[我的信息]（来自长期记忆，Bot 自己的身份背景）")
+                lines_local.append(self_memory)
+                lines_local.append("")
+
             last_sender = unreplied[-1].sender
             # 去除 @群名 后缀，提取纯用户名用于 wiki 查询
             clean_sender = last_sender.split(" @")[0] if last_sender and " @" in last_sender else last_sender
             if clean_sender and clean_sender != "我":
+                t_m2 = time.time()
                 memory_text = self.memory_engine.get_user_memory(clean_sender, max_chars=2000)
+                t_mem_ms["other"] = (time.time() - t_m2) * 1000
                 if memory_text and "（暂无）" not in memory_text:
                     lines_local.append("[对方信息]（来自长期记忆，仅为该用户记忆的部分摘要）")
                     lines_local.append(memory_text)
                     lines_local.append("")
             if is_group and chat_name:
+                t_m3 = time.time()
                 group_text = self.memory_engine.get_group_memory(chat_name, max_chars=2000)
+                t_mem_ms["group"] = (time.time() - t_m3) * 1000
                 if group_text and "（暂无）" not in group_text:
                     lines_local.append("[本群信息]（来自长期记忆）")
                     lines_local.append(group_text)
@@ -767,20 +875,24 @@ class ReplyGenerator:
 
             # 跨 wiki 搜索：扫描未读消息中提到的人名/alias，grep 所有 wiki
             if unreplied:
+                t_m4 = time.time()
                 mention_text = " ".join(m.text or "" for m in unreplied)
                 related = self.memory_engine.search_related_mentions(
                     mention_text, exclude_user=clean_sender if clean_sender and clean_sender != "我" else None, max_files=3
                 )
+                t_mem_ms["mentions"] = (time.time() - t_m4) * 1000
                 if related:
                     lines_local.append("[相关背景]（来自其他聊天记录）")
                     for r in related:
                         lines_local.append(r)
                     lines_local.append("")
 
+            mem_summary = " ".join(f"{k}={v:.0f}ms" for k, v in t_mem_ms.items())
+            print(f"[Perf][Memory] {mem_summary}")
+
         # 历史消息：最近20条 或 最近10分钟内，取并集
         if all_messages:
             lines_local.append("[历史消息]（仅背景参考，按时间倒序）")
-            import time
 
             def _msg_ts(m: ChatMessage) -> float:
                 if m.sender_type == SenderType.SELF and m.reply_time:
@@ -820,10 +932,7 @@ class ReplyGenerator:
         for i, m in enumerate(unreplied, 1):
             lines_local.append(f"{i}. {self._format_message_line(m)}")
         lines_local.append("")
-        if not is_group or is_at:
-            lines_local.append("提示：回复重点放在[未读消息]，历史只是背景。当前是私聊/被@，必须回复，不得空 replies。")
-        else:
-            lines_local.append("提示：回复重点放在[未读消息]，历史只是背景。当前群聊没被@，不回复，空 replies []。")
+        lines_local.append("提示：回复重点放在[未读消息]，历史只是背景。当前必须回复，不得空 replies。")
 
         return "\n".join(lines_local)
     def _clean_reply(self, text: str) -> str:

@@ -1,0 +1,9 @@
+{
+  "description": "群聊王芊@ai开发小分队无未读",
+  "target_nickname": "王芊 @ai开发小分队",
+  "has_unread": false,
+  "unread_count": "",
+  "category": "false_positive",
+  "avatar_type": "group_mosaic",
+  "notes": "4人群聊拼贴头像，无红色未读角标。API误判为'10'"
+}

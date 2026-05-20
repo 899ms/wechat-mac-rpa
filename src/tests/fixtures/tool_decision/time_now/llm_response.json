@@ -1,0 +1,14 @@
+{
+  "tool_calls": [
+    {
+      "id": "call_5b1822f16a9c4344b013db79",
+      "type": "function",
+      "function": {
+        "name": "get_current_time",
+        "arguments": "{}"
+      }
+    }
+  ],
+  "content": "",
+  "timestamp": 1779235094.506803
+}

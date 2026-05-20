@@ -16,6 +16,8 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
+from src.utils.xml_utils import _extract_xml_text
+
 _logger = logging.getLogger("src.weflow_client")
 
 
@@ -30,6 +32,7 @@ class WeFlowMessage:
     sender_username: str
     content: str
     raw_content: str
+    sender_display_name: str = ""  # WeFlow 返回的 sender 昵称
 
     @property
     def sender_type(self) -> str:
@@ -155,11 +158,12 @@ class WeFlowClient:
         for m in raw_msgs:
             # 群聊消息：sender_username 可能是 wxid，需要映射为昵称
             sender = m.get("senderUsername", "")
+            sender_display_name = m.get("senderDisplayName", "")
             content = m.get("content", "")
 
             # 对 XML 类消息尝试提取文本摘要
             if m.get("localType", 1) != 1 and content and content.startswith("<"):
-                content = self._extract_xml_text(content) or content[:200]
+                content = _extract_xml_text(content) or content[:200]
 
             messages.append(
                 WeFlowMessage(
@@ -170,6 +174,7 @@ class WeFlowClient:
                     sort_seq=m.get("sortSeq", 0),
                     is_send=bool(m.get("isSend", 0)),
                     sender_username=sender,
+                    sender_display_name=sender_display_name,
                     content=content,
                     raw_content=m.get("rawContent", ""),
                 )
@@ -189,19 +194,7 @@ class WeFlowClient:
     # ------------------------------------------------------------------
     # 辅助
     # ------------------------------------------------------------------
-    @staticmethod
-    def _extract_xml_text(xml: str) -> Optional[str]:
-        """从 XML 消息中提取可读文本"""
-        import re
-        # 小程序 / appmsg
-        title = re.search(r"<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</title>", xml)
-        des = re.search(r"<des>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</des>", xml)
-        parts = []
-        if title:
-            parts.append(title.group(1))
-        if des:
-            parts.append(des.group(1))
-        return " — ".join(parts) if parts else None
+
 
     def health_check(self) -> bool:
         try:

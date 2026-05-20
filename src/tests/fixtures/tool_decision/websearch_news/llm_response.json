@@ -1,0 +1,22 @@
+{
+  "tool_calls": [
+    {
+      "id": "call_302c72beaa73434b8e4d09b7",
+      "type": "function",
+      "function": {
+        "name": "get_current_time",
+        "arguments": "{}"
+      }
+    },
+    {
+      "id": "call_1dcc931b65194bb4a3a255d5",
+      "type": "function",
+      "function": {
+        "name": "web_search",
+        "arguments": "{\"query\": \"今日新闻 2025年7月\"}"
+      }
+    }
+  ],
+  "content": "",
+  "timestamp": 1779235100.401639
+}
