@@ -133,22 +133,9 @@ Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知
 
 LCS 对齐后，只有真正的新消息进入后续流程，旧消息被静默丢弃。这解决了"重复回复"这个致命错误。
 
-#### 超轻量化日常对话 Agent
-
-我们做了一个刻意的设计：**日常闲聊不需要重型 Agent**。
-
-ReplyGenerator 虽然是一个完整的 Agent 运行时（支持多轮工具调用、ReAct 循环、超时保护），但**默认路径是超轻量的**：
-
-- **system prompt 精简**：没有人设背景、没有复杂规则，只有核心指令 + 可用工具列表
-- **不加载 skill**：只有当用户消息匹配到 skill 时才加载 skill 正文
-- **单轮调用为主**：绝大多数日常对话（问候、表情、简单问答）一次 LLM 调用就结束，不需要工具
-- **模型选择**：`deepseek-v4-flash`（低延迟、Tool Calling、成本可控）
-
-只有在需要深度推理时，才"加码"到重型 Agent：加载 skill 正文、切换 Hermes 模型、启用多轮 ReAct 循环。
-
 #### Skills / 复杂模型路由
 
-单一模型无法同时满足"秒回闲聊"和"深度推理"。ReplyGenerator 内部有一个路由决策：
+ReplyGenerator 内部有一个三级路由决策：
 
 ```
 用户消息
@@ -156,22 +143,49 @@ ReplyGenerator 虽然是一个完整的 Agent 运行时（支持多轮工具调�
     ▼
 [SkillRouter] 轻量 LLM 调用（几十 token）
     │
-    ├── 未匹配 skill → deepseek-v4-flash（超轻量路径）
+    ├── 路径 A：未匹配 skill → 直接调用 Agent（超轻量）
     │
-    └── 匹配 skill → Hermes Agent（深度路径）
-            │
-            ├── 加载 skill 正文（如股票查询、旅行规划）
+    ├── 路径 B：匹配 skill → 加载 skill 正文
+    │       │
+    │       ├── skill 不复杂 → 仍走 flash，按 skill 步骤执行
+    │       └── skill 复杂 → 切换 Hermes，深度推理
+    │
+    └── 路径 C：调用 Hermes Agent（重型路径）
+            ├── 加载 skill 正文
             ├── 切换长上下文模型
             └── 启用多轮 ReAct 循环
 ```
 
-**SkillRouter 只消耗几十 token**，但决定了后续走轻量路径还是深度路径。这种"先轻量判断、再决定投入"的设计，让 90% 的日常对话保持毫秒级响应，只有 10% 的复杂任务才走重型路径。
+**SkillRouter 只消耗几十 token**，但决定了后续投入多少计算资源。这种"先轻量判断、再决定投入"的设计，让 90% 的日常对话保持毫秒级响应，只有 10% 的复杂任务才走重型路径。
 
 Skills 是可插拔的 Markdown 文件（`skills/<name>/SKILL.md`），包含触发条件、执行步骤、示例。新增一个 skill 只需要丢一个 Markdown 文件进目录，零代码改动。
 
+#### 超轻量化日常对话 Agent
+
+我们做了一个刻意的设计：**日常闲聊不需要重型 Agent**。
+
+默认路径（路径 A）是超轻量的：
+- **system prompt 精简**：没有人设背景、没有复杂规则，只有核心指令 + 可用工具列表
+- **不加载 skill**：只有当用户消息匹配到 skill 时才加载 skill 正文
+- **单轮调用为主**：绝大多数日常对话（问候、表情、简单问答）一次 LLM 调用就结束，不需要工具
+- **模型选择**：`deepseek-v4-flash`（低延迟、Tool Calling、成本可控）
+
+**内置工具：**
+
+| 工具 | 用途 |
+|------|------|
+| `get_current_time` | 获取当前日期和时间 |
+| `get_weather` | 查询指定城市天气 |
+| `web_search` | 网页搜索实时信息 |
+| `browse_url` | 提取链接网页正文 |
+| `stock_query` | 查询股票实时行情 |
+| `search_memory` | 搜索本地 LLM Wiki 记忆库 |
+
+工具通过统一注册表管理，新增工具只需实现函数 + 注册，零改动现有代码。
+
 #### ReAct 循环
 
-当进入深度路径时，ReplyGenerator 运行完整的 **ReAct 循环**：
+当进入路径 B/C 时，ReplyGenerator 运行完整的 **ReAct 循环**：
 
 ```
 用户输入
@@ -181,7 +195,7 @@ Skills 是可插拔的 Markdown 文件（`skills/<name>/SKILL.md`），包含触
     │
     ├── 无需工具 → 直接生成回复
     │
-    └── 需要工具 → 输出 tool_call（如 search_memory）
+    └── 需要工具 → 输出 tool_call
             │
             ▼
         [行动] 执行工具，获取结果
@@ -200,7 +214,7 @@ Skills 是可插拔的 Markdown 文件（`skills/<name>/SKILL.md`），包含触
 
 #### 记忆系统（LLM Wiki）
 
-Bot 不是无状态聊天机器人。每个联系人、群聊、话题都有独立的 **Wiki**（Markdown 格式），由 LLM 自动维护、人工可覆写。
+Bot 不是无状态聊天机器人。每个联系人、群聊、话题都有独立的 **Wiki**（Markdown 格式）。
 
 ```mermaid
 graph LR
@@ -211,13 +225,19 @@ graph LR
     E --> F["ReplyGenerator"]
 ```
 
-**三个核心机制：**
+**全量构建（逆向初始化）**：
 
-- **自动构建**：从聊天历史提取实体、关系、偏好，生成结构化 Markdown。增量更新时严禁删除现有内容，所有事实必须标注来源
-- **Overrides**：人工可覆写任意字段，LLM 更新时自动保护（`# OVERRIDE` 标记）。人工纠正一次，Bot 永远记住
-- **实时检索**：`search_memory` 工具在回复前自动查询相关上下文。关键词必须是具体人名/名词，禁止组合查询（正确：'王芊'；错误：'王芊 王海 关系'）
+从存量聊天记录批量生成 wiki。`bulk_import_from_chats.py` 按 wxid 聚合跨聊天消息，自动发现别名，分轮次调用 LLM 生成完整 wiki。Bot 上线时即可拥有完整背景知识，不需要从零积累。
 
-**召回率**：96.6%（29 个 benchmark cases）。所有数据本地存储（`data/memory/wiki/`），不上传云端。
+**增量构建（运行时更新）**：
+
+Bot 运行中，新对话被后台异步队列消费。更新任务进入队列，worker 线程分批处理（每批最多 3 条，或积压超过 5 分钟触发）。增量更新时 LLM 接收「现有 wiki + 新对话」，输出更新后的完整 wiki，严禁删除现有内容，所有新增事实标注来源。
+
+**Overrides**：
+
+人工可覆写任意字段，LLM 更新时自动保护（`# OVERRIDE` 标记）。人工纠正一次，Bot 永远记住。
+
+**召回率**：96.6%（29 个 benchmark cases）。所有数据本地存储，不上传云端。
 
 ---
 
