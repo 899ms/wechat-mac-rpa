@@ -17,7 +17,7 @@
 ## 3. 非功能需求 (NFR)
 
 - **NFR-1**: deepseek 总超时 35 秒，hermes 总超时 600 秒。
-- **NFR-2**: 每条回复简洁自然，deepseek 不超过 50 字，hermes 不超过 300 字。
+- **NFR-2**: 每条回复简洁自然，deepseek 不超过 50 字，hermes 不超过 300 字。（目前仅依赖 prompt 约束，无代码级兜底。TODO：增加代码级截断）
 - **NFR-3**: 所有 LLM 调用、工具调用、trace 记录到 debug 字段，供排查使用。
 
 ## 4. 接口契约
@@ -34,6 +34,7 @@ generate(
     unreplied: List[ChatMessage],
     all_messages: List[ChatMessage],
     is_group: bool = False,
+    tick_id: int = 0,
 ) -> List[str]
 ```
 

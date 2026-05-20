@@ -116,7 +116,6 @@ class ReplyGenerator:
         生成回复内容，返回多条回复列表（最多3条）。
         支持多轮工具调用，但总工具时间不超过 max_tool_seconds，超时后强制生成文本回复。
         """
-        import time
         t_generate_start = time.time()
         if not unreplied:
             self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)

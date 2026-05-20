@@ -190,7 +190,7 @@ class WeChatBot:
             messages = result.messages
             raw_chat_name = result.chat_name or ""
             chat_name = _normalize_chat_name(raw_chat_name)
-            is_group = _is_group_chat_name(raw_chat_name)
+            is_group = result.is_group
 
             if not chat_name:
                 if messages:
@@ -365,7 +365,7 @@ class WeChatBot:
                     self.debug_logger.log_action("send", action_input=reply, success=True)
                     # Bot 自己发的消息不直接进 history，放入 pending 等感知层确认
                     self_msg = ChatMessage(
-                        text=reply, sender="bot", sender_type=SenderType.SELF,
+                        text=reply, sender="自己", sender_type=SenderType.SELF,
                         chat_name=chat_name, replied=True, reply_text=reply,
                         reply_time=time.time(), message_type="text"
                     )
@@ -593,7 +593,7 @@ class WeChatBot:
             # 创建一条虚拟的已回复消息记录，放入 pending 等感知层确认
             from src.models.base import ChatMessage, SenderType
             msg = ChatMessage(
-                text=text, sender="bot", sender_type=SenderType.SELF,
+                text=text, sender="自己", sender_type=SenderType.SELF,
                 chat_name=norm, replied=True, reply_text=text, reply_time=time.time()
             )
             state = self.global_store.chats.get(norm)

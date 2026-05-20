@@ -4,7 +4,10 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, FrozenSet, List, Optional, Tuple
+
+# 媒体消息类型常量，供各模块统一引用
+MEDIA_MESSAGE_TYPES: FrozenSet[str] = frozenset({"image", "sticker", "mixed", "link_card", "video"})
 
 
 @dataclass(frozen=True)
@@ -54,7 +57,7 @@ class ChatMessage:
     reply_time: Optional[float] = None # 回复时间戳
 
     # === 图片/表情相关 ===
-    message_type: str = "text"         # "text" / "image" / "sticker" / "mixed" / "link_card"
+    message_type: str = "text"         # "text" / "image" / "sticker" / "mixed" / "link_card" / "video"
     image_description: str = ""        # 视觉模型对图片内容的描述
     image_text: str = ""               # 图片上的文字（如有）
     is_image_duplicate: bool = False   # 是否被去重标记（原始描述仍保留在 image_description 中）

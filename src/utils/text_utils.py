@@ -13,7 +13,7 @@ def _compress_text(text: str, max_chars: int) -> str:
     """压缩长文本：优先保留开头和结尾，中间用省略号连接。"""
     if not text or len(text) <= max_chars:
         return text
-    # 保留开头 40% 和结尾 40%
+    # 保留头 40% + 尾 60%
     head_len = int(max_chars * 0.4)
-    tail_len = int(max_chars * 0.4)
+    tail_len = int(max_chars * 0.6)
     return text[:head_len] + "\n...（中间省略）...\n" + text[-tail_len:]

@@ -86,7 +86,7 @@ Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知
 ```
 截图 → MD5 全图哈希比对
     │
-    ├── 哈希相同 → 零 API 调用，直接复用上轮结果
+    ├── 哈希相同 → 跳过多模态 API，直接复用上轮结果（仍执行本地 OCR 更新聊天列表坐标）
     │
     └── 哈希不同 → 消息区 + 聊天列表区像素 diff
             │
@@ -128,35 +128,29 @@ Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知
 
 对齐不是简单的"内容相同"，而是基于**多维度相似度**的模糊匹配：
 - 精确匹配：内容哈希相同 → 100% 匹配
-- 模糊匹配：2-gram Jaccard 相似度 → 容忍 OCR 偶尔错 1-2 个字
-- 图片匹配：图片描述相似度 → 避免同一张表情包被重复识别
+- 文字匹配：difflib.SequenceMatcher（ratio ≥ 0.80）→ 容忍 OCR 偶尔错 1-2 个字
+- 图片/表情匹配：2-gram Jaccard 相似度 → 避免同一张表情包被重复识别
 
 LCS 对齐后，只有真正的新消息进入后续流程，旧消息被静默丢弃。这解决了"重复回复"这个致命错误。
 
 #### Skills / 复杂模型路由
 
-ReplyGenerator 内部有一个三级路由决策：
+ReplyGenerator 内部有一个二级路由决策：
 
 ```
 用户消息
     │
     ▼
-[SkillRouter] 轻量 LLM 调用（几十 token）
+ReplyGenerator 内部的 _route_skills() 方法（轻量 LLM 调用，几十 token）
     │
     ├── 路径 A：未匹配 skill → 直接调用 Agent（超轻量）
     │
-    ├── 路径 B：匹配 skill → 加载 skill 正文
-    │       │
-    │       ├── skill 不复杂 → 仍走 flash，按 skill 步骤执行
-    │       └── skill 复杂 → 切换 Hermes，深度推理
-    │
-    └── 路径 C：调用 Hermes Agent（重型路径）
+    └── 路径 B：匹配 skill 且 complex_llm_client 存在 → 切换 Hermes，深度推理
             ├── 加载 skill 正文
-            ├── 切换长上下文模型
-            └── 启用多轮 ReAct 循环
+            └── 切换长上下文模型
 ```
 
-**SkillRouter 只消耗几十 token**，但决定了后续投入多少计算资源。这种"先轻量判断、再决定投入"的设计，让 90% 的日常对话保持毫秒级响应，只有 10% 的复杂任务才走重型路径。
+路由判断只消耗几十 token，但决定了后续投入多少计算资源。这种"先轻量判断、再决定投入"的设计，让 90% 的日常对话保持毫秒级响应，只有 10% 的复杂任务才走重型路径。
 
 Skills 是可插拔的 Markdown 文件（`skills/<name>/SKILL.md`），包含触发条件、执行步骤、示例。新增一个 skill 只需要丢一个 Markdown 文件进目录，零代码改动。
 
@@ -185,7 +179,7 @@ Skills 是可插拔的 Markdown 文件（`skills/<name>/SKILL.md`），包含触
 
 #### ReAct 循环
 
-当进入路径 B/C 时，ReplyGenerator 运行完整的 **ReAct 循环**：
+ReAct 循环仅在路径 A（deepseek）中运行。当进入路径 A 时，ReplyGenerator 运行完整的 **ReAct 循环**：
 
 ```
 用户输入
@@ -210,7 +204,7 @@ Skills 是可插拔的 Markdown 文件（`skills/<name>/SKILL.md`），包含触
             └── 信息充分 → 生成最终回复
 ```
 
-内置防失控机制：工具调用有轮次上限，单条链路有超时保护，模型返回空回复时自动重试，同一对话内的工具结果会被缓存避免重复查询。
+路径 B（Hermes）为单轮生成，不启用工具调用。内置防失控机制：工具调用有轮次上限，单条链路有超时保护，模型返回空回复时自动重试，同一对话内的工具结果会被缓存避免重复查询。
 
 #### 记忆系统（LLM Wiki）
 
@@ -235,7 +229,7 @@ Bot 运行中，新对话被后台异步队列消费。更新任务进入队列�
 
 **Overrides**：
 
-人工可覆写任意字段，LLM 更新时自动保护（`# OVERRIDE` 标记）。人工纠正一次，Bot 永远记住。
+人工可覆写任意字段，通过外挂 JSON（aliases.json / facts.json / corrections.json）实现。LLM 更新 wiki 时不会自动保护人工修改，需维护对应的外挂文件。
 
 **召回率**：96.6%（29 个 benchmark cases）。所有数据本地存储，不上传云端。
 
@@ -247,7 +241,7 @@ Bot 运行中，新对话被后台异步队列消费。更新任务进入队列�
 
 消息发送是一个原子操作链：激活 WeChat 窗口 → 确保 frontmost（验证当前激活应用名）→ 文本写入剪贴板 → 模拟粘贴 → 模拟回车发送 → 剪贴板验证。安全机制包括：粘贴前确认 WeChat 是 frontmost 进程（防止消息发到其他应用）、异常内容熔断、每次重试从头开始。
 
-Bot 遍历未读聊天列表，逐个处理：获取目标聊天坐标 → 点击 → 等待界面渲染 → 截图验证聊天名是否匹配。同一目标在短时间内不会重复切换，避免高频切换导致的界面卡顿。
+Bot 每个 tick 检测并切换到未读数最高的聊天逐个处理：获取目标聊天坐标 → 点击 → 等待界面渲染 → 截图验证聊天名是否匹配。无未读时最多切换到一个未读聊天。同一目标在短时间内不会重复切换，避免高频切换导致的界面卡顿。
 
 长期运行可能遇到微信掉线。`WeChatLoginHandler` 监控异常模式（窗口标题变为登录、截图出现二维码、连续感知失败），触发后进入恢复流程：扫码提醒 → 等待登录 → 验证恢复 → 继续主循环。
 
@@ -334,7 +328,7 @@ data/memory/wiki/
 │   └── ...
 └── groups/
     ├── ai开发小分队.md
-n    └── ...
+    └── ...
 ```
 
 初始化完成后，Bot 上线时就已经拥有完整的背景知识，不需要再从零积累。
@@ -448,9 +442,9 @@ wechat-mac-rpa/
 │   ├── ocr/vision_ocr.py              # L2: macOS Vision 文字识别
 │   ├── models/base.py                 # L1: 领域模型
 │   ├── llm/
-│   │   ├── openclaw_client.py         # LLM 客户端（Kimi 本地代理）
-│   │   └── qwen_client.py             # LLM 客户端（DashScope API）
+│   │   └── openclaw_client.py         # LLM 客户端（Kimi 本地代理）
 │   ├── utils/                         # L1-L5 共享工具
+│   │   └── qwen_client.py             # LLM 客户端（DashScope API）
 │   ├── badcase/                       # Badcase 闭环体系
 │   │   ├── case_generator.py          # 从 tick 数据生成 benchmark case
 │   │   ├── judge_worker.py            # 异步 Judge LLM 评估

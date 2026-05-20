@@ -10,11 +10,11 @@ import re
 import threading
 import time
 import traceback
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from src.models.base import ChatMessage, SenderType
+from src.models.base import ChatMessage, MEDIA_MESSAGE_TYPES, SenderType
 from src.utils.chat_utils import _is_group_chat_name
 
 _logger = logging.getLogger("src.global_store")
@@ -82,7 +82,7 @@ def _msg_id(chat_name: str, msg: ChatMessage, is_group: bool = False) -> str:
     图片/表情/混合消息：基于 message_type + image_description，避免不同图片
     因 text 都为空而被误判为相同。
     """
-    if msg.message_type in ("image", "sticker", "mixed", "video"):
+    if msg.message_type in MEDIA_MESSAGE_TYPES:
         content = f"[{msg.message_type}]{msg.image_description}"
     else:
         content = msg.text
@@ -103,15 +103,15 @@ def _is_fuzzy_duplicate(state, msg: ChatMessage, lookback: int = 10) -> bool:
     阈值按消息长度动态调整：越短的消息要求越严格（避免不同短句误判）。
     只对 lookback 条消息比较，避免遍历全部历史影响性能。
     """
-    # 图片/表情/混合消息：基于 image_description 做 2-gram Jaccard
-    if msg.message_type in ("image", "sticker", "mixed"):
+    # 媒体消息：基于 image_description 做 2-gram Jaccard
+    if msg.message_type in MEDIA_MESSAGE_TYPES:
         desc = msg.image_description
         if not desc:
             return False
         for hist_msg in state.messages[-lookback:]:
             if hist_msg.sender_type.value == "self":
                 continue
-            if hist_msg.message_type not in ("image", "sticker", "mixed"):
+            if hist_msg.message_type not in MEDIA_MESSAGE_TYPES:
                 continue
             hist_desc = hist_msg.image_description
             if not hist_desc:
@@ -141,8 +141,8 @@ def _is_fuzzy_duplicate(state, msg: ChatMessage, lookback: int = 10) -> bool:
         # 跳过 Bot 自己的消息，避免拿 Bot 回复去重用户新消息
         if hist_msg.sender_type.value == "self":
             continue
-        # 跳过图片类消息（不参与文字模糊去重）
-        if hist_msg.message_type in ("image", "sticker", "mixed"):
+        # 跳过媒体类消息（不参与文字模糊去重）
+        if hist_msg.message_type in MEDIA_MESSAGE_TYPES:
             continue
         other = _normalize_text(hist_msg.text)
         if not other:
@@ -396,9 +396,9 @@ class GlobalStore:
         if new_messages:
             self._dirty.add(chat_name)
         for msg in new_messages:
-            msg.chat_name = chat_name
-            state.messages.append(msg)
-            state._msg_ids.add(_msg_id(chat_name, msg, is_group))
+            new_msg = replace(msg, chat_name=chat_name)
+            state.messages.append(new_msg)
+            state._msg_ids.add(_msg_id(chat_name, new_msg, is_group))
 
         # 裁剪旧消息
         if len(state.messages) > self.max_messages:
@@ -529,9 +529,8 @@ class GlobalStore:
                 lid = getattr(msg, "local_id", None)
                 if lid is not None and lid in seen_ids:
                     continue
-                msg.chat_name = chat_name
-                msg.replied = True  # 历史消息不需要回复
-                state.messages.append(msg)
+                new_msg = replace(msg, chat_name=chat_name, replied=True)
+                state.messages.append(new_msg)
                 if lid is not None:
                     seen_ids.add(lid)
                 count += 1
@@ -541,10 +540,9 @@ class GlobalStore:
                 mid = _msg_id(chat_name, msg, is_group)
                 if mid in state._msg_ids:
                     continue
-                msg.chat_name = chat_name
-                msg.replied = True  # 历史消息不需要回复
-                state.messages.append(msg)
-                state._msg_ids.add(mid)
+                new_msg = replace(msg, chat_name=chat_name, replied=True)
+                state.messages.append(new_msg)
+                state._msg_ids.add(_msg_id(chat_name, new_msg, is_group))
                 count += 1
 
         if count:

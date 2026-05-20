@@ -17,8 +17,12 @@ JudgeWorker - 异步 badcase 判定与自动入库
 import json
 import logging
 import os
+import py_compile
 import queue
 import re
+import subprocess
+import sys
+import tempfile
 import threading
 import time
 from datetime import datetime
@@ -354,15 +358,23 @@ class JudgeWorker:
     # 内部：自动入库
     # ------------------------------------------------------------------
     def _auto_commit(self, draft: dict):
-        """直接追加到 benchmark 文件"""
+        """直接追加到 benchmark 文件（经回归验证）"""
         module = draft["generated_case"].get("module", "P2")
         case_code = draft["generated_case"].get("case_code", "")
         if not case_code:
             _logger.warning("Auto commit skipped: no case code generated")
             return
 
-        # 追加到 benchmark 文件
+        # 回归验证：确保不破坏现有 benchmark
         benchmark_file = self._get_benchmark_file(module)
+        ok, reason = self._regression_check(benchmark_file, case_code)
+        if not ok:
+            _logger.warning("[Judge] 回归验证失败: %s，转为 pending", reason)
+            draft["status"] = "pending"
+            self._save_pending(draft)
+            return
+
+        # 追加到 benchmark 文件
         self._append_case_to_benchmark(benchmark_file, case_code)
 
         # 缓存 LLM 响应
@@ -375,6 +387,46 @@ class JudgeWorker:
         self._write_json(self._committed_dir / f"{draft['draft_id']}.json", draft)
 
         _logger.info("Auto committed %s to %s", draft["draft_id"], benchmark_file.name)
+
+    def _regression_check(self, benchmark_file: Path, case_code: str) -> tuple[bool, str]:
+        """回归验证：确保追加 case 不会破坏现有 benchmark"""
+        if not benchmark_file.exists():
+            return False, "benchmark 文件不存在"
+
+        content = benchmark_file.read_text(encoding="utf-8")
+
+        # 1. 检查 case 不重复
+        case_name = self._extract_case_name(case_code)
+        if case_name and f'case_name="{case_name}"' in content:
+            return False, f"case {case_name} 已存在"
+
+        # 2. 语法验证 + import 回归验证
+        test_content = content + f"\n\n{case_code}\n"
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as f:
+            f.write(test_content)
+            tmp = f.name
+        try:
+            py_compile.compile(tmp, doraise=True)
+            # 3. 回归验证：追加后模块能正常 import 且 BENCHMARK_CASES 可访问
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("regression_test_module", tmp)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            if not hasattr(module, "BENCHMARK_CASES"):
+                return False, "BENCHMARK_CASES 未找到"
+        except py_compile.PyCompileError as e:
+            return False, f"语法验证失败: {e}"
+        except Exception as e:
+            return False, f"回归验证失败: {e}"
+        finally:
+            os.unlink(tmp)
+
+        return True, ""
+
+    @staticmethod
+    def _extract_case_name(case_code: str) -> str:
+        m = re.search(r'case_name="([^"]+)"', case_code)
+        return m.group(1) if m else ""
 
     def _get_benchmark_file(self, module: str) -> Path:
         mapping = {

@@ -10,9 +10,9 @@
 - **FR-3**: 聊天切换：当前聊天无未读时，自动切换到未读数最多的聊天（支持 WeFlow API 轮询和 OCR 角标两种检测方式）。
 - **FR-4**: WeFlow 初始化：启动时若 `WEFLOW_MODE=weflow/hybrid`，注入全量历史到 GlobalStore，然后切回 OCR 模式运行。
 - **FR-5**: 逐条发送回复，间隔 1.5 秒。
-- **FR-6**: 发送后立即将 Bot 回复注入 GlobalStore，避免 WeFlow API 延迟导致上下文缺失。
+- **FR-6**: 发送后将 Bot 回复放入 `pending_self_messages`，等待感知层确认后入库，避免 WeFlow API 延迟导致上下文缺失。
 - **FR-7**: 记忆更新：每轮回复后异步更新用户 wiki / 群 wiki。
-- **FR-8**: `send_to_chat()`：外部系统调用，主动发消息到指定聊天。
+- **FR-8**: `send_to_chat()`：外部系统调用，主动发消息。注意：实际直接调用 `sender.send(text)`，未先切换到目标聊天。
 - **FR-9**: Debug 日志：每轮 tick 保存完整的 perception/session/reply/action debug 信息。
 
 ## 3. 非功能需求 (NFR)

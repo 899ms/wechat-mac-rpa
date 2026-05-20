@@ -15,6 +15,7 @@
 import hashlib
 import logging
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional
@@ -22,14 +23,14 @@ from typing import Optional
 import numpy as np
 from PIL import Image
 
-from src.models.base import ChatListItem, ChatMessage, PerceptionResult, Rect, SenderType
+from src.models.base import ChatListItem, ChatMessage, MEDIA_MESSAGE_TYPES, PerceptionResult, Rect, SenderType
 from src.capture.window_capture import WindowCapture, WeChatNotReadyError
 from src.ocr.vision_ocr import VisionOCREngine
 from src.layout.layout_parser import TIMESTAMP_PATTERNS, LayoutParser, UILayout
 from src.layout.profile import LayoutProfile
 from src.action.login_recovery import WeChatLoginHandler
 from src.utils.chat_utils import _is_group_chat_name
-from src.utils.xml_utils import _extract_xml_text
+
 
 _logger = logging.getLogger("src.runtime.smart_pipeline")
 
@@ -200,15 +201,17 @@ class _QwenAPIClient:
             if lines and lines[-1].startswith("```"):
                 lines = lines[:-1]
             text = "\n".join(lines).strip()
-        return _json.loads(text)
+        try:
+            return _json.loads(text)
+        except _json.JSONDecodeError:
+            return {}
 
 
 # ---------------------------------------------------------------------------
 # Image Description Dedup Tracker - 基于描述相似度的图片去重
 # ---------------------------------------------------------------------------
 
-from collections import deque
-from difflib import SequenceMatcher
+
 
 
 # ---------------------------------------------------------------------------
@@ -474,8 +477,6 @@ class SmartPerceptionPipeline:
     ) -> list[ChatMessage]:
         """从本地 Layout 结果中粗略提取消息，用于本地路径检测变化。
         只做基本分类（self/other），不做复杂的群聊 sender 识别。"""
-        import re
-
         messages: list[ChatMessage] = []
         input_texts = {e.text.strip() for e in layout.input_elements}
 
@@ -840,7 +841,6 @@ class SmartPerceptionPipeline:
         支持图片/表情包识别和去重。
         私聊 sender 统一为 chat_name；群聊 sender 做校验防错。
         """
-        import re
         is_group = _is_group_chat_name(chat_name)
 
         messages = []
@@ -873,7 +873,7 @@ class SmartPerceptionPipeline:
                 last_left_sender = sender
 
             # 图片/表情/链接卡片：允许 text 为空
-            is_media = msg_type in ("image", "sticker", "mixed", "link_card", "video")
+            is_media = msg_type in MEDIA_MESSAGE_TYPES
             if not text and not is_media:
                 continue
 

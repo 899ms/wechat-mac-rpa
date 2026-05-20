@@ -32,6 +32,8 @@
 ### 规则 2: `msg.chat_name` 和 `msg.sender` 是只读字段
 存储层和 Bot 层不得修改 `ChatMessage.chat_name` 和 `ChatMessage.sender`。存储使用独立的 `session_key` 做查找。
 
+例外：在 `merge_tick` 首次入库时，`chat_name` 会被标准化为归一化后的 session key（`_normalize_chat_name`）。此修改仅发生在消息首次进入 GlobalStore 时，后续不得再次修改。
+
 ### 规则 3: 新增 WeFlow 字段不影响现有代码
 `local_id`、`server_id`、`create_time`、`raw_type`、`sender_wxid` 为 WeFlow 扩展字段，必须为 `Optional` 且有默认值。
 

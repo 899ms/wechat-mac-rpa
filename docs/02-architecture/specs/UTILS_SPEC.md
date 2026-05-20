@@ -33,8 +33,8 @@ _extract_xml_text(xml: str) -> Optional[str]   # 提取 title + des
 
 ### text_utils
 ```python
-_truncate_text(text: str, max_len: int, suffix="...") -> str
-_compress_text(text: str, max_chars: int) -> str   # 保留头 40% + 尾 60%
+_truncate_text(text: str, max_len: int, suffix="\n\n... [truncated]") -> str
+_compress_text(text: str, max_chars: int) -> str   # 保留头 40% + 尾 40%
 ```
 
 ## 5. 核心规则与约束（红线）

@@ -2,7 +2,6 @@
 """L4 Reply Policy - 回复决策."""
 
 from src.models.base import ChatMessage, SenderType
-from src.utils.chat_utils import _is_group_chat_name as _is_group_chat
 from typing import Any
 
 
