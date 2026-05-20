@@ -6,7 +6,7 @@
 ## 2. 功能需求 (FR)
 
 - **FR-1**: 提供与 `VisionPipeline.perceive()` 完全兼容的接口（duck typing）。
-- **FR-2**: 本地预判：通过像素差异判断截图是否有实质变化，无变化时跳过 API 调用（92.6% tick 可跳过）。
+- **FR-2**: 本地预判：通过像素差异判断截图是否有实质变化。消息区域或聊天列表区域任一有变化即触发 API；两区域均无变化时跳过 API 调用。
 - **FR-3**: 有变化时：本地 Layout 提供聊天列表位置 + qwen3.6-flash API 提供消息/昵称/未读数识别。
 - **FR-4**: 支持 WeFlow 分流模式（`weflow` / `hybrid` / `ocr`）。
 - **FR-5**: 合并本地 Layout 和 API 的聊天列表结果（本地提供准确 `rect`，API 提供准确 `nickname`/`unread_count`）。
@@ -15,10 +15,10 @@
 
 ## 3. 非功能需求 (NFR)
 
-- **NFR-1**: 像素差异阈值默认 0.001（消息区域）。
-- **NFR-2**: 稳定模式：连续 3 帧低差异后，阈值临时降低 50%。
+- **NFR-1**: 像素差异阈值默认 0.001，同时应用于消息区域和聊天列表区域。
+- **NFR-2**: 稳定模式：连续多帧低差异后，阈值临时降低 50%。
 - **NFR-3**: API 客户端延迟初始化，失败时优雅降级为本地 OCR。
-- **NFR-4**: 消息区域 ROI：`(0.35, 0.12, 0.95, 0.85)`，排除左侧列表和底部输入框。
+- **NFR-4**: 消息区域 ROI：`(0.35, 0.12, 0.95, 0.97)`；聊天列表区域 ROI：`(0.0, 0.0, 0.35, 1.0)`。
 
 ## 4. 接口契约
 
@@ -28,7 +28,8 @@ SmartPerceptionPipeline(
     profile: LayoutProfile,
     api_key: Optional[str] = None,
     pixel_diff_threshold: float = 0.001,
-    message_region: tuple = (0.35, 0.12, 0.95, 0.85),
+    message_region: tuple = (0.35, 0.12, 0.95, 0.97),
+    chat_list_region: tuple = (0.0, 0.0, 0.35, 1.0),
     always_use_api: bool = False,
 )
 ```

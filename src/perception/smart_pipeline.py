@@ -226,6 +226,8 @@ class SmartPerceptionPipeline:
     DEFAULT_PIXEL_DIFF_THRESHOLD = 0.001
     # 消息区域 ROI（相对坐标 x1, y1, x2, y2），排除左侧列表和底部输入框
     DEFAULT_MESSAGE_REGION = (0.35, 0.12, 0.95, 0.97)
+    # 聊天列表区域（左侧边栏，用于检测新未读、列表滚动等变化）
+    DEFAULT_CHAT_LIST_REGION = (0.0, 0.0, 0.35, 1.0)
     # 窗口最小有效尺寸（小于此值视为异常，如登录浮窗）
     MIN_WINDOW_WIDTH = 800
     MIN_WINDOW_HEIGHT = 600
@@ -356,7 +358,9 @@ class SmartPerceptionPipeline:
                     f"[SmartPipeline] 截图完全相同 (hash一致)，跳过API调用"
                 )
             else:
-                diff_ratio = self._check_pixel_diff(str(self._last_screenshot), image_path)
+                msg_diff = self._check_pixel_diff(str(self._last_screenshot), image_path, self.message_region)
+                chat_diff = self._check_pixel_diff(str(self._last_screenshot), image_path, self.chat_list_region)
+                diff_ratio = max(msg_diff, chat_diff)
                 # 稳定模式：连续多帧低差异后，阈值临时降低 50%
                 effective_threshold = self.pixel_diff_threshold
                 if self._consecutive_low_diff >= self._stable_mode_after:
@@ -371,8 +375,8 @@ class SmartPerceptionPipeline:
                 else:
                     self._consecutive_low_diff = 0
                 _logger.info(
-                    f"[SmartPipeline] 像素差异: {diff_ratio:.6f} "
-                    f"(阈值={effective_threshold}), "
+                    f"[SmartPipeline] 像素差异: msg={msg_diff:.6f} chat_list={chat_diff:.6f} "
+                    f"max={diff_ratio:.6f} (阈值={effective_threshold}), "
                     f"决策={'跳过API' if skip_api else '调用API'}"
                 )
         else:
@@ -801,8 +805,8 @@ class SmartPerceptionPipeline:
         with open(path, "rb") as f:
             return hashlib.md5(f.read()).hexdigest()
 
-    def _check_pixel_diff(self, prev_path: str, curr_path: str) -> float:
-        """计算消息区域像素差异比例。"""
+    def _check_pixel_diff(self, prev_path: str, curr_path: str, region: tuple) -> float:
+        """计算指定区域像素差异比例。"""
         try:
             prev = np.array(Image.open(prev_path).convert("RGB"), dtype=np.int16)
             curr = np.array(Image.open(curr_path).convert("RGB"), dtype=np.int16)
@@ -813,13 +817,13 @@ class SmartPerceptionPipeline:
             return 1.0  # 尺寸变化视为有变化
 
         h, w = curr.shape[:2]
-        x1, y1, x2, y2 = self.message_region
-        region = (
+        x1, y1, x2, y2 = region
+        region_slice = (
             slice(int(y1 * h), int(y2 * h)),
             slice(int(x1 * w), int(x2 * w)),
         )
 
-        diff = np.abs(curr[region] - prev[region])
+        diff = np.abs(curr[region_slice] - prev[region_slice])
         diff_mask = np.any(diff > 10, axis=2)  # RGB 任一通道差异 > 10
         diff_ratio = float(np.mean(diff_mask))
         return diff_ratio
