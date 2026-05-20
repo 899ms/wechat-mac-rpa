@@ -11,23 +11,32 @@
 ```mermaid
 graph TB
     subgraph Perception["感知层 Perception"]
-        P1["窗口截图<br/>AVFoundation + CoreGraphics"]
-        P2["ROI Hash 预判<br/>MD5 + 像素 Diff"]
-        P3["多模态 API<br/>qwen3.6-flash"]
-        P4["布局解析<br/>气泡检测 + 消息提取"]
+        P1["窗口截图"]
+        P2["像素 Diff 预判<br/>消息区 + 聊天列表区"]
+        P3["多模态 API"]
+        P4["布局解析"]
     end
 
     subgraph Reasoning["推理层 Reasoning"]
-        R1["状态机 ChatState<br/>消息去重 + 会话持久化"]
-        R2["双模型路由<br/>flash 日常 / Hermes 深度"]
-        R3["ReAct 循环<br/>思考 → 工具 → 观察 → 再思考"]
-        R4["记忆检索<br/>search_memory → LLM Wiki"]
+        R1["状态机 ChatState"]
+        R2["双模型路由"]
+        R3["ReAct 循环"]
+        R4["记忆检索"]
     end
 
     subgraph Action["行动层 Action"]
-        A1["消息发送<br/>AppleScript + 剪贴板"]
-        A2["聊天切换<br/>坐标点击 + 防抖"]
-        A3["登录恢复<br/>异常检测 + 重试"]
+        A1["消息发送"]
+        A2["聊天切换"]
+        A3["登录恢复"]
+    end
+
+    subgraph Flywheel["数据飞轮 Case 闭环"]
+        F1["case_generator<br/>自动提取异常"]
+        F2["judge_worker<br/>LLM 自动评估"]
+        F3["review_server<br/>人工审核"]
+        F4["加入 benchmark<br/>量化基线"]
+        F5["通用规则修复"]
+        F6["回归验证"]
     end
 
     P1 --> P2
@@ -41,7 +50,9 @@ graph TB
     R4 --> R3
     R3 -->|reply| A1
     R1 -->|switch| A2
-    A1 -->|tick_complete| P1
+    A1 --> F1
+    F1 --> F2 --> F3 --> F4 --> F5 --> F6
+    F6 -->|修复上生产| P2
 ```
 
 Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知层提取当前对话状态，推理层决定如何回复，行动层执行界面操作。三个层之间通过严格的数据契约（`PerceptionResult`、`ChatState`、`ActionResult`）通信，底层细节完全隔离。
@@ -56,19 +67,13 @@ Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知
 
 感知层的任务是**把像素变成结构化数据**。它不"理解"对话，只负责忠实还原界面上的文字、布局和状态。
 
-#### 1. 像素差异预判
-
 不是每帧都调 API。我们设计了两级预判：**全图哈希比对** → **消息区 + 聊天列表区像素 diff** → **两区域均无变化才本地跳过，任一区域有变化即走多模态 API**。
 
-绝大多数 tick（实测超过九成）截图没有实质变化——无新消息、用户正在打字、界面静止。此时直接复用上轮结果，**零 API 调用**，感知延迟从秒级降至毫秒级。
+绝大多数 tick 截图没有实质变化——无新消息、用户正在打字、界面静止。此时直接复用上轮结果，**零 API 调用**，感知延迟从秒级降至毫秒级。
 
-当预判认为"有实质变化"时，截图被编码送入 `qwen3.6-flash` 做结构化识别。系统 prompt 包含严格的识别规则：未读角标必须满足「红色圆形 + 白色数字 + 头像外」三条件；时间戳和输入框不得被识别为消息；私聊 sender 统一为 `"自己"/"对方"`，群聊保留昵称。
+当预判认为"有实质变化"时，截图被编码送入 `qwen3.6-flash` 做结构化识别，同时本地 LayoutParser 提取精确坐标（气泡边界框、聊天列表位置）。多模态模型对群聊昵称、emoji、换行格式的识别准确率远高于本地 OCR，且能识别图片和表情包中的文字内容。
 
-本地 OCR（macOS Vision）在群聊场景下准确率有限，主要痛点是昵称截断、emoji 丢失、换行格式混乱。多模态模型在相同场景下准确率大幅提升，且能识别图片和表情包中的文字内容。
-
-#### 2. 布局解析
-
-`LayoutParser` 负责从截图中提取精确坐标：基于颜色聚类区分左右气泡（自己发的 vs 对方发的），提取每个气泡的边界框坐标，以及聊天列表中每个会话条目的位置。布局配置按微信版本管理，不同版本的坐标系差异通过配置文件隔离，升级微信时只需更新配置，无需改代码。
+布局配置按微信版本管理，不同版本的坐标系差异通过配置文件隔离，升级微信时只需更新配置，无需改代码。
 
 ---
 
@@ -76,11 +81,11 @@ Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知
 
 推理层是 Bot 的"大脑"。它不直接操作界面，只决定"说什么"和"用什么工具"。
 
-#### 1. 状态机：ChatState
+#### 状态机：ChatState
 
 每个聊天有独立的状态对象，包含完整消息历史、去重集合、已发送但未确认的消息。感知层定期输出一帧消息列表，但这些消息可能在上一个 tick 已经见过。GlobalStore 使用 **Jaccard 相似度**做内容去重，同时维护精确去重集合，避免"重复回复同一条消息"的致命错误。所有状态以 JSON 形式本地持久化，Bot 重启后对话上下文不丢失。
 
-#### 2. 双模型路由
+#### 双模型路由
 
 单一模型无法同时满足"秒回闲聊"和"深度推理"。ReplyGenerator 内部有一个路由决策：
 
@@ -89,7 +94,7 @@ Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知
 
 路由基于 prompt 中的 skill 分类和工具调用历史**动态决定**，不是简单的 if-else。flash 模型处理绝大多数日常对话，Hermes 处理复杂的深度场景。两者拥有独立的 system prompt 和工具体系。
 
-#### 3. ReAct 循环
+#### ReAct 循环
 
 ReplyGenerator 是一个完整的 **ReAct Agent 运行时**：
 
@@ -118,7 +123,7 @@ ReplyGenerator 是一个完整的 **ReAct Agent 运行时**：
 
 内置防失控机制：工具调用有轮次上限，单条链路有超时保护，模型返回空回复时自动重试，同一对话内的工具结果会被缓存避免重复查询。
 
-#### 4. 记忆检索（LLM Wiki）
+#### 记忆检索（LLM Wiki）
 
 Bot 不是无状态聊天机器人。每个联系人、群聊、话题都有独立的 **Wiki**（Markdown 格式），由 LLM 自动维护、人工可覆写。
 
@@ -143,35 +148,17 @@ graph LR
 
 行动层负责**把文本变成界面操作**。它面对的是不稳定的 GUI 环境：窗口可能被遮挡、焦点可能丢失、剪贴板可能被其他应用污染。
 
-#### 1. 消息发送的原子操作链
+消息发送是一个原子操作链：激活 WeChat 窗口 → 确保 frontmost（验证当前激活应用名）→ 文本写入剪贴板 → 模拟粘贴 → 模拟回车发送 → 剪贴板验证。安全机制包括：粘贴前确认 WeChat 是 frontmost 进程（防止消息发到其他应用）、异常内容熔断、每次重试从头开始。
 
-```
-激活 WeChat 窗口
-    ↓
-确保 frontmost（验证当前激活应用名）
-    ↓
-文本写入剪贴板 → 模拟粘贴 → 模拟回车发送
-    ↓
-剪贴板验证（读取确认内容正确）
-    ↓
-成功 / 失败 → 重试
-```
+Bot 遍历未读聊天列表，逐个处理：获取目标聊天坐标 → 点击 → 等待界面渲染 → 截图验证聊天名是否匹配。同一目标在短时间内不会重复切换，避免高频切换导致的界面卡顿。
 
-**安全机制：** 粘贴前确认 WeChat 是 frontmost 进程，防止消息发到其他应用；检测到异常内容时立即熔断中止；每次重试都从头开始（重新激活 + 写入剪贴板），避免窗口焦点丢失后后续重试白给。
-
-#### 2. 聊天列表切换
-
-Bot 遍历未读聊天列表，逐个处理：获取目标聊天坐标 → 点击 → 等待界面渲染 → 截图验证聊天名是否匹配 → 不匹配则重试或标记失败。同一目标在短时间内不会重复切换，避免高频切换导致的界面卡顿。
-
-#### 3. 登录恢复
-
-Bot 长期运行可能遇到微信掉线。`WeChatLoginHandler` 监控异常模式（窗口标题变为登录、截图出现二维码、连续感知失败），触发后进入恢复流程：扫码提醒 → 等待登录 → 验证恢复 → 继续主循环。
+长期运行可能遇到微信掉线。`WeChatLoginHandler` 监控异常模式（窗口标题变为登录、截图出现二维码、连续感知失败），触发后进入恢复流程：扫码提醒 → 等待登录 → 验证恢复 → 继续主循环。
 
 ---
 
 ## 数据飞轮：生产 case 收集闭环
 
-> Bot 上线不是终点，而是数据积累的开始。我们建立了一套从生产环境自动收集 badcase、量化评估、修复验证的闭环系统。
+> Bot 上线不是终点，而是数据积累的开始。
 
 ```mermaid
 graph LR
@@ -199,6 +186,64 @@ graph LR
 
 ---
 
+## 记忆系统逆向初始化
+
+Bot 上线时记忆系统是空的，但这不意味着要从零开始积累。如果你有历史聊天记录（微信导出或 WeFlow 备份），可以**逆向初始化**：从存量对话中批量构建 Wiki。
+
+```mermaid
+graph TD
+    A["微信聊天记录导出<br/>data/chats/*.json"] --> B["分类 & 索引"]
+    B --> C["群聊 / 私聊分类"]
+    B --> D["全局用户索引<br/>按 wxid 聚合跨聊天消息"]
+    D --> E["别名解析<br/>主名 + 别名自动发现"]
+    C --> F["群聊 wiki 生成"]
+    E --> G["用户 wiki 生成<br/>跨聊天聚合"]
+    G --> H["增量更新<br/>按 token 分批"]
+    F --> I["data/memory/wiki/"]
+    H --> I
+```
+
+**流程：**
+
+1. **加载聊天记录**：从 `data/chats/*.json` 加载所有聊天历史
+2. **分类**：按消息特征区分群聊和私聊（群聊有多个不同 wxid、名称含"群"等）
+3. **全局用户索引**：按 `sender_wxid` 聚合同一个用户在所有聊天中的消息，自动发现别名（出现次数≥3 的昵称）
+4. **主名解析**：优先使用已有 aliases.json 中的映射，其次使用消息量最多的昵称，冲突时自动加后缀
+5. **分轮次增量更新**：按 token 估算把消息分批（每批不超过模型上下文），从旧到新逐轮更新，每轮复用上一轮生成的 wiki 作为基础
+
+**运行：**
+
+```bash
+# 先 dry-run 看统计
+python3 scripts/bulk_import_from_chats.py --dry-run
+
+# 生成用户 wiki（跨聊天聚合）
+python3 scripts/bulk_import_from_chats.py --users-only --workers 3
+
+# 生成群聊 wiki
+python3 scripts/bulk_import_from_chats.py --groups-only --workers 3
+
+# 全部生成
+python3 scripts/bulk_import_from_chats.py --workers 3
+```
+
+**生成的 wiki 结构：**
+
+```
+data/memory/wiki/
+├── users/
+│   ├── 王芊.md
+│   ├── 秋水文章.md
+│   └── ...
+└── groups/
+    ├── ai开发小分队.md
+n    └── ...
+```
+
+初始化完成后，Bot 上线时就已经拥有完整的背景知识，不需要再从零积累。
+
+---
+
 ## 工程体系
 
 ### Benchmark 驱动开发
@@ -213,29 +258,11 @@ graph LR
 | **Chat List Unread** | 23 | Precision/Recall | ✅ 100% |
 | **OCR Quality** | 33 | Sender/Text/ChatName/Count | 🔴 24.2% |
 
-**评估基础设施：**
-- **LLM-as-a-Judge**：Reply Quality 和 Tool Decision 对抗性 case 使用 `deepseek-v4-pro` 做结构化 Rubric 评估（非关键词匹配）
-- **缓存机制**：Judge 结果按内容哈希缓存（`judge_{hash}.json`），支持快速回归
-- **pytest 集成**：所有 benchmark 可直接用 `pytest -v` 运行，CI 友好
-
 **开发铁律：** 任何 prompt 修改、模型切换、感知层逻辑变更，必须先跑 benchmark 验证，禁止直接上生产。
 
 ### 全链路 Profile 监控
 
-**不是"感觉慢"，而是数据驱动。**
-
-整个链路已植入统一的 `[Perf]` 打点：
-
-```
-[Perf][Capture] total=650ms find_window=120ms screenshot=380ms validate=150ms
-[Perf][OCR] recognize: 1200ms, elements=47
-[Perf][Layout] parse: 580ms bubbles=420ms chat_list=160ms
-[Perf][Generate] total=7200ms sp=80ms tc=120ms up=1800ms route=2200ms llm=2800ms parse=200ms
-[Perf][Memory] self=45ms other=380ms group=120ms mentions=850ms
-[Perf][Sender] total=3200ms read_clipboard=15ms activate=200ms pbcopy=80ms ...
-```
-
-基于日志数据驱动，我们编写了 `PERFORMANCE_SPEC.md`（`docs/02-architecture/specs/PERFORMANCE_SPEC.md`），包含各阶段耗时基线、瓶颈分解与优先级排序、优化方案设计、A/B 测试指标定义。
+整个链路已植入统一的 `[Perf]` 打点，覆盖截图、OCR、布局、生成、记忆、发送各阶段。基于日志数据驱动优化，详见 `PERFORMANCE_SPEC.md`。
 
 ---
 
