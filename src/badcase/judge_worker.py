@@ -14,11 +14,12 @@ JudgeWorker - 异步 badcase 判定与自动入库
   - 人工确认后入库或丢弃
 """
 
-import asyncio
 import json
 import logging
 import os
+import queue
 import re
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -84,13 +85,13 @@ def _get_qwen_client():
 
 
 class JudgeWorker:
-    """异步 badcase 判定 worker"""
+    """异步 badcase 判定 worker（基于 threading，适配 Bot 同步主循环）"""
 
     def __init__(self, model: str = "deepseek-v4-flash"):
         self.client = _get_qwen_client()
-        self.queue: asyncio.Queue = asyncio.Queue()
+        self.queue: queue.Queue = queue.Queue()
         self._running = False
-        self._consumer_task: Optional[asyncio.Task] = None
+        self._consumer_thread: Optional[threading.Thread] = None
         self.case_generator = CaseGenerator()
         self._pending_dir = PROJECT_ROOT / "data" / "review_drafts" / "pending"
         self._committed_dir = PROJECT_ROOT / "data" / "review_drafts" / "committed"
@@ -106,42 +107,33 @@ class JudgeWorker:
         """提交一个 tick 给判定队列，立即返回，不阻塞"""
         if not self._running:
             self._start()
-        # 使用 call_soon_threadsafe 保证线程安全（主循环可能不是 asyncio 线程）
-        try:
-            loop = asyncio.get_running_loop()
-            loop.call_soon_threadsafe(lambda: asyncio.create_task(self.queue.put(tick_data)))
-        except RuntimeError:
-            # 没有运行中的事件循环，直接丢弃（不应发生）
-            _logger.warning("No running event loop, dropping tick %s", tick_data.get("tick_id"))
+        self.queue.put(tick_data)
 
     def shutdown(self):
         """优雅关闭"""
         self._running = False
-        if self._consumer_task:
-            self._consumer_task.cancel()
+        if self._consumer_thread and self._consumer_thread.is_alive():
+            self._consumer_thread.join(timeout=5)
 
     # ------------------------------------------------------------------
-    # 内部：后台消费协程
+    # 内部：后台消费线程
     # ------------------------------------------------------------------
     def _start(self):
         if self._running:
             return
         self._running = True
-        try:
-            loop = asyncio.get_running_loop()
-            self._consumer_task = loop.create_task(self._consume_loop())
-            _logger.info("JudgeWorker started")
-        except RuntimeError:
-            _logger.warning("No running event loop, JudgeWorker not started")
+        self._consumer_thread = threading.Thread(target=self._consume_loop, daemon=True)
+        self._consumer_thread.start()
+        _logger.info("JudgeWorker started (threading)")
 
-    async def _consume_loop(self):
+    def _consume_loop(self):
         while self._running:
             try:
-                tick_data = await asyncio.wait_for(self.queue.get(), timeout=1.0)
-            except asyncio.TimeoutError:
+                tick_data = self.queue.get(timeout=1.0)
+            except queue.Empty:
                 continue
             try:
-                await self._process_one(tick_data)
+                self._process_one(tick_data)
             except Exception as e:
                 _logger.exception("JudgeWorker process tick %s failed: %s", tick_data.get("tick_id"), e)
                 # 失败时把原始 tick_data 写入 unjudged，避免丢失
@@ -149,12 +141,12 @@ class JudgeWorker:
             finally:
                 self.queue.task_done()
 
-    async def _process_one(self, tick_data: dict):
+    def _process_one(self, tick_data: dict):
         tick_id = tick_data.get("tick_id", 0)
         _logger.info("[Judge] processing tick %s", tick_id)
 
         # 1. 调用 LLM Judge
-        judge_result = await self._judge(tick_data)
+        judge_result = self._judge(tick_data)
         if not judge_result.get("is_badcase"):
             _logger.info("[Judge] tick %s is not badcase", tick_id)
             return
@@ -177,12 +169,11 @@ class JudgeWorker:
     # ------------------------------------------------------------------
     # 内部：LLM Judge
     # ------------------------------------------------------------------
-    async def _judge(self, tick_data: dict) -> dict:
+    def _judge(self, tick_data: dict) -> dict:
         """调用 LLM Judge，返回结构化 dict"""
         prompt = self._build_judge_prompt(tick_data)
-        # 在 asyncio 线程中同步调用 LLM
-        raw = await asyncio.to_thread(
-            self.client.chat,
+        # 在线程中同步调用 LLM
+        raw = self.client.chat(
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
             max_tokens=800,
