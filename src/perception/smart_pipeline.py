@@ -238,6 +238,7 @@ class SmartPerceptionPipeline:
         api_key: Optional[str] = None,
         pixel_diff_threshold: float = DEFAULT_PIXEL_DIFF_THRESHOLD,
         message_region: tuple = DEFAULT_MESSAGE_REGION,
+        chat_list_region: tuple = DEFAULT_CHAT_LIST_REGION,
         always_use_api: bool = False,
     ):
         self.capture = WindowCapture(login_handler=WeChatLoginHandler())
@@ -253,6 +254,7 @@ class SmartPerceptionPipeline:
         # 像素差异判断状态
         self.pixel_diff_threshold = pixel_diff_threshold
         self.message_region = message_region
+        self.chat_list_region = chat_list_region
         self.always_use_api = always_use_api
         self._last_screenshot: Optional[Path] = None
         self._last_hash: Optional[str] = None
