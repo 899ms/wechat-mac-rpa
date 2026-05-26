@@ -2,7 +2,7 @@
 
 基于多模态视觉感知与 LLM Agent 的 macOS 微信自动化框架。
 
-**不是协议逆向，不是 Hook，不碰微信数据库。** 我们把微信当作黑盒 GUI 应用，用计算机视觉读取界面，用大语言模型理解对话，用系统级自动化操作界面。微信升级 UI 只是换了一套视觉输入，不需要追着协议跑。
+**不是协议逆向，不是 Hook，不碰微信数据库。** 我们把微信当作黑盒 GUI 应用，用计算机视觉读取界面，用大语言模型理解对话，用系统级自动化操作界面。微信更新 UI 只是换了一套视觉输入，不需要追着协议跑。
 
 ---
 
@@ -19,24 +19,29 @@ graph TB
 
     subgraph Reasoning["推理层 Reasoning"]
         R1["状态机 ChatState"]
-        R2["双模型路由"]
+        R2["动态计算路由"]
         R3["ReAct 循环"]
         R4["记忆检索"]
     end
 
     subgraph Action["行动层 Action"]
-        A1["消息发送"]
-        A2["聊天切换"]
-        A3["登录恢复"]
+        A1["UI 交互抽象"]
+        A2["消息发送"]
+        A3["聊天切换"]
+        A4["登录恢复"]
     end
 
-    subgraph Flywheel["数据飞轮 Case 闭环"]
-        F1["case_generator<br/>自动提取异常"]
-        F2["judge_worker<br/>LLM 自动评估"]
-        F3["review_server<br/>人工审核"]
-        F4["加入 benchmark<br/>量化基线"]
-        F5["通用规则修复"]
-        F6["回归验证"]
+    subgraph Logging["结构化日志 Logging"]
+        L1["bot_logger"]
+        L2["debug_logger"]
+    end
+
+    subgraph Data["数据层 Data"]
+        D1["tick_log"]
+        D2["cases"]
+        D3["benchmark_cases"]
+        D4["experiments"]
+        D5["daily_metrics"]
     end
 
     P1 --> P2
@@ -49,15 +54,20 @@ graph TB
     R3 -->|tool_call| R4
     R4 --> R3
     R3 -->|reply| A1
-    R1 -->|switch| A2
-    A1 --> F1
-    F1 --> F2 --> F3 --> F4 --> F5 --> F6
-    F6 -->|修复上生产| P2
+    R1 -->|switch| A1
+    A1 --> A2
+    A1 --> A3
+    A1 --> A4
+    A2 --> L1
+    L1 --> D1
+    D1 --> D2
+    D2 --> D3
+    D3 -->|回归验证| P2
 ```
 
 Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知层提取当前对话状态，推理层决定如何回复，行动层执行界面操作。三个层之间通过严格的数据契约（`PerceptionResult`、`ChatState`、`ActionResult`）通信，底层细节完全隔离。
 
-感知层的预判同时监控**消息区域**和**聊天列表区域**：任一区域有实质变化即触发多模态 API，两区域均静止时才本地跳过。这确保其他聊天的新未读不会被漏掉。
+每一次认知循环的完整链路（截图 → 感知 → 去重 → 决策 → 回复 → 发送）都被结构化日志逐条记录到 `tick_log`，为后续的质量审计与数据飞轮提供原始素材。
 
 ---
 
@@ -66,6 +76,12 @@ Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知
 ### 感知层（Perception）
 
 感知层的任务是**把像素变成结构化数据**。它不"理解"对话，只负责忠实还原界面上的文字、布局和状态。
+
+当前有三条感知管道：
+
+- **SmartPipeline**（主力）：本地预判 + 多模态 API 兜底。先用像素 Diff 判断截图是否有实质变化，无变化时零 API 调用直接跳过；有变化时调用多模态大模型提取消息内容，同时用本地 OCR 做几何定位。
+- **VisionPipeline**（Fallback）：纯本地 OCR 备用管道，在多模态 API 不可用时降级运行。
+- **WeFlowPipeline**（实验性）：直接读取 WeChat 数据库驱动感知，启动时用于历史注入，运行时可辅助未读检测。
 
 #### 多模态视觉理解
 
@@ -140,11 +156,47 @@ graph LR
 
 行动层负责**把文本变成界面操作**。它面对的是不稳定的 GUI 环境：窗口可能被遮挡、焦点可能丢失、剪贴板可能被其他应用污染。
 
+我们用 **UIInteractor** 抽象所有坐标级交互（点击聊天列表项、聚焦输入框），上层 Action（消息发送、聊天切换）基于该抽象实现，便于替换底层自动化方案。
+
 消息发送是一个原子操作链：激活窗口 → 验证 frontmost → 写入剪贴板 → 模拟粘贴 → 模拟回车 → 剪贴板验证。安全机制包括：粘贴前确认 WeChat 是 frontmost 进程（防止消息发到其他应用）、异常内容熔断、每次重试从头开始。
 
 Bot 每个 tick 检测并切换到未读数最高的聊天逐个处理：获取目标坐标 → 点击 → 等待渲染 → 截图验证。同一目标在短时间内不会重复切换，避免高频切换导致的界面卡顿。
 
 长期运行可能遇到微信掉线。LoginHandler 监控异常模式（窗口标题变为登录、截图出现二维码、连续感知失败），触发后进入恢复流程：扫码提醒 → 等待登录 → 验证恢复 → 继续主循环。
+
+---
+
+## 数据飞轮：生产质量闭环
+
+> Bot 上线不是终点，而是数据积累的开始。
+
+```mermaid
+graph LR
+    A["生产环境<br/>每条 tick"] --> B["tick_log<br/>结构化存储"]
+    B --> C["JudgeWorker<br/>LLM 自动评估"]
+    C --> D["人工 GT 标注<br/>在 tick 上直接打标"]
+    D --> E["cases<br/>确认 badcase 入库"]
+    E --> F["CaseGenerator<br/>生成 benchmark case"]
+    F --> G["benchmark_cases<br/>量化基线"]
+    G --> H["根因分析<br/>通用规则修复"]
+    H --> I["benchmark<br/>回归验证"]
+    I -->|通过| J["合并上生产"]
+    I -->|失败| H
+    J --> A
+```
+
+与传统"散落 JSON + 手动归档"不同，我们的闭环以 **SQLite 数据库**为核心：
+
+1. **tick_log**：每条认知循环的完整链路（截图、prompt、回复、工具调用、耗时）自动入库
+2. **JudgeWorker 自动评估**：后台线程消费 tick_log，按结构化 Rubric 打分，判断是否为 badcase，结果写回 tick_log
+3. **人工 GT 标注**：开发者在后台对 tick 直接打标（`human_is_badcase`、`human_badcase_type`），修正 Judge 的误判
+4. **cases 入库**：确认的 badcase 进入 cases 表，保存完整对话、prompt、评分维度、工具调用链
+5. **CaseGenerator**：从 cases 自动生成 benchmark case 代码，直接插入对应测试模块
+6. **量化基线**：新 case 加入 benchmark，成为回归测试的一部分
+7. **通用规则修复**：禁止 case-by-case 的 prompt 补丁，必须从根因出发写通用规则
+8. **回归验证**：修复后跑全量 benchmark，全部通过才能上生产
+
+生产环境中的每一条异常都被自动捕获、评估、归档。不是"修完就忘"，而是形成**可追溯、可回归的 case 资产**。随着 case 库的增长，Bot 的鲁棒性持续提升。
 
 ---
 
@@ -173,32 +225,6 @@ Bot 每个 tick 检测并切换到未读数最高的聊天逐个处理：获取�
 Badcase → Benchmark 复现 → 根因分析 → 通用规则修复 → Benchmark 回归验证 → 上生产
 ```
 
-### 数据飞轮：生产 Case 闭环
-
-> Bot 上线不是终点，而是数据积累的开始。
-
-```mermaid
-graph LR
-    A["生产环境<br/>异常 tick"] --> B["case_generator<br/>自动提取"]
-    B --> C["judge_worker<br/>LLM 自动评估"]
-    C --> D["review_server<br/>人工审核"]
-    D --> E["加入 benchmark<br/>量化基线"]
-    E --> F["根因分析<br/>通用规则修复"]
-    F --> G["benchmark<br/>回归验证"]
-    G -->|通过| H["合并上生产"]
-    G -->|失败| F
-    H --> A
-```
-
-1. **自动提取**：生产环境中每一条异常 tick 都被自动捕获，生成标准化的 case 文件
-2. **自动评估**：Judge LLM 对 case 做结构化 Rubric 评估，判断是否为真 badcase
-3. **人工审核**：Web 界面确认、标注、归档
-4. **量化基线**：确认的 case 加入 benchmark，成为回归测试的一部分
-5. **通用规则修复**：禁止 case-by-case 的 prompt 补丁，必须从根因出发写通用规则
-6. **回归验证**：修复后跑全量 benchmark，全部通过才能上生产
-
-生产环境中的每一条异常都被自动捕获、评估、归档。不是"修完就忘"，而是形成**可追溯、可回归的 case 资产**。随着 case 库的增长，Bot 的鲁棒性持续提升。
-
 ### 多维度评测体系
 
 除了核心链路 benchmark，我们还建立了完整的评测基础设施：
@@ -218,8 +244,7 @@ graph LR
 
 - **Dashboard**：实时查看今日 Tick 数、回复数、平均 Judge 分、跳过率
 - **Tick 查看**：逐条浏览生产环境的感知-决策-回复全链路记录
-- **GT 标注**：对生产数据打标，构建 Ground Truth
-- **人工审核**：对 Judge 判定结果进行人工确认与分类
+- **人工标注**：对 Judge 判定结果进行人工确认与分类（GT 标注直接打在 tick 上）
 - **截图 OCR**：可视化验证多模态识别与本地 OCR 的融合效果
 - **Benchmark 报告**：Judge 质量、回复质量的多维度可视化
 - **实验管理**：查看历史实验记录与对比结果
@@ -264,7 +289,7 @@ wechat-mac-rpa/
 ├── src/
 │   ├── bot/wechat_bot.py              # L5: 主循环编排
 │   ├── perception/
-│   │   ├── smart_pipeline.py          # L3.5: 智能感知（本地预判 + API 兜底）
+│   │   ├── smart_pipeline.py          # L3.5: 主力感知（本地预判 + API 兜底）
 │   │   ├── vision_pipeline.py         # L3.5: 纯本地 OCR 备用管道
 │   │   ├── weflow_pipeline.py         # L3.5: 数据库驱动感知（实验性）
 │   │   └── weflow_client.py           # L3.5: WeFlow 客户端
@@ -283,10 +308,10 @@ wechat-mac-rpa/
 │   │   ├── builtin_tools.py
 │   │   └── stock_tools.py
 │   ├── action/
-│   │   ├── message_sender.py          # L4: 消息发送
-│   │   ├── chat_list_clicker.py       # L4: 聊天列表切换
-│   │   ├── login_recovery.py          # L4: 登录恢复
-│   │   └── ui_interactor.py           # L4: UI 交互原子操作
+│   │   ├── ui_interactor.py           # L4: UI 交互抽象（点击 / 聚焦）
+│   │   ├── message_sender.py          # L4: 消息发送（基于 ui_interactor）
+│   │   ├── chat_list_clicker.py       # L4: 聊天列表切换（基于 ui_interactor）
+│   │   └── login_recovery.py          # L4: 登录恢复
 │   ├── capture/window_capture.py      # L2: 窗口截图
 │   ├── ocr/vision_ocr.py              # L2: macOS Vision 文字识别
 │   ├── models/base.py                 # L1: 领域模型
@@ -302,8 +327,8 @@ wechat-mac-rpa/
 │   │   ├── text_utils.py
 │   │   └── xml_utils.py
 │   ├── badcase/                       # Badcase 闭环体系
-│   │   ├── case_db.py                 # Case 数据库
-│   │   ├── case_generator.py          # 从 tick 数据生成 benchmark case
+│   │   ├── case_db.py                 # Case 数据库（tick_log / cases / experiments）
+│   │   ├── case_generator.py          # 从 cases 生成 benchmark case 代码
 │   │   ├── judge_worker.py            # 异步 Judge LLM 评估
 │   │   └── review_server.py           # 人工审核 Web 服务
 │   └── tests/                         # Benchmark 套件 + 单元测试
@@ -318,7 +343,7 @@ wechat-mac-rpa/
 │       ├── test_judge_quality_benchmark_v2.py
 │       └── ...
 ├── scripts/
-│   ├── admin.py                       # FastAPI 开发者后台
+│   ├── admin.py                       # FastAPI 统一开发者后台
 │   ├── generate_benchmark_dashboard.py # Benchmark 报告生成
 │   ├── generate_dashboard.py          # 旧版 Dashboard 生成
 │   ├── run_experiment.py              # A/B 实验框架
@@ -334,7 +359,7 @@ wechat-mac-rpa/
 │   │   ├── API_SURFACE.md
 │   │   ├── MODULE_INDEX.md
 │   │   ├── CODING_PRINCIPLES.md
-│   │   └── specs/                       # 各模块 SPEC（ACTION / BOT / CAPTURE / LAYOUT / MEMORY / MODELS / OCR / PERCEPTION / PERFORMANCE / REPLY / SESSION / TOOLS / UTILS）
+│   │   └── specs/                       # 各模块 SPEC
 │   ├── 03-guides/                       # 使用指南 + 项目状态
 │   ├── 04-troubleshooting/              # 问题排查 + 经验教训
 │   └── 05-meta/                         # 实验记录 + 审计
@@ -345,7 +370,7 @@ wechat-mac-rpa/
 │   ├── memory/wiki/                     # 用户/群聊/话题 wiki
 │   ├── benchmark_history/               # Benchmark 历史数据
 │   ├── experiments/                     # 实验结果归档
-│   └── cases.db                         # Badcase 数据库
+│   └── cases.db                         # Badcase 核心数据库
 └── run_bot.py                           # 生产环境入口
 ```
 
