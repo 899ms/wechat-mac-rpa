@@ -67,45 +67,20 @@ Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知
 
 感知层的任务是**把像素变成结构化数据**。它不"理解"对话，只负责忠实还原界面上的文字、布局和状态。
 
-#### 1. 多模态大模型取代传统 OCR
+#### 多模态视觉理解
 
-传统方案用本地 OCR（如 macOS Vision）识别截图文字，但有几个致命局限：
-- **跨版本脆弱**：微信每次更新 UI，气泡位置、字体大小、颜色主题都会变，OCR 的锚点和后处理规则需要重写
-- **信息丢失**：群聊昵称截断、emoji 变成乱码、换行格式混乱、图片内容完全不可读
-- **布局理解弱**：OCR 只能输出文字和粗糙坐标，无法理解"这是左侧对方气泡、那是右侧自己气泡"
+传统 OCR 方案在微信这类高度定制 UI 的应用上存在结构性脆弱：硬编码的锚点规则在每次 UI 更新后都需要重写，emoji 与图片内容完全丢失，群聊昵称截断后无法还原。
 
-我们用 **qwen3.6-flash 多模态模型**直接看截图、输出结构化 JSON。优势在于：
-- **跨版本兼容**：模型通过视觉理解界面，而不是硬编码坐标规则。微信升级后只需要调整 system prompt 中的识别规则描述，**不需要改一行代码**
-- **信息完整**：群聊昵称、emoji、换行格式、图片中的文字、表情包内容全部保留
-- **布局理解**：模型直接判断气泡对齐方向（左=对方，右=自己），准确率远高于基于颜色的启发式规则
+我们用**多模态大模型**直接阅读截图并输出结构化数据。模型通过视觉理解界面语义，而不是依赖硬编码坐标规则——微信升级后只需调整识别规则的文本描述，不需要改动任何代码。布局理解（气泡对齐方向、sender 归属）由模型直接判断，准确率显著高于基于颜色或坐标的启发式规则。
 
-#### 2. 两级预判节约 API 调用
+#### 两级预判与混合定位
 
 不是每帧都调多模态 API。我们设计了两级预判：
 
-```
-截图 → MD5 全图哈希比对
-    │
-    ├── 哈希相同 → 跳过多模态 API，直接复用上轮结果（仍执行本地 OCR 更新聊天列表坐标）
-    │
-    └── 哈希不同 → 消息区 + 聊天列表区像素 diff
-            │
-            ├── 两区域均无变化 → 本地跳过
-            └── 任一区域有变化 → 走多模态 API
-```
+- **全图哈希比对**：截图与上轮完全相同时，直接复用上轮结果，零 API 调用。
+- **分区像素 Diff**：消息区与聊天列表区任一区域有实质变化时，才触发多模态 API；两区域均静止时本地跳过。
 
-绝大多数 tick 截图没有实质变化——无新消息、用户正在打字、界面静止。此时直接复用上轮结果，**零 API 调用**，感知延迟从秒级降至毫秒级。
-
-#### 3. OCR 保留用于精确坐标定位
-
-多模态模型虽然擅长"看懂"界面，但**不擅长输出精确的像素坐标**。而 Bot 的行动层需要精确坐标来点击气泡、滚动列表、切换聊天。
-
-所以我们保留了本地 OCR 作为**坐标定位器**：
-- 多模态模型负责"识别文字内容和对齐方向"
-- 本地 OCR 负责"输出每个文字元素的精确坐标（x, y, w, h）"
-- LayoutParser 将两者融合：用 OCR 坐标确定气泡边界框，用模型输出确定 sender 和内容
-
-这种分工让各自做擅长的事：模型负责语义理解，OCR 负责几何定位。
+多模态模型负责语义理解，本地 OCR 负责几何定位（精确坐标输出），LayoutParser 将两者融合。这种分工让各自做擅长的事。
 
 ---
 
@@ -115,100 +90,32 @@ Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知
 
 #### LCS 序列对齐：跨 tick 消息去重
 
-感知层每 5 秒输出一帧消息列表，但这些消息大部分在上一轮已经见过（聊天历史不会消失）。如果 Bot 把旧消息当成新消息，就会重复回复。
+感知层以固定间隔输出一帧消息列表，但聊天历史不会消失——大部分消息在上一轮已经见过。如果 Bot 把旧消息当成新消息，就会重复回复。
 
-我们用 **LCS（最长公共子序列）**做跨 tick 消息对齐：
+我们用 **LCS（最长公共子序列）**做跨 tick 消息对齐，对齐基于多维度模糊匹配：精确哈希匹配、文字相似度、图片 2-gram Jaccard 相似度。对齐后只有真正的新消息进入后续流程，旧消息被静默丢弃。这解决了"重复回复"这个致命错误。
 
-```
-历史消息: [A, B, C, D, E]
-当前 tick:  [A, B, C, D, E, F, G]
-                ↑ LCS 对齐 ↑
-新消息:              [F, G]
-```
+#### 动态计算路由
 
-对齐不是简单的"内容相同"，而是基于**多维度相似度**的模糊匹配：
-- 精确匹配：内容哈希相同 → 100% 匹配
-- 文字匹配：difflib.SequenceMatcher（ratio ≥ 0.80）→ 容忍 OCR 偶尔错 1-2 个字
-- 图片/表情匹配：2-gram Jaccard 相似度 → 避免同一张表情包被重复识别
+ReplyGenerator 内部有一个二级路由决策：先用轻量调用判断用户意图是否匹配某个复杂 Skill，再决定后续投入多少计算资源。
 
-LCS 对齐后，只有真正的新消息进入后续流程，旧消息被静默丢弃。这解决了"重复回复"这个致命错误。
+- **日常路径**：绝大多数闲聊、问候、简单问答走超轻量单轮生成，不加载 Skill，不启用工具调用。
+- **深度路径**：匹配到复杂 Skill 时，切换长上下文模型，加载 Skill 正文，启用完整工具链。
 
-#### Skills / 复杂模型路由
+这种"先轻量判断、再决定投入"的设计，让大部分日常对话保持毫秒级响应，只有复杂任务才走重型路径。Skills 是可插拔的 Markdown 文件，新增一个 Skill 只需要丢一个文件进目录，零代码改动。
 
-ReplyGenerator 内部有一个二级路由决策：
+#### ReAct 工具循环
+
+当进入日常路径且需要外部信息时，ReplyGenerator 运行完整的 **ReAct 循环**：
 
 ```
-用户消息
-    │
-    ▼
-ReplyGenerator 内部的 _route_skills() 方法（轻量 LLM 调用，几十 token）
-    │
-    ├── 路径 A：未匹配 skill → 直接调用 Agent（超轻量）
-    │
-    └── 路径 B：匹配 skill 且 complex_llm_client 存在 → 切换 Hermes，深度推理
-            ├── 加载 skill 正文
-            └── 切换长上下文模型
+[思考] 分析意图 → [行动] 调用工具 → [观察] 注入结果 → [再思考] 重新推理
 ```
 
-路由判断只消耗几十 token，但决定了后续投入多少计算资源。这种"先轻量判断、再决定投入"的设计，让 90% 的日常对话保持毫秒级响应，只有 10% 的复杂任务才走重型路径。
-
-Skills 是可插拔的 Markdown 文件（`skills/<name>/SKILL.md`），包含触发条件、执行步骤、示例。新增一个 skill 只需要丢一个 Markdown 文件进目录，零代码改动。
-
-#### 超轻量化日常对话 Agent
-
-我们做了一个刻意的设计：**日常闲聊不需要重型 Agent**。
-
-默认路径（路径 A）是超轻量的：
-- **system prompt 精简**：没有人设背景、没有复杂规则，只有核心指令 + 可用工具列表
-- **不加载 skill**：只有当用户消息匹配到 skill 时才加载 skill 正文
-- **单轮调用为主**：绝大多数日常对话（问候、表情、简单问答）一次 LLM 调用就结束，不需要工具
-- **模型选择**：`deepseek-v4-flash`（低延迟、Tool Calling、成本可控）
-
-**内置工具：**
-
-| 工具 | 用途 |
-|------|------|
-| `get_current_time` | 获取当前日期和时间 |
-| `get_weather` | 查询指定城市天气 |
-| `web_search` | 网页搜索实时信息 |
-| `browse_url` | 提取链接网页正文 |
-| `stock_query` | 查询股票实时行情 |
-| `search_memory` | 搜索本地 LLM Wiki 记忆库 |
-
-工具通过统一注册表管理，新增工具只需实现函数 + 注册，零改动现有代码。
-
-#### ReAct 循环
-
-ReAct 循环仅在路径 A（deepseek）中运行。当进入路径 A 时，ReplyGenerator 运行完整的 **ReAct 循环**：
-
-```
-用户输入
-    │
-    ▼
-[思考] LLM 分析意图，决定是否需要工具
-    │
-    ├── 无需工具 → 直接生成回复
-    │
-    └── 需要工具 → 输出 tool_call
-            │
-            ▼
-        [行动] 执行工具，获取结果
-            │
-            ▼
-        [观察] 工具结果注入上下文
-            │
-            ▼
-        [再思考] LLM 基于新信息重新推理
-            │
-            └── 可能需要更多工具 → 循环继续
-            └── 信息充分 → 生成最终回复
-```
-
-路径 B（Hermes）为单轮生成，不启用工具调用。内置防失控机制：工具调用有轮次上限，单条链路有超时保护，模型返回空回复时自动重试，同一对话内的工具结果会被缓存避免重复查询。
+循环内置防失控机制：工具调用有轮次上限，单条链路有超时保护，同一对话内的工具结果会被缓存避免重复查询。
 
 #### 记忆系统（LLM Wiki）
 
-Bot 不是无状态聊天机器人。每个联系人、群聊、话题都有独立的 **Wiki**（Markdown 格式）。
+Bot 不是无状态聊天机器人。每个联系人、群聊都有独立的 **Wiki**（Markdown 格式），通过 `search_memory` 工具在对话中实时召回。
 
 ```mermaid
 graph LR
@@ -219,19 +126,13 @@ graph LR
     E --> F["ReplyGenerator"]
 ```
 
-**全量构建（逆向初始化）**：
+**全量构建**：从存量聊天记录批量生成 wiki，按全局用户索引聚合跨聊天消息，自动发现别名，分轮次增量构建。Bot 上线时即可拥有完整背景知识，不需要从零积累。
 
-从存量聊天记录批量生成 wiki。`bulk_import_from_chats.py` 按 wxid 聚合跨聊天消息，自动发现别名，分轮次调用 LLM 生成完整 wiki。Bot 上线时即可拥有完整背景知识，不需要从零积累。
+**增量构建**：运行中新对话被后台异步队列消费，LLM 接收「现有 wiki + 新对话」，输出更新后的完整 wiki。所有新增事实标注来源，严禁删除现有内容。
 
-**增量构建（运行时更新）**：
+**人工 Overrides**：通过外挂 JSON 实现任意字段覆写，LLM 更新时不会破坏人工修改。
 
-Bot 运行中，新对话被后台异步队列消费。更新任务进入队列，worker 线程分批处理（每批最多 3 条，或积压超过 5 分钟触发）。增量更新时 LLM 接收「现有 wiki + 新对话」，输出更新后的完整 wiki，严禁删除现有内容，所有新增事实标注来源。
-
-**Overrides**：
-
-人工可覆写任意字段，通过外挂 JSON（aliases.json / facts.json / corrections.json）实现。LLM 更新 wiki 时不会自动保护人工修改，需维护对应的外挂文件。
-
-**召回率**：96.6%（29 个 benchmark cases）。所有数据本地存储，不上传云端。
+所有数据本地存储，不上传云端。
 
 ---
 
@@ -239,15 +140,15 @@ Bot 运行中，新对话被后台异步队列消费。更新任务进入队列�
 
 行动层负责**把文本变成界面操作**。它面对的是不稳定的 GUI 环境：窗口可能被遮挡、焦点可能丢失、剪贴板可能被其他应用污染。
 
-消息发送是一个原子操作链：激活 WeChat 窗口 → 确保 frontmost（验证当前激活应用名）→ 文本写入剪贴板 → 模拟粘贴 → 模拟回车发送 → 剪贴板验证。安全机制包括：粘贴前确认 WeChat 是 frontmost 进程（防止消息发到其他应用）、异常内容熔断、每次重试从头开始。
+消息发送是一个原子操作链：激活窗口 → 验证 frontmost → 写入剪贴板 → 模拟粘贴 → 模拟回车 → 剪贴板验证。安全机制包括：粘贴前确认 WeChat 是 frontmost 进程（防止消息发到其他应用）、异常内容熔断、每次重试从头开始。
 
-Bot 每个 tick 检测并切换到未读数最高的聊天逐个处理：获取目标聊天坐标 → 点击 → 等待界面渲染 → 截图验证聊天名是否匹配。无未读时最多切换到一个未读聊天。同一目标在短时间内不会重复切换，避免高频切换导致的界面卡顿。
+Bot 每个 tick 检测并切换到未读数最高的聊天逐个处理：获取目标坐标 → 点击 → 等待渲染 → 截图验证。同一目标在短时间内不会重复切换，避免高频切换导致的界面卡顿。
 
-长期运行可能遇到微信掉线。`WeChatLoginHandler` 监控异常模式（窗口标题变为登录、截图出现二维码、连续感知失败），触发后进入恢复流程：扫码提醒 → 等待登录 → 验证恢复 → 继续主循环。
+长期运行可能遇到微信掉线。LoginHandler 监控异常模式（窗口标题变为登录、截图出现二维码、连续感知失败），触发后进入恢复流程：扫码提醒 → 等待登录 → 验证恢复 → 继续主循环。
 
 ---
 
-## 数据飞轮：生产 case 收集闭环
+## 数据飞轮：生产 Case 收集闭环
 
 > Bot 上线不是终点，而是数据积累的开始。
 
@@ -264,74 +165,14 @@ graph LR
     H --> A
 ```
 
-**闭环流程：**
-
-1. **自动提取**：生产环境中每一条异常 tick（回复质量差、工具误调用、OCR 识别错）都被 `case_generator.py` 自动捕获，生成标准化的 case 文件
-2. **自动评估**：`judge_worker.py` 使用 deepseek-v4-pro 对 case 做结构化 Rubric 评估，判断是否为真 badcase
-3. **人工审核**：`review_server.py` 提供 Web 界面，人工确认、标注、归档
+1. **自动提取**：生产环境中每一条异常 tick 都被自动捕获，生成标准化的 case 文件
+2. **自动评估**：Judge LLM 对 case 做结构化 Rubric 评估，判断是否为真 badcase
+3. **人工审核**：Web 界面确认、标注、归档
 4. **量化基线**：确认的 case 加入 benchmark，成为回归测试的一部分
-5. **通用规则修复**：禁止 case-by-case 的 prompt 补丁。必须从根因出发，写通用规则
-6. **回归验证**：修复后跑全量 benchmark，必须全部通过才能上生产
+5. **通用规则修复**：禁止 case-by-case 的 prompt 补丁，必须从根因出发写通用规则
+6. **回归验证**：修复后跑全量 benchmark，全部通过才能上生产
 
 生产环境中的每一条异常都被自动捕获、评估、归档。不是"修完就忘"，而是形成**可追溯、可回归的 case 资产**。随着 case 库的增长，Bot 的鲁棒性持续提升。
-
----
-
-## 记忆系统逆向初始化
-
-Bot 上线时记忆系统是空的，但这不意味着要从零开始积累。如果你有历史聊天记录（微信导出或 WeFlow 备份），可以**逆向初始化**：从存量对话中批量构建 Wiki。
-
-```mermaid
-graph TD
-    A["微信聊天记录导出<br/>data/chats/*.json"] --> B["分类 & 索引"]
-    B --> C["群聊 / 私聊分类"]
-    B --> D["全局用户索引<br/>按 wxid 聚合跨聊天消息"]
-    D --> E["别名解析<br/>主名 + 别名自动发现"]
-    C --> F["群聊 wiki 生成"]
-    E --> G["用户 wiki 生成<br/>跨聊天聚合"]
-    G --> H["增量更新<br/>按 token 分批"]
-    F --> I["data/memory/wiki/"]
-    H --> I
-```
-
-**流程：**
-
-1. **加载聊天记录**：从 `data/chats/*.json` 加载所有聊天历史
-2. **分类**：按消息特征区分群聊和私聊（群聊有多个不同 wxid、名称含"群"等）
-3. **全局用户索引**：按 `sender_wxid` 聚合同一个用户在所有聊天中的消息，自动发现别名（出现次数≥3 的昵称）
-4. **主名解析**：优先使用已有 aliases.json 中的映射，其次使用消息量最多的昵称，冲突时自动加后缀
-5. **分轮次增量更新**：按 token 估算把消息分批（每批不超过模型上下文），从旧到新逐轮更新，每轮复用上一轮生成的 wiki 作为基础
-
-**运行：**
-
-```bash
-# 先 dry-run 看统计
-python3 scripts/bulk_import_from_chats.py --dry-run
-
-# 生成用户 wiki（跨聊天聚合）
-python3 scripts/bulk_import_from_chats.py --users-only --workers 3
-
-# 生成群聊 wiki
-python3 scripts/bulk_import_from_chats.py --groups-only --workers 3
-
-# 全部生成
-python3 scripts/bulk_import_from_chats.py --workers 3
-```
-
-**生成的 wiki 结构：**
-
-```
-data/memory/wiki/
-├── users/
-│   ├── 王芊.md
-│   ├── 秋水文章.md
-│   └── ...
-└── groups/
-    ├── ai开发小分队.md
-    └── ...
-```
-
-初始化完成后，Bot 上线时就已经拥有完整的背景知识，不需要再从零积累。
 
 ---
 
@@ -339,76 +180,54 @@ data/memory/wiki/
 
 ### Benchmark 驱动开发
 
-**5 个独立 benchmark，136 个 case，覆盖核心链路：**
+**任何 prompt 修改、模型切换、感知层逻辑变更，必须先跑 benchmark 验证，禁止直接上生产。**
+
+现有 6 个独立 benchmark，覆盖核心链路：
 
 | Benchmark | Cases | 评估方式 | 当前状态 |
 |-----------|-------|---------|---------|
-| **Reply Quality** | 24 | LLM-as-a-Judge + 18 个自定义 Rubric | ✅ 100% |
+| **Reply Quality** | 24 | LLM-as-a-Judge + 自定义 Rubric | ✅ 100% |
 | **Tool Decision** | 27 | Binary + Judge Rubric（对抗性 case） | 🟡 81.5% |
-| **Memory Search** | 29 | Precision/Recall/F1 | 🟡 96.6% |
-| **Chat List Unread** | 23 | Precision/Recall | ✅ 100% |
-| **OCR Quality** | 33 | Sender/Text/ChatName/Count | 🔴 24.2% |
+| **Memory Search** | 29 | Precision / Recall / F1 | 🟡 96.6% |
+| **Chat List Unread** | 23 | Precision / Recall | ✅ 100% |
+| **OCR Quality** | 33 | Sender / Text / ChatName / Count | 🔴 24.2% |
+| **Judge Quality** | 18 | Meta-benchmark：评估 Judge LLM 自身准确率 | — |
 
-**开发铁律：** 任何 prompt 修改、模型切换、感知层逻辑变更，必须先跑 benchmark 验证，禁止直接上生产。
+开发流程：
+
+```
+Badcase → Benchmark 复现 → 根因分析 → 通用规则修复 → Benchmark 回归验证 → 上生产
+```
 
 ### 全链路 Profile 监控
 
-整个链路已植入统一的 `[Perf]` 打点，覆盖截图、OCR、布局、生成、记忆、发送各阶段。基于日志数据驱动优化，详见 `PERFORMANCE_SPEC.md`。
+整个链路植入统一的性能打点，覆盖截图、OCR、布局、生成、记忆、发送各阶段。基于日志数据驱动优化。
+
+---
+
+## 内置工具
+
+工具通过统一注册表管理，新增工具只需实现函数 + 注册，零改动现有代码。
+
+| 工具 | 用途 |
+|------|------|
+| `get_current_time` | 获取当前日期和时间 |
+| `get_weather` | 查询指定城市天气 |
+| `web_search` | 网页搜索实时信息 |
+| `browse_url` | 提取链接网页正文 |
+| `stock_query` | 查询股票实时行情 |
+| `search_memory` | 搜索本地 LLM Wiki 记忆库 |
 
 ---
 
 ## 快速开始
 
-### 环境
+- **环境**：macOS 12+，Python 3.10+，微信 Mac 版
+- **配置**：复制 `.env.example` 为 `.env`，填入 API Key
+- **启动**：`python3 run_bot.py`
+- **测试**：`python3 -m pytest src/tests/test_*_benchmark.py -v`
 
-- macOS 12+
-- Python 3.10+
-- 微信 Mac 版（推荐 4.1.8）
-
-### 安装
-
-```bash
-git clone <repo>
-cd wechat-mac-rpa
-pip install -r requirements.txt
-```
-
-### 配置
-
-```bash
-# API Key（感知层 + LLM 调用）
-export DASHSCOPE_API_KEY=your_key
-
-# 可选：Kimi 本地代理（回复生成）
-export OPENCLAW_API_KEY=your_key
-
-# 可选：启用 WeFlow 数据库驱动感知（实验性）
-export WEFLOW_MODE=weflow
-```
-
-### 启动
-
-```bash
-# 生产环境
-python3 run_bot.py
-
-# 指定配置
-USE_MULTIMODAL_OCR=false python3 run_bot.py   # 纯本地 OCR 模式
-```
-
-### 测试
-
-```bash
-# 全量 benchmark 回归（使用缓存）
-python3 -m pytest src/tests/test_ocr_quality_benchmark.py -v
-python3 -m pytest src/tests/test_reply_quality_benchmark.py -v
-python3 -m pytest src/tests/test_tool_decision_benchmark.py -v
-python3 -m pytest src/tests/test_memory_search_benchmark.py -v
-python3 -m pytest src/tests/test_chat_list_unread_benchmark.py -v
-
-# 真实 API（更新缓存）
-python3 -m pytest src/tests/test_reply_quality_benchmark.py -v --run-api
-```
+详细安装与配置指南见 `docs/01-quickstart/AI_QUICKSTART.md`。
 
 ---
 
@@ -442,10 +261,11 @@ wechat-mac-rpa/
 │   ├── ocr/vision_ocr.py              # L2: macOS Vision 文字识别
 │   ├── models/base.py                 # L1: 领域模型
 │   ├── llm/
-│   │   └── openclaw_client.py         # LLM 客户端（Kimi 本地代理）
-│   ├── utils/                         # L1-L5 共享工具
+│   │   ├── openclaw_client.py         # LLM 客户端（Kimi 本地代理）
 │   │   └── qwen_client.py             # LLM 客户端（DashScope API）
+│   ├── utils/                         # L1-L5 共享工具
 │   ├── badcase/                       # Badcase 闭环体系
+│   │   ├── case_db.py                 # Case 数据库
 │   │   ├── case_generator.py          # 从 tick 数据生成 benchmark case
 │   │   ├── judge_worker.py            # 异步 Judge LLM 评估
 │   │   └── review_server.py           # 人工审核 Web 服务
@@ -455,6 +275,7 @@ wechat-mac-rpa/
 │       ├── test_tool_decision_benchmark.py      # 27 cases
 │       ├── test_memory_search_benchmark.py      # 29 cases
 │       ├── test_chat_list_unread_benchmark.py   # 23 cases
+│       ├── test_judge_quality_benchmark.py      # 18 cases
 │       └── ...                          # 单元测试
 ├── docs/
 │   ├── 01-quickstart/                   # 快速开始
