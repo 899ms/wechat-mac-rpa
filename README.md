@@ -2,7 +2,7 @@
 
 基于多模态视觉感知与 LLM Agent 的 macOS 微信自动化框架。
 
-**不是协议逆向，不是 Hook，不碰微信数据库。** 我们把微信当作黑盒 GUI 应用，用计算机视觉读取界面，用大语言模型理解对话，用系统级自动化操作界面。微信更新 UI 只是换了一套视觉输入，不需要追着协议跑。
+**不是协议逆向，不是 Hook，不碰微信数据库。** 我们把微信当作黑盒 GUI 应用，用计算机视觉读取界面，用大语言模型理解对话，用系统级自动化操作界面。微信升级 UI 只是换了一套视觉输入，不需要追着协议跑。
 
 ---
 
@@ -148,7 +148,32 @@ Bot 每个 tick 检测并切换到未读数最高的聊天逐个处理：获取�
 
 ---
 
-## 数据飞轮：生产 Case 收集闭环
+## 工程体系
+
+### Benchmark 驱动开发
+
+**任何 prompt 修改、模型切换、感知层逻辑变更，必须先跑 benchmark 验证，禁止直接上生产。**
+
+现有 8 个独立 benchmark，覆盖核心链路：
+
+| Benchmark | Cases | 评估方式 | 当前状态 |
+|-----------|-------|---------|---------|
+| **Reply Quality** | 24 | LLM-as-a-Judge + 自定义 Rubric | ✅ 100% |
+| **Reply Stability** | — | 多轮重复一致性检验 | — |
+| **Tool Decision** | 27 | Binary + Judge Rubric（对抗性 case） | 🟡 81.5% |
+| **Memory Search** | 29 | Precision / Recall / F1 | 🟡 96.6% |
+| **Chat List Unread** | 23 | Precision / Recall | ✅ 100% |
+| **OCR Quality** | 33 | Sender / Text / ChatName / Count | 🔴 24.2% |
+| **Judge Quality** | 18 | Meta-benchmark：评估 Judge LLM 自身准确率 | — |
+| **Judge Quality v2** | — | 多维度 Rubric 评估 | — |
+
+开发流程：
+
+```
+Badcase → Benchmark 复现 → 根因分析 → 通用规则修复 → Benchmark 回归验证 → 上生产
+```
+
+### 数据飞轮：生产 Case 闭环
 
 > Bot 上线不是终点，而是数据积累的开始。
 
@@ -174,30 +199,30 @@ graph LR
 
 生产环境中的每一条异常都被自动捕获、评估、归档。不是"修完就忘"，而是形成**可追溯、可回归的 case 资产**。随着 case 库的增长，Bot 的鲁棒性持续提升。
 
----
+### 多维度评测体系
 
-## 工程体系
+除了核心链路 benchmark，我们还建立了完整的评测基础设施：
 
-### Benchmark 驱动开发
+- **Benchmark Dashboard**：自动生成可视化报告，汇总各 benchmark 的历史趋势与当前状态
+- **Judge 质量监控**：Meta-benchmark 持续评估 Judge LLM 自身的评判准确率，防止评判标准漂移
+- **回复稳定性测试**：同一输入多次运行，检验输出一致性，发现随机性导致的质量回归
+- **OCR 质量评测**：多模态识别与本地 OCR 的融合效果量化评估
 
-**任何 prompt 修改、模型切换、感知层逻辑变更，必须先跑 benchmark 验证，禁止直接上生产。**
+### 实验框架
 
-现有 6 个独立 benchmark，覆盖核心链路：
+支持 A/B 实验与参数调优：`scripts/run_experiment.py` 提供标准化的实验运行环境，支持对比不同 prompt、模型、路由策略的效果，实验结果自动归档到 `data/experiments/`。
 
-| Benchmark | Cases | 评估方式 | 当前状态 |
-|-----------|-------|---------|---------|
-| **Reply Quality** | 24 | LLM-as-a-Judge + 自定义 Rubric | ✅ 100% |
-| **Tool Decision** | 27 | Binary + Judge Rubric（对抗性 case） | 🟡 81.5% |
-| **Memory Search** | 29 | Precision / Recall / F1 | 🟡 96.6% |
-| **Chat List Unread** | 23 | Precision / Recall | ✅ 100% |
-| **OCR Quality** | 33 | Sender / Text / ChatName / Count | 🔴 24.2% |
-| **Judge Quality** | 18 | Meta-benchmark：评估 Judge LLM 自身准确率 | — |
+### 管理后台
 
-开发流程：
+内置 FastAPI 开发者后台（`scripts/admin.py`），提供：
 
-```
-Badcase → Benchmark 复现 → 根因分析 → 通用规则修复 → Benchmark 回归验证 → 上生产
-```
+- **Dashboard**：实时查看今日 Tick 数、回复数、平均 Judge 分、跳过率
+- **Tick 查看**：逐条浏览生产环境的感知-决策-回复全链路记录
+- **GT 标注**：对生产数据打标，构建 Ground Truth
+- **人工审核**：对 Judge 判定结果进行人工确认与分类
+- **截图 OCR**：可视化验证多模态识别与本地 OCR 的融合效果
+- **Benchmark 报告**：Judge 质量、回复质量的多维度可视化
+- **实验管理**：查看历史实验记录与对比结果
 
 ### 全链路 Profile 监控
 
@@ -225,6 +250,7 @@ Badcase → Benchmark 复现 → 根因分析 → 通用规则修复 → Benchma
 - **环境**：macOS 12+，Python 3.10+，微信 Mac 版
 - **配置**：复制 `.env.example` 为 `.env`，填入 API Key
 - **启动**：`python3 run_bot.py`
+- **后台**：`python3 scripts/admin.py`
 - **测试**：`python3 -m pytest src/tests/test_*_benchmark.py -v`
 
 详细安装与配置指南见 `docs/01-quickstart/AI_QUICKSTART.md`。
@@ -253,45 +279,73 @@ wechat-mac-rpa/
 │   │   └── session_memory.py          # L4: 跨 tick 工具缓存
 │   ├── memory/engine.py               # L4: 长期记忆（LLM Wiki + Overrides）
 │   ├── tools/                         # L4: 工具注册 + 内置工具
+│   │   ├── tool_registry.py
+│   │   ├── builtin_tools.py
+│   │   └── stock_tools.py
 │   ├── action/
 │   │   ├── message_sender.py          # L4: 消息发送
 │   │   ├── chat_list_clicker.py       # L4: 聊天列表切换
-│   │   └── login_recovery.py          # L4: 登录恢复
+│   │   ├── login_recovery.py          # L4: 登录恢复
+│   │   └── ui_interactor.py           # L4: UI 交互原子操作
 │   ├── capture/window_capture.py      # L2: 窗口截图
 │   ├── ocr/vision_ocr.py              # L2: macOS Vision 文字识别
 │   ├── models/base.py                 # L1: 领域模型
 │   ├── llm/
 │   │   ├── openclaw_client.py         # LLM 客户端（Kimi 本地代理）
 │   │   └── qwen_client.py             # LLM 客户端（DashScope API）
+│   ├── logging/bot_logger.py          # 结构化日志与全链路追踪
 │   ├── utils/                         # L1-L5 共享工具
+│   │   ├── chat_utils.py
+│   │   ├── debug_logger.py
+│   │   ├── llm_client.py
+│   │   ├── qwen_client.py
+│   │   ├── text_utils.py
+│   │   └── xml_utils.py
 │   ├── badcase/                       # Badcase 闭环体系
 │   │   ├── case_db.py                 # Case 数据库
 │   │   ├── case_generator.py          # 从 tick 数据生成 benchmark case
 │   │   ├── judge_worker.py            # 异步 Judge LLM 评估
 │   │   └── review_server.py           # 人工审核 Web 服务
-│   └── tests/
-│       ├── test_ocr_quality_benchmark.py        # 33 cases
-│       ├── test_reply_quality_benchmark.py      # 24 cases
-│       ├── test_tool_decision_benchmark.py      # 27 cases
-│       ├── test_memory_search_benchmark.py      # 29 cases
-│       ├── test_chat_list_unread_benchmark.py   # 23 cases
-│       ├── test_judge_quality_benchmark.py      # 18 cases
-│       └── ...                          # 单元测试
+│   └── tests/                         # Benchmark 套件 + 单元测试
+│       ├── test_ocr_quality_benchmark.py
+│       ├── test_reply_quality_benchmark.py
+│       ├── test_reply_quality_benchmark_v2.py
+│       ├── test_reply_stability_benchmark.py
+│       ├── test_tool_decision_benchmark.py
+│       ├── test_memory_search_benchmark.py
+│       ├── test_chat_list_unread_benchmark.py
+│       ├── test_judge_quality_benchmark.py
+│       ├── test_judge_quality_benchmark_v2.py
+│       └── ...
+├── scripts/
+│   ├── admin.py                       # FastAPI 开发者后台
+│   ├── generate_benchmark_dashboard.py # Benchmark 报告生成
+│   ├── generate_dashboard.py          # 旧版 Dashboard 生成
+│   ├── run_experiment.py              # A/B 实验框架
+│   ├── run_daily_benchmark.py         # 每日定时 benchmark
+│   ├── monitor_benchmark.py           # Benchmark 趋势监控
+│   ├── migrate_benchmarks_to_db.py    # Benchmark 数据迁移
+│   ├── bulk_import_from_chats.py      # Wiki 逆向初始化
+│   └── ...
 ├── docs/
 │   ├── 01-quickstart/                   # 快速开始
 │   ├── 02-architecture/                 # 架构设计 + API 接口 + 模块索引
 │   │   ├── ARCHITECTURE.md
-│   │   ├── API_SURFACE.md              # 公共接口速查表
-│   │   ├── MODULE_INDEX.md             # 按问题/文件索引
+│   │   ├── API_SURFACE.md
+│   │   ├── MODULE_INDEX.md
 │   │   ├── CODING_PRINCIPLES.md
-│   │   └── specs/                      # 各模块 SPEC
+│   │   └── specs/                       # 各模块 SPEC（ACTION / BOT / CAPTURE / LAYOUT / MEMORY / MODELS / OCR / PERCEPTION / PERFORMANCE / REPLY / SESSION / TOOLS / UTILS）
 │   ├── 03-guides/                       # 使用指南 + 项目状态
 │   ├── 04-troubleshooting/              # 问题排查 + 经验教训
 │   └── 05-meta/                         # 实验记录 + 审计
 ├── data/
 │   ├── debug/                           # tick 级 debug JSON
+│   ├── logs/                            # 运行日志
+│   ├── screenshots/                     # 截图存档
 │   ├── memory/wiki/                     # 用户/群聊/话题 wiki
-│   └── screenshots/                     # 截图存档
+│   ├── benchmark_history/               # Benchmark 历史数据
+│   ├── experiments/                     # 实验结果归档
+│   └── cases.db                         # Badcase 数据库
 └── run_bot.py                           # 生产环境入口
 ```
 
