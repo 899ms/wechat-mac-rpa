@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>项目问题 Review（校正版）</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; line-height: 1.7; color: #333; }
+  h1 { font-size: 22px; margin-bottom: 8px; }
+  .subtitle { color: #888; font-size: 14px; margin-bottom: 24px; }
+  .severity { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; margin-right: 8px; }
+  .p1 { background: #fff3cd; color: #856404; }
+  .p2 { background: #e7f3ff; color: #004085; }
+  .item { border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin-bottom: 16px; }
+  .item-header { display: flex; align-items: baseline; margin-bottom: 8px; }
+  .item-title { font-weight: 600; font-size: 15px; flex: 1; }
+  .item-desc { color: #555; font-size: 14px; margin: 8px 0; }
+  .item-code { background: #f5f5f5; padding: 10px 14px; border-radius: 6px; font-family: monospace; font-size: 13px; color: #444; overflow-x: auto; }
+  .item-impact { color: #666; font-size: 13px; margin-top: 8px; }
+  .checkbox-wrap { display: flex; align-items: flex-start; gap: 10px; }
+  input[type="checkbox"] { width: 18px; height: 18px; margin-top: 3px; cursor: pointer; }
+  .checked { border-color: #4a90d9; background: #f0f7ff; }
+  #submit { background: #4a90d9; color: white; border: none; padding: 12px 32px; border-radius: 6px; font-size: 15px; cursor: pointer; margin-top: 20px; }
+  #submit:hover { background: #357abd; }
+  #result { margin-top: 24px; padding: 16px; background: #f8f8f8; border-radius: 8px; font-family: monospace; font-size: 13px; white-space: pre-wrap; display: none; }
+  .note { color: #888; font-size: 13px; margin-top: 24px; padding: 12px 16px; background: #fafafa; border-radius: 6px; }
+</style>
+</head>
+<body>
+<h1>🔍 项目问题 Review（校正版）</h1>
+<p class="subtitle">重新用代码逐条验证后，筛掉了误判项。以下是我<strong>确认有问题</strong>的代码 bug，请勾选你要修的。</p>
+
+<div class="item" id="item-1">
+  <div class="checkbox-wrap">
+    <input type="checkbox" id="cb-1" checked>
+    <div style="flex:1">
+      <div class="item-header">
+        <span class="severity p1">P1</span>
+        <span class="item-title"><code>_is_fuzzy_duplicate</code> 未处理 video 类型</span>
+      </div>
+      <div class="item-desc">
+        video 不在 <code>("image", "sticker", "mixed")</code> 中，模糊去重走 text 分支，text 为空直接返回 False。
+        <code>_msg_id</code> 已用 <code>image_description</code> 做精确指纹（已修复），但如果 API 对同一视频的两个 tick 给出略有差异的 <code>image_description</code>（如"长发女性"vs"一个女性"），
+        精确去重不同 + 模糊去重失效 → 同一视频被重复存储。
+      </div>
+      <div class="item-code">if msg.message_type in ("image", "sticker", "mixed"):  # ← video 没在里面</div>
+      <div class="item-impact">影响：同一视频重复入历史，上下文膨胀。</div>
+    </div>
+  </div>
+</div>
+
+<div class="item" id="item-2">
+  <div class="checkbox-wrap">
+    <input type="checkbox" id="cb-2" checked>
+    <div style="flex:1">
+      <div class="item-header">
+        <span class="severity p1">P1</span>
+        <span class="item-title"><code>link_card</code> 的 <code>_msg_id</code> 和空 text 消息冲突</span>
+      </div>
+      <div class="item-desc">
+        <code>_msg_id</code> media 分支只有 <code>image/sticker/mixed/video</code>，<code>link_card</code> 走 else 分支用 <code>msg.text</code>。
+        API 返回的 link_card 通常 <code>text=""</code>（文字放在 <code>image_text</code> 里），所以 <code>content = ""</code>。
+        同一个 sender 发的两条不同 link_card，或一条 link_card 和一条 video，text 都为空时，<code>_msg_id</code> 完全相同，后一条被去重过滤。
+      </div>
+      <div class="item-code">content = msg.text  # link_card 走这里，text 通常为空</div>
+      <div class="item-impact">影响：不同的 link_card 被误判为重复，漏读消息。</div>
+    </div>
+  </div>
+</div>
+
+<div class="item" id="item-3">
+  <div class="checkbox-wrap">
+    <input type="checkbox" id="cb-3">
+    <div style="flex:1">
+      <div class="item-header">
+        <span class="severity p2">P2</span>
+        <span class="item-title">群聊 sender 校验逻辑存在误判（概率极低）</span>
+      </div>
+      <div class="item-desc">
+        <code>sender == text and len(text) &gt; 3</code> 时，认为 API 把消息内容错当成了 sender，用 <code>last_left_sender</code> 替代。
+        如果群聊中有人昵称等于消息内容（比如昵称"张三今天来了"发了"张三今天来了"），会被错误替换为上一个发言者。
+      </div>
+      <div class="item-code">if sender == text and len(text) &gt; 3:
+    sender = last_left_sender</div>
+      <div class="item-impact">影响：极特定场景下消息被错误归因，概率极低。</div>
+    </div>
+  </div>
+</div>
+
+<div class="item" id="item-4">
+  <div class="checkbox-wrap">
+    <input type="checkbox" id="cb-4" checked>
+    <div style="flex:1">
+      <div class="item-header">
+        <span class="severity p2">P2</span>
+        <span class="item-title"><code>no_reply_chats</code> 免回复列表严重不足</span>
+      </div>
+      <div class="item-desc">
+        当前只有 <code>{"腾讯新闻", "文件传输助手"}</code>，缺少微信支付、微信团队、订阅号、各种服务号通知等。
+        这些账号的消息会被当成普通聊天处理，可能触发无效回复。
+      </div>
+      <div class="item-code">self.no_reply_chats = {"腾讯新闻", "文件传输助手"}</div>
+      <div class="item-impact">影响：Bot 可能对服务号/系统通知回复无意义内容。属于配置缺失，非代码 bug。</div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+<strong>以下项经代码验证后筛除：</strong><br><br>
+• <code>_normalize_chat_name</code> 去后缀 — 注释明确是<strong>设计意图</strong>，非 bug<br>
+• system prompt vs policy 冲突 — AI 遵守 prompt 规则，<strong>无实际冲突</strong><br>
+• <code>_merge_chat_list</code> 顺序错配 — 有 fallback + 概率极低，<strong>不构成问题</strong><br>
+• debug 日志无清理 — <strong>运维问题</strong>，非功能 bug
+</div>
+
+<button id="submit" onclick="generateResult()">✅ 确认勾选，生成修复清单</button>
+<pre id="result"></pre>
+
+<script>
+function generateResult() {
+  const items = [];
+  for (let i = 1; i <= 4; i++) {
+    const cb = document.getElementById('cb-' + i);
+    const item = document.getElementById('item-' + i);
+    if (cb.checked) {
+      item.classList.add('checked');
+      const title = item.querySelector('.item-title').textContent;
+      const sev = item.querySelector('.severity').textContent;
+      items.push(sev + ' ' + title);
+    } else {
+      item.classList.remove('checked');
+    }
+  }
+  const result = document.getElementById('result');
+  if (items.length === 0) {
+    result.textContent = '未勾选任何问题';
+  } else {
+    result.textContent = '待修复项（' + items.length + ' 个）：\n\n' + items.map((t, i) => (i+1) + '. ' + t).join('\n');
+  }
+  result.style.display = 'block';
+}
+</script>
+</body>
+</html>

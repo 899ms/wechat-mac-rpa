@@ -1,0 +1,42 @@
+{
+  "chat_name": "王老板们和小天才 (5)",
+  "chat_list": [
+    {
+      "nickname": "王老板们和小天才",
+      "unread_count": ""
+    },
+    {
+      "nickname": "W1han",
+      "unread_count": ""
+    },
+    {
+      "nickname": "文件传输助手",
+      "unread_count": ""
+    },
+    {
+      "nickname": "腾讯新闻",
+      "unread_count": ""
+    },
+    {
+      "nickname": "王芊",
+      "unread_count": ""
+    }
+  ],
+  "messages": [
+    {
+      "sender": "wanglc",
+      "text": "是不是忙着切号呢",
+      "type": "text"
+    },
+    {
+      "sender": "自己",
+      "text": "哈哈误会啦！😂 我是 **AI 助手**，不是真人客服～\n\n不存在\"切号\"这种操作：\n• 🤖 我没有微信号，也不是 Qian\n• ⚡️ 回复速度取决于网络/服务器负载\n• 🎯 同时只处理你这一个对话窗口\n\n你是不是把我当成某个真人客服了？或者@错人了？🤔\n\n还有登录问题需要解决吗？随时叫我！👋",
+      "type": "text"
+    },
+    {
+      "sender": "自己",
+      "text": "1aayaua5aapangaaaaa~",
+      "type": "text"
+    }
+  ]
+}

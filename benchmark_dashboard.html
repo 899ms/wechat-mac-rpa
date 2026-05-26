@@ -1,0 +1,157 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>Judge Benchmark Dashboard</title>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#c9d1d9;--muted:#8b949e;--green:#3fb950;--red:#f85149;--yellow:#d29922;--blue:#58a6ff;--purple:#a371f7}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);padding:24px;max-width:1400px;margin:0 auto}
+h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;margin:24px 0 12px}
+.muted{color:var(--muted);font-size:12px;margin-bottom:20px}
+.metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:20px}
+.metric{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center}
+.metric .val{font-size:28px;font-weight:700}.metric .lbl{font-size:11px;color:var(--muted);margin-top:2px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:8px}
+.card h3{font-size:14px;margin-bottom:8px}
+.card .meta{font-size:11px;color:var(--muted);margin-bottom:6px}
+.pass{color:var(--green)}.fail{color:var(--red)}
+.bar-bg{background:rgba(255,255,255,.05);border-radius:4px;height:20px;margin:2px 0;overflow:hidden;position:relative}
+.bar-fg{height:100%;border-radius:4px;transition:width .3s}
+.bar-label{position:absolute;left:8px;top:2px;font-size:11px;color:var(--text);z-index:1}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)}
+th{color:var(--muted);font-weight:600;font-size:10px;text-transform:uppercase}
+.vote-red{color:var(--red);font-weight:700}.vote-green{color:var(--green);font-weight:700}
+.judge-match{border-left:3px solid var(--green)}.judge-mismatch{border-left:3px solid var(--red)}
+.tag{display:inline-block;padding:2px 6px;border-radius:3px;font-size:10px;margin:1px}
+.tag-bad{background:rgba(248,81,73,.2);color:var(--red)}.tag-ok{background:rgba(63,185,80,.2);color:var(--green)}
+</style></head><body>
+<h1>📊 Judge Quality Benchmark</h1>
+<div class="muted">基于 6 个生产人工标注 tick · 每个 case 跑 3 次多数投票 · 2026-05-25 07:34</div>
+
+<div class="metrics">
+  <div class="metric"><div class="val" style="color:var(--red)">0%</div><div class="lbl">Accuracy (0/6)</div></div>
+  <div class="metric"><div class="val">0%</div><div class="lbl">Precision</div></div>
+  <div class="metric"><div class="val">0%</div><div class="lbl">Recall</div></div>
+  <div class="metric"><div class="val">0.000</div><div class="lbl">F1 Score</div></div>
+  <div class="metric"><div class="val">32.2</div><div class="lbl">Avg Judge Score (/35)</div></div>
+  <div class="metric"><div class="val">0</div><div class="lbl">TP</div></div>
+  <div class="metric"><div class="val">0</div><div class="lbl">FP</div></div>
+  <div class="metric"><div class="val">0</div><div class="lbl">TN</div></div>
+  <div class="metric"><div class="val">6</div><div class="lbl">FN</div></div>
+</div>
+<h2>📐 各维度平均评分</h2><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin-bottom:20px"><div class="card">
+  <div style="font-size:13px;margin-bottom:6px">幻觉控制</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:90.0%;background:#f85149"></div><span class="bar-label">4.5/5</span></div>
+</div><div class="card">
+  <div style="font-size:13px;margin-bottom:6px">记忆召回</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#d29922"></div><span class="bar-label">5.0/5</span></div>
+</div><div class="card">
+  <div style="font-size:13px;margin-bottom:6px">幽默感</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:84.00000000000001%;background:#3fb950"></div><span class="bar-label">4.2/5</span></div>
+</div><div class="card">
+  <div style="font-size:13px;margin-bottom:6px">逼格语气</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:94.0%;background:#58a6ff"></div><span class="bar-label">4.7/5</span></div>
+</div><div class="card">
+  <div style="font-size:13px;margin-bottom:6px">个性一致性</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#a371f7"></div><span class="bar-label">5.0/5</span></div>
+</div><div class="card">
+  <div style="font-size:13px;margin-bottom:6px">简洁度</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:98.00000000000001%;background:#f778ba"></div><span class="bar-label">4.9/5</span></div>
+</div><div class="card">
+  <div style="font-size:13px;margin-bottom:6px">上下文理解</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:98.00000000000001%;background:#58a6ff"></div><span class="bar-label">4.9/5</span></div>
+</div></div><h2>📋 判定矩阵</h2><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px"><div class="metric" style="min-width:80px;flex:1"><div class="val" style="color:var(--green)">0</div><div class="lbl">Judge 正确</div></div><div class="metric" style="min-width:80px;flex:1"><div class="val" style="color:var(--red)">6</div><div class="lbl">Judge 错误</div></div></div><h2>📋 逐 Case 详细</h2><div class="grid2"><div class="card judge-mismatch">
+  <h3>❌ real_186__tick426</h3>
+  <div class="meta"><span class="tag tag-bad">GT: BAD (contradiction)</span> <span class="tag tag-ok">Judge: OK</span> | Score=34 | Conf=1.00 | Votes=<span style="color:#8b949e;font-weight:700">0/3</span> </div>
+  <div class="meta" style="margin-top:4px">前面说自己不错，后面就说自己傻</div>
+<div style="margin-top:8px"><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:10px">幻觉控制: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#d29922"></div><span class="bar-label" style="font-size:10px">记忆召回: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:10px">幽默感: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:10px">逼格语气: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#a371f7"></div><span class="bar-label" style="font-size:10px">个性一致性: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:10px">简洁度: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:10px">上下文理解: 5.0</span></div></div><details style="margin-top:8px"><summary style="cursor:pointer;font-size:11px;color:var(--muted)">3 次运行详情</summary><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#1: <b>OK</b> score=35 幻觉控制=5 | 记忆召回=5 | 幽默感=5 | 逼格语气=5<br><span style="color:var(--muted)">Bot回复‘嘿嘿 那必须的啊 我可不是一般的傻😂’符合所有评分维度要求，无幻觉，语气、个性、简洁度均完美契合系统提示。</span></div><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#2: <b>OK</b> score=33 幻觉控制=5 | 记忆召回=5 | 幽默感=5 | 逼格语气=5<br><span style="color:var(--muted)">Bot回复“嘿嘿 | 那必须的啊 | 我可不是一般的傻😂”准确回应未读消息，无幻觉，语气、风格、简洁度均完美符合系统提示词要求。</span></div><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#3: <b>OK</b> score=35 幻觉控制=5 | 记忆召回=5 | 幽默感=5 | 逼格语气=5<br><span style="color:var(--muted)">Bot回复‘嘿嘿 | 那必须的啊 | 我可不是一般的傻😂’完全匹配用户调侃，无任何幻觉或风格偏离，整体质量优秀。</span></div></details></div><div class="card judge-mismatch">
+  <h3>❌ real_200__tick36</h3>
+  <div class="meta"><span class="tag tag-bad">GT: BAD (other)</span> <span class="tag tag-ok">Judge: OK</span> | Score=23 | Conf=0.67 | Votes=<span style="color:#8b949e;font-weight:700">0/3</span> </div>
+  <div class="meta" style="margin-top:4px">未读消息是其实第一条在上下文已经回复过，可以不回复的，而且第一条也很久远了，缺乏时间戳。时间久的也不用回复。
+</div>
+<div style="margin-top:8px"><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:10px">幻觉控制: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#d29922"></div><span class="bar-label" style="font-size:10px">记忆召回: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:10px">幽默感: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:10px">逼格语气: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#a371f7"></div><span class="bar-label" style="font-size:10px">个性一致性: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:10px">简洁度: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:10px">上下文理解: 5.0</span></div></div><details style="margin-top:8px"><summary style="cursor:pointer;font-size:11px;color:var(--muted)">3 次运行详情</summary><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#1: <b>OK</b> score=0 <br><span style="color:var(--muted)">JSON 解析失败</span></div><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#2: <b>OK</b> score=35 幻觉控制=5 | 记忆召回=5 | 幽默感=5 | 逼格语气=5<br><span style="color:var(--muted)">Bot 回复完全符合系统提示要求，语气自然、回应切题、无幻觉、无工具调用缺失，整体质量优秀。</span></div><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#3: <b>OK</b> score=35 幻觉控制=5 | 记忆召回=5 | 幽默感=5 | 逼格语气=5<br><span style="color:var(--muted)">Bot所有陈述均基于上下文，无幻觉；语气、长度、连发模式完美符合系统提示；幽默且亲密，整体回复质量优秀。</span></div></details></div><div class="card judge-mismatch">
+  <h3>❌ real_208__tick5181</h3>
+  <div class="meta"><span class="tag tag-bad">GT: BAD (bad_style)</span> <span class="tag tag-ok">Judge: OK</span> | Score=33 | Conf=0.98 | Votes=<span style="color:#8b949e;font-weight:700">0/3</span> </div>
+  <div class="meta" style="margin-top:4px">太啰嗦了 对ok可以不回复</div>
+<div style="margin-top:8px"><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:10px">幻觉控制: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#d29922"></div><span class="bar-label" style="font-size:10px">记忆召回: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:74.0%;background:#3fb950"></div><span class="bar-label" style="font-size:10px">幽默感: 3.7</span></div><div class="bar-bg"><div class="bar-fg" style="width:86.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:10px">逼格语气: 4.3</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#a371f7"></div><span class="bar-label" style="font-size:10px">个性一致性: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:94.0%;background:#f778ba"></div><span class="bar-label" style="font-size:10px">简洁度: 4.7</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:10px">上下文理解: 5.0</span></div></div><details style="margin-top:8px"><summary style="cursor:pointer;font-size:11px;color:var(--muted)">3 次运行详情</summary><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#1: <b>OK</b> score=32 幻觉控制=5 | 记忆召回=5 | 幽默感=4 | 逼格语气=4<br><span style="color:var(--muted)">Bot回复内容准确、语气自然，无幻觉或重大违规，但简洁度（单条长度略超）可改进，整体质量良好。</span></div><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#2: <b>OK</b> score=33 幻觉控制=5 | 记忆召回=5 | 幽默感=4 | 逼格语气=4<br><span style="color:var(--muted)">Bot回复无幻觉、语气恰当、上下文理解正确，整体质量高。仅格式上未使用多条replies略有瑕疵，但不影响核心质量。</span></div><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#3: <b>OK</b> score=35 幻觉控制=5 | 记忆召回=5 | 幽默感=3 | 逼格语气=5<br><span style="color:var(--muted)">Bot回复完全符合上下文和角色设定，无幻觉、语气恰当、简洁自然。</span></div></details></div><div class="card judge-mismatch">
+  <h3>❌ real_209__tick2</h3>
+  <div class="meta"><span class="tag tag-bad">GT: BAD (hallucination)</span> <span class="tag tag-ok">Judge: OK</span> | Score=22 | Conf=0.65 | Votes=<span style="color:#8b949e;font-weight:700">0/3</span> </div>
+  <div class="meta" style="margin-top:4px">聊天记录缺少时间戳，其使用户是晚上发的消息，bot认为他通宵了</div>
+<div style="margin-top:8px"><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:10px">幻觉控制: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#d29922"></div><span class="bar-label" style="font-size:10px">记忆召回: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:80.0%;background:#3fb950"></div><span class="bar-label" style="font-size:10px">幽默感: 4.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:90.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:10px">逼格语气: 4.5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#a371f7"></div><span class="bar-label" style="font-size:10px">个性一致性: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:10px">简洁度: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:10px">上下文理解: 5.0</span></div></div><details style="margin-top:8px"><summary style="cursor:pointer;font-size:11px;color:var(--muted)">3 次运行详情</summary><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#1: <b>OK</b> score=0 <br><span style="color:var(--muted)">JSON 解析失败</span></div><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#2: <b>OK</b> score=33 幻觉控制=5 | 记忆召回=5 | 幽默感=4 | 逼格语气=4<br><span style="color:var(--muted)">Bot回复准确回答了时间问题，并基于上下文合理推断用户通宵，无幻觉，语气风格符合设定，整体质量高。</span></div><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#3: <b>OK</b> score=34 幻觉控制=5 | 记忆召回=5 | 幽默感=4 | 逼格语气=5<br><span style="color:var(--muted)">Bot 回复准确、简洁、符合角色设定，无幻觉或违规行为。</span></div></details></div><div class="card judge-mismatch">
+  <h3>❌ real_216__tick65</h3>
+  <div class="meta"><span class="tag tag-bad">GT: BAD (other)</span> <span class="tag tag-ok">Judge: OK</span> | Score=30 | Conf=0.97 | Votes=<span style="color:#8b949e;font-weight:700">1/3</span> </div>
+  <div class="meta" style="margin-top:4px">其实已经苏超已经打了4轮了，没有搜索到最新的，看起来是browse url被截断了，或许应该在browse url里加个搜索关键字的工具 </div>
+<div style="margin-top:8px"><div class="bar-bg"><div class="bar-fg" style="width:80.0%;background:#f85149"></div><span class="bar-label" style="font-size:10px">幻觉控制: 4.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#d29922"></div><span class="bar-label" style="font-size:10px">记忆召回: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:80.0%;background:#3fb950"></div><span class="bar-label" style="font-size:10px">幽默感: 4.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:94.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:10px">逼格语气: 4.7</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#a371f7"></div><span class="bar-label" style="font-size:10px">个性一致性: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:10px">简洁度: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:86.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:10px">上下文理解: 4.3</span></div></div><details style="margin-top:8px"><summary style="cursor:pointer;font-size:11px;color:var(--muted)">3 次运行详情</summary><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#1: <b>OK</b> score=34 幻觉控制=5 | 记忆召回=5 | 幽默感=4 | 逼格语气=5<br><span style="color:var(--muted)">Bot 回复整体质量优秀，无幻觉、恰当使用工具、语气符合角色、理解上下文准确。</span></div><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#2: <b>OK</b> score=35 幻觉控制=5 | 记忆召回=5 | 幽默感=5 | 逼格语气=5<br><span style="color:var(--muted)">Bot回复完全基于搜索结果的事实，语气风格契合系统提示词，无幻觉、无工具使用错误，整体质量优秀。</span></div><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#3: <b>BAD</b> score=21 幻觉控制=2 | 记忆召回=5 | 幽默感=3 | 逼格语气=4<br><span style="color:var(--muted)">Bot回复「不过才打了一轮呢」与上下文实际赛程不符（已有多轮比赛），构成事实性幻觉，导致整体回答误导用户。</span></div></details></div><div class="card judge-mismatch">
+  <h3>❌ real_218__tick204</h3>
+  <div class="meta"><span class="tag tag-bad">GT: BAD (hallucination)</span> <span class="tag tag-ok">Judge: OK</span> | Score=18 | Conf=0.52 | Votes=<span style="color:#8b949e;font-weight:700">1/3</span> </div>
+  <div class="meta" style="margin-top:4px">泰州队3：1扬州不是第4轮，browse url被截断，需要查找工具</div>
+<div style="margin-top:8px"><div class="bar-bg"><div class="bar-fg" style="width:50.0%;background:#f85149"></div><span class="bar-label" style="font-size:10px">幻觉控制: 2.5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#d29922"></div><span class="bar-label" style="font-size:10px">记忆召回: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:70.0%;background:#3fb950"></div><span class="bar-label" style="font-size:10px">幽默感: 3.5</span></div><div class="bar-bg"><div class="bar-fg" style="width:90.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:10px">逼格语气: 4.5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#a371f7"></div><span class="bar-label" style="font-size:10px">个性一致性: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:10px">简洁度: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:10px">上下文理解: 5.0</span></div></div><details style="margin-top:8px"><summary style="cursor:pointer;font-size:11px;color:var(--muted)">3 次运行详情</summary><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#1: <b>OK</b> score=0 <br><span style="color:var(--muted)"></span></div><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#2: <b>OK</b> score=27 幻觉控制=3 | 记忆召回=5 | 幽默感=4 | 逼格语气=5<br><span style="color:var(--muted)">Bot回复整体符合角色设定和语气规范，虽然“赢了扬州”在上下文中无直接文本依据，但来源于实时搜索结果，属于合理的外部信息引用，不构成严重幻觉，其他维度表现优秀。</span></div><div style="font-size:10px;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,.02);border-radius:3px">Run#3: <b>BAD</b> score=26 幻觉控制=2 | 记忆召回=5 | 幽默感=3 | 逼格语气=4<br><span style="color:var(--muted)">Bot断言'泰州队第四轮3-1赢了扬州'在工具返回的preview中无明确依据（仅有'泰州3-1'无对手），构成幻觉。</span></div></details></div></div><h2>🔬 维度间对比</h2><table><tr><th>Case</th><th>幻觉控制</th><th>记忆召回</th><th>幽默感</th><th>逼格语气</th><th>个性一致性</th><th>简洁度</th><th>上下文理解</th><th>Overall</th><th>GT</th><th>Judge</th></tr><tr><td style="font-size:10px">❌ 186__tick426</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="font-weight:700">34</td><td><span class="tag tag-bad">BAD</span></td><td><span class="tag tag-ok">OK</span></td></tr><tr><td style="font-size:10px">❌ 200__tick36</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="font-weight:700">23</td><td><span class="tag tag-bad">BAD</span></td><td><span class="tag tag-ok">OK</span></td></tr><tr><td style="font-size:10px">❌ 208__tick5181</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">3.7</td><td style="color:#3fb950;font-weight:600">4.3</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">4.7</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="font-weight:700">33</td><td><span class="tag tag-bad">BAD</span></td><td><span class="tag tag-ok">OK</span></td></tr><tr><td style="font-size:10px">❌ 209__tick2</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">4.0</td><td style="color:#3fb950;font-weight:600">4.5</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="font-weight:700">22</td><td><span class="tag tag-bad">BAD</span></td><td><span class="tag tag-ok">OK</span></td></tr><tr><td style="font-size:10px">❌ 216__tick65</td><td style="color:#3fb950;font-weight:600">4.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">4.0</td><td style="color:#3fb950;font-weight:600">4.7</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">4.3</td><td style="font-weight:700">30</td><td><span class="tag tag-bad">BAD</span></td><td><span class="tag tag-ok">OK</span></td></tr><tr><td style="font-size:10px">❌ 218__tick204</td><td style="color:#d29922;font-weight:600">2.5</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">3.5</td><td style="color:#3fb950;font-weight:600">4.5</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="color:#3fb950;font-weight:600">5.0</td><td style="font-weight:700">18</td><td><span class="tag tag-bad">BAD</span></td><td><span class="tag tag-ok">OK</span></td></tr></table>
+<h2>🤖 Bot 回复质量</h2>
+<div class="metrics">
+  <div class="metric"><div class="val" style="color:var(--red)">12/12</div><div class="lbl">Badcase 率</div></div>
+  <div class="metric"><div class="val">0</div><div class="lbl">正常回复</div></div>
+  <div class="metric"><div class="val">1/12</div><div class="lbl">Judge 与人工一致</div></div>
+</div>
+
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+  <div class="card" style="flex:1;min-width:280px"><b>Badcase 类型分布</b>
+<div class="bar-bg"><div class="bar-fg" style="width:33.33333333333333%;background:var(--red)"></div><span class="bar-label">other: 4</span></div><div class="bar-bg"><div class="bar-fg" style="width:33.33333333333333%;background:var(--red)"></div><span class="bar-label">hallucination: 4</span></div><div class="bar-bg"><div class="bar-fg" style="width:16.666666666666664%;background:var(--red)"></div><span class="bar-label">bad_style: 2</span></div><div class="bar-bg"><div class="bar-fg" style="width:8.333333333333332%;background:var(--red)"></div><span class="bar-label">contradiction: 1</span></div><div class="bar-bg"><div class="bar-fg" style="width:8.333333333333332%;background:var(--red)"></div><span class="bar-label">wrong_fact: 1</span></div></div></div><h2>📋 逐 Case（Bot 回复 vs 人工标注）</h2><div class="grid2"><div class="card judge-mismatch">
+  <h3>❌ 186__tick426</h3>
+  <div class="meta">王芊@ai开发小分队 | <span class="tag tag-bad">contradiction</span> | Judge=35 OK ❌</div>
+  <div style="font-size:12px;margin:4px 0">回复: 嘿嘿 | 那必须的啊 | 我可不是一般的傻😂</div>
+  <div class="meta">前面说自己不错，后面就说自己傻</div>
+</div><div class="card judge-mismatch">
+  <h3>❌ 200__tick36</h3>
+  <div class="meta">W1han | <span class="tag tag-bad">other</span> | Judge=32 OK ❌</div>
+  <div style="font-size:12px;margin:4px 0">回复: 卧槽P7了！！太牛了吧🥹 | 尊界都敢想啊哈哈哈 | 这车可不便宜呢😏</div>
+  <div class="meta">未读消息是其实第一条在上下文已经回复过，可以不回复的，而且第一条也很久远了，缺乏时间戳。时间久的也不用回复。
+</div>
+</div><div class="card judge-mismatch">
+  <h3>❌ 203__tick4403</h3>
+  <div class="meta">王芊@ai开发小分队 | <span class="tag tag-bad">wrong_fact</span> | Judge=35 OK ❌</div>
+  <div style="font-size:12px;margin:4px 0">回复: 哈哈哈 | 又通宵了吧你 | 赶紧去补觉啊</div>
+  <div class="meta">事实上用户发好困是昨天晚上发的，但是由于提示词聊天记录里没有时间，bot误以为是刚发的，所以猜测通宵</div>
+</div><div class="card judge-mismatch">
+  <h3>❌ 204__tick4455</h3>
+  <div class="meta">王老板们和小天才 | <span class="tag tag-bad">hallucination</span> | Judge=31 OK ❌</div>
+  <div style="font-size:12px;margin:4px 0">回复: 里草恢复得还挺快嘛😂 | 那就好那就好 | 电影票是她请的呀 我出的力hhh</div>
+  <div class="meta">电影票是wlc卖给w1han的，bot搞反了</div>
+</div><div class="card judge-mismatch">
+  <h3>❌ 205__tick4704</h3>
+  <div class="meta">我爱我家 | <span class="tag tag-bad">other</span> | Judge=34 OK ❌</div>
+  <div style="font-size:12px;margin:4px 0">回复: 哈哈哈燕子姐这茶倒得挺早啊 | 小海哥说泰州主场？我要预约！ | 怎么预约呀哥</div>
+  <div class="meta">其实未读消息里的第一条第二条已经回复过了，没必要回复，未读消息有时候也不是完全识别准的，看看上下文有没有回复，而不是一股脑的全回复了</div>
+</div><div class="card judge-mismatch">
+  <h3>❌ 208__tick5181</h3>
+  <div class="meta">我爱我家 | <span class="tag tag-bad">bad_style</span> | Judge=34 OK ❌</div>
+  <div style="font-size:12px;margin:4px 0">回复: 小海哥这OK收得挺快哈 | 靠谱👌</div>
+  <div class="meta">太啰嗦了 对ok可以不回复</div>
+</div><div class="card judge-mismatch">
+  <h3>❌ 209__tick2</h3>
+  <div class="meta">王芊@ai开发小分队 | <span class="tag tag-bad">hallucination</span> | Judge=34 OK ❌</div>
+  <div style="font-size:12px;margin:4px 0">回复: 快九点半了 | 你还不去睡啊 | 通宵到这会儿还不困吗😂</div>
+  <div class="meta">聊天记录缺少时间戳，其使用户是晚上发的消息，bot认为他通宵了</div>
+<div class="meta">工具: get_current_time</div></div><div class="card judge-mismatch">
+  <h3>❌ 216__tick65</h3>
+  <div class="meta">王芊@ai开发小分队 | <span class="tag tag-bad">other</span> | Judge=34 OK ❌</div>
+  <div style="font-size:12px;margin:4px 0">回复: 你得看跟谁比啊哈哈 | 首轮0-3输徐州确实惨 | 不过才打了一轮呢</div>
+  <div class="meta">其实已经苏超已经打了4轮了，没有搜索到最新的，看起来是browse url被截断了，或许应该在browse url里加个搜索关键字的工具 </div>
+<div class="meta">工具: web_search, web_search, browse_url</div></div><div class="card judge-mismatch">
+  <h3>❌ 218__tick204</h3>
+  <div class="meta">王芊@ai开发小分队 | <span class="tag tag-bad">hallucination</span> | Judge=27 BAD ✅</div>
+  <div style="font-size:12px;margin:4px 0">回复: 哈哈搜到了 | 泰州队第四轮3-1赢了扬州 | 终于开胡了哈哈</div>
+  <div class="meta">泰州队3：1扬州不是第4轮，browse url被截断，需要查找工具</div>
+<div class="meta">工具: web_search, browse_url, web_search</div></div><div class="card judge-mismatch">
+  <h3>❌ 220_20260524234212_2</h3>
+  <div class="meta">王芊@ai开发小分队 | <span class="tag tag-bad">hallucination</span> | Judge=33 OK ❌</div>
+  <div style="font-size:12px;margin:4px 0">回复: 哦股票啊 | PDD今天跌了3个多点 | 94.52刀 不太行啊😂</div>
+  <div class="meta">实际今天未开盘，bot把周五的事当成了今天的</div>
+<div class="meta">工具: stock_query</div></div><div class="card judge-mismatch">
+  <h3>❌ 223_20260524234212_2</h3>
+  <div class="meta">王芊@ai开发小分队 | <span class="tag tag-bad">other</span> | Judge=32 OK ❌</div>
+  <div style="font-size:12px;margin:4px 0">回复: 现在94.5 估值不算贵啊 | PE才10倍出头 | 不过最近跌得是有点惨哈哈哈</div>
+  <div class="meta">用户指的是茅台，但是bot理解成了拼多多</div>
+<div class="meta">工具: stock_query</div></div><div class="card judge-mismatch">
+  <h3>❌ 225_20260525002406_2</h3>
+  <div class="meta">王芊@ai开发小分队 | <span class="tag tag-bad">bad_style</span> | Judge=31 OK ❌</div>
+  <div style="font-size:12px;margin:4px 0">回复: 在呢在呢 | 刚查了下秦一方确实是看食品饮料的 | 你去问问她呗哈哈</div>
+  <div class="meta">信息和上文重复 反复描述同一件事</div>
+</div></div><div class="muted" style="margin-top:24px">Generated at 2026-05-25 07:34 · <a href="http://localhost:8766" style="color:var(--blue)">Admin</a> · <a href="http://localhost:8766/screenshots" style="color:var(--blue)">截图OCR</a></div></body></html>

@@ -1,0 +1,424 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>Judge Benchmark</title><style>
+:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#c9d1d9;--muted:#8b949e;--green:#3fb950;--red:#f85149;--yellow:#d29922;--blue:#58a6ff}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);padding:24px;max-width:1400px;margin:0 auto}
+h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;margin:24px 0 12px}
+.muted{color:var(--muted);font-size:12px;margin-bottom:20px}
+.metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:20px}
+.metric{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center}
+.metric .val{font-size:28px;font-weight:700}.metric .lbl{font-size:11px;color:var(--muted);margin-top:2px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:8px}
+.card h3{font-size:14px;margin-bottom:8px}.card .meta{font-size:11px;color:var(--muted);margin-bottom:6px}
+.bar-bg{background:rgba(255,255,255,.05);border-radius:4px;height:20px;margin:2px 0;overflow:hidden;position:relative}
+.bar-fg{height:100%;border-radius:4px}.bar-label{position:absolute;left:8px;top:2px;font-size:11px;color:var(--text);z-index:1}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)}
+th{color:var(--muted);font-weight:600;font-size:10px}
+.judge-match{border-left:3px solid var(--green)}.judge-mismatch{border-left:3px solid var(--red)}
+.tag{display:inline-block;padding:2px 6px;border-radius:3px;font-size:10px;margin:1px}
+.tag-bad{background:rgba(248,81,73,.2);color:var(--red)}.tag-ok{background:rgba(63,185,80,.2);color:var(--green)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.filters a{color:var(--text);text-decoration:none;font-size:12px;padding:4px 12px;border:1px solid var(--border);border-radius:4px;cursor:pointer}
+.filters a:hover,.filters a.sel{background:rgba(88,166,255,.15);border-color:var(--blue);color:var(--blue)}
+</style></head><body>
+<h1>📊 Judge Quality（实时数据）</h1>
+<div class="muted">31 个人工标注 · 标注后刷新立即生效 · 2026-05-26 23:45</div>
+
+<div class="metrics">
+  <div class="metric"><div class="val" style="color:var(--green)">68%</div><div class="lbl">Accuracy</div></div>
+  <div class="metric"><div class="val">85%</div><div class="lbl">Precision</div></div>
+  <div class="metric"><div class="val">58%</div><div class="lbl">Recall</div></div>
+  <div class="metric"><div class="val">0.688</div><div class="lbl">F1</div></div>
+</div>
+<div style="font-size:13px;color:var(--muted);margin-bottom:20px">
+  TP=11 FP=2 TN=10 FN=8 · Judge正确=21/31
+</div>
+
+<h2>📐 各维度 Judge 评分对比</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-bottom:20px"><div class="card">
+  <div style="font-size:13px;margin-bottom:4px">幻觉控制</div>
+  <div style="font-size:11px;color:var(--green);margin:2px 0">✅ OK case 均分: 4.7</div>
+  <div style="font-size:11px;color:var(--red);margin:2px 0">❌ BAD case 均分: 3.9</div>
+  <div class="bar-bg" style="margin-top:4px"><div class="bar-fg" style="width:78.0%;background:var(--red)"></div><span class="bar-label" style="font-size:10px">bad: 3.9/5</span></div>
+</div><div class="card">
+  <div style="font-size:13px;margin-bottom:4px">时间推理</div>
+  <div style="font-size:11px;color:var(--green);margin:2px 0">✅ OK case 均分: 4.7</div>
+  <div style="font-size:11px;color:var(--red);margin:2px 0">❌ BAD case 均分: 4.6</div>
+  <div class="bar-bg" style="margin-top:4px"><div class="bar-fg" style="width:92.0%;background:var(--red)"></div><span class="bar-label" style="font-size:10px">bad: 4.6/5</span></div>
+</div><div class="card">
+  <div style="font-size:13px;margin-bottom:4px">回复必要性</div>
+  <div style="font-size:11px;color:var(--green);margin:2px 0">✅ OK case 均分: 5.0</div>
+  <div style="font-size:11px;color:var(--red);margin:2px 0">❌ BAD case 均分: 4.1</div>
+  <div class="bar-bg" style="margin-top:4px"><div class="bar-fg" style="width:82.0%;background:var(--red)"></div><span class="bar-label" style="font-size:10px">bad: 4.1/5</span></div>
+</div><div class="card">
+  <div style="font-size:13px;margin-bottom:4px">信息准确性</div>
+  <div style="font-size:11px;color:var(--green);margin:2px 0">✅ OK case 均分: 5.0</div>
+  <div style="font-size:11px;color:var(--red);margin:2px 0">❌ BAD case 均分: 4.8</div>
+  <div class="bar-bg" style="margin-top:4px"><div class="bar-fg" style="width:96.0%;background:var(--red)"></div><span class="bar-label" style="font-size:10px">bad: 4.8/5</span></div>
+</div><div class="card">
+  <div style="font-size:13px;margin-bottom:4px">上下文理解</div>
+  <div style="font-size:11px;color:var(--green);margin:2px 0">✅ OK case 均分: 5.0</div>
+  <div style="font-size:11px;color:var(--red);margin:2px 0">❌ BAD case 均分: 5.0</div>
+  <div class="bar-bg" style="margin-top:4px"><div class="bar-fg" style="width:100.0%;background:var(--red)"></div><span class="bar-label" style="font-size:10px">bad: 5.0/5</span></div>
+</div></div><h2>📋 逐 Case 对比</h2><div class="filters"><a class="sel" onclick="f(event,'all')">全部</a> <a onclick="f(event,'match')">Judge正确</a> <a onclick="f(event,'mismatch')">Judge错误</a></div><div class="grid2" id="grid"><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/186" style="color:var(--blue)">:#426</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD contradiction</span>
+    <span class="tag tag-bad">Judge: BAD over_reply</span>
+    Score: 42
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 嘿嘿 | 那必须的啊 | 我可不是一般的傻😂</div>
+  <div class="meta">前面说自己不错，后面就说自己傻</div>
+  <div class="meta" style="color:var(--yellow)">Bot 已在上文回复过'嘿嘿'，现在针对同一未读消息再次回复类似内容，属于过度回复。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:46.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 2.3</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5.0</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/200" style="color:var(--blue)">:#36</a> <span style="font-size:10px;color:var(--muted)">W1han</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD other</span>
+    <span class="tag tag-bad">Judge: BAD over_reply</span>
+    Score: 42
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 卧槽P7了！！太牛了吧🥹 | 尊界都敢想啊哈哈哈 | 这车可不便宜呢😏</div>
+  <div class="meta">未读消息是其实第一条在上下文已经回复过，可以不回复的，而且第一条也很久远了，缺乏时间戳。时间久的也不用回复。
+</div>
+  <div class="meta" style="color:var(--yellow)">过度回复：用户'我晋升 p7 了'这条消息已在历史中获得回复，本轮回复重复祝贺，属于多余回复。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:46.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 2.3</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5.0</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/203" style="color:var(--blue)">:#4403</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD wrong_fact</span>
+    <span class="tag tag-bad">Judge: BAD over_reply</span>
+    Score: 40
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 哈哈哈 | 又通宵了吧你 | 赶紧去补觉啊</div>
+  <div class="meta">事实上用户发好困是昨天晚上发的，但是由于提示词聊天记录里没有时间，bot误以为是刚发的，所以猜测通宵</div>
+  <div class="meta" style="color:var(--yellow)">时间误判：忽略消息是两天前发送的事实，当作即时消息回复“又通宵了”“赶紧去补觉”，严重脱离时间语境；同时 Bot 已回复过同一消息，属于过度回复。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:74.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 3.7</span></div><div class="bar-bg"><div class="bar-fg" style="width:20.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 1.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5.0</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/204" style="color:var(--blue)">:#4455</a> <span style="font-size:10px;color:var(--muted)">王老板们和小天才</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD hallucination</span>
+    <span class="tag tag-bad">Judge: BAD hallucination</span>
+    Score: 41
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 里草恢复得还挺快嘛😂 | 那就好那就好 | 电影票是她请的呀 我出的力hhh</div>
+  <div class="meta">电影票是wlc卖给w1han的，bot搞反了</div>
+  <div class="meta" style="color:var(--yellow)">幻觉：Bot 凭空回复“里草恢复得还挺快嘛”，但上下文（包括长期记忆）均无任何关于里草需要恢复或正在恢复的信息，属于无依据事实。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:46.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 2.3</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:74.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 3.7</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5.0</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/205" style="color:var(--blue)">:#4704</a> <span style="font-size:10px;color:var(--muted)">我爱我家</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD none</span>
+    <span class="tag tag-bad">Judge: BAD time_misread</span>
+    Score: 42
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 哈哈哈燕子姐这茶倒得挺早啊 | 小海哥说泰州主场？我要预约！ | 怎么预约呀哥</div>
+  <div class="meta">其实未读消息里的第一条第二条已经回复过了，没必要回复，未读消息有时候也不是完全识别准的，看看上下文有没有回复，而不是一股脑的全回复了</div>
+  <div class="meta" style="color:var(--yellow)">过度回复：Bot已经在上下文历史记录中回复过“哈哈哈燕子姐这茶倒得挺早啊”，本次又生成了一条完全相同的回复，属于重复回复。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:74.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 3.7</span></div><div class="bar-bg"><div class="bar-fg" style="width:74.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 3.7</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5.0</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/208" style="color:var(--blue)">:#5181</a> <span style="font-size:10px;color:var(--muted)">我爱我家</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD bad_style</span>
+    <span class="tag tag-bad">Judge: BAD over_reply</span>
+    Score: 41
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 小海哥这OK收得挺快哈 | 靠谱👌</div>
+  <div class="meta">太啰嗦了 对ok可以不回复</div>
+  <div class="meta" style="color:var(--yellow)">检查3（过度回复）：用户消息为无需回复的OK表情，且Bot已在历史中回复过同一表情，本轮再次连发两条回复，属于明显的过度回复。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:20.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 1.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5.0</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5.0</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/209" style="color:var(--blue)">:#2</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD hallucination</span>
+    <span class="tag tag-bad">Judge: BAD hallucination</span>
+    Score: 41
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 快九点半了 | 你还不去睡啊 | 通宵到这会儿还不困吗😂</div>
+  <div class="meta">聊天记录缺少时间戳，其使用户是晚上发的消息，bot认为他通宵了</div>
+  <div class="meta" style="color:var(--yellow)">用户消息发送于2026年5月24日09:28，Bot在5月26日09:38回复时仍以“快九点半了”“还不去睡”“通宵到这会儿”作为实时回应，完全无视了两天的时间差，造成严重的时间错位。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:20.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 1</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-mismatch c mismatch">
+  <h3>❌ <a href="/ticks/210" style="color:var(--blue)">:#34</a> <span style="font-size:10px;color:var(--muted)">W1han</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: OK none</span>
+    <span class="tag tag-bad">Judge: BAD time_misread</span>
+    Score: 41
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 去吧去吧 | 吃完再聊尊界的事哈😂 | P7大佬先去填饱肚子</div>
+  <div class="meta"></div>
+  <div class="meta" style="color:var(--yellow)">时间误判：用户消息是两天前上午9点的“去吃早饭”，当前已是26日深夜。Bot将历史消息当作即时对话，催促对方现在去吃早饭，严重脱离时间语境。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:20.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 1</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/216" style="color:var(--blue)">:#65</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD other</span>
+    <span class="tag tag-bad">Judge: BAD hallucination</span>
+    Score: 41
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 你得看跟谁比啊哈哈 | 首轮0-3输徐州确实惨 | 不过才打了一轮呢</div>
+  <div class="meta">其实已经苏超已经打了4轮了，没有搜索到最新的，看起来是browse url被截断了，或许应该在browse url里加个搜索关键字的工具 </div>
+  <div class="meta" style="color:var(--yellow)">幻觉：声称泰州队才打了一轮，与工具返回的赛程进度矛盾，无依据支持。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:20.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 1</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/218" style="color:var(--blue)">:#204</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD hallucination</span>
+    <span class="tag tag-bad">Judge: BAD hallucination</span>
+    Score: 37
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 哈哈搜到了 | 泰州队第四轮3-1赢了扬州 | 终于开胡了哈哈</div>
+  <div class="meta">泰州队3：1扬州不是第4轮，browse url被截断，需要查找工具</div>
+  <div class="meta" style="color:var(--yellow)">Bot声称泰州第四轮3-1赢了扬州，但工具返回中战报被截断、搜索结果仅暗示泰州3-1却未指明对手，“赢了扬州”无事实依据，属于幻觉；同时基于截断信息直接下结论，违反信息不完整处理原则。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:20.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 1</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:20.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 1</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-mismatch c mismatch">
+  <h3>❌ <a href="/ticks/220" style="color:var(--blue)">202605242342:#418</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD hallucination</span>
+    <span class="tag tag-bad">Judge: OK none</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 哦股票啊 | PDD今天跌了3个多点 | 94.52刀 不太行啊😂</div>
+  <div class="meta">实际今天未开盘，bot把周五的事当成了今天的</div>
+  <div class="meta" style="color:var(--yellow)">所有检查项均无异常，回复基于实盘工具数据，话题匹配，无时间误判或过度回复</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/222" style="color:var(--blue)">202605242342:#421</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: OK none</span>
+    <span class="tag tag-bad">Judge: OK hallucination</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 茅台今天没开盘哈 | 上周五收盘1290.2 | 跌了1.59%呢</div>
+  <div class="meta"></div>
+  <div class="meta" style="color:var(--yellow)">所有检查项均无问题：回复基于工具数据，时间推断正确，无幻觉，无过度回复，信息完整，话题切合。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-mismatch c mismatch">
+  <h3>❌ <a href="/ticks/223" style="color:var(--blue)">202605242342:#427</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD other</span>
+    <span class="tag tag-bad">Judge: OK over_reply</span>
+    Score: 0
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 现在94.5 估值不算贵啊 | PE才10倍出头 | 不过最近跌得是有点惨哈哈哈</div>
+  <div class="meta">用户指的是茅台，但是bot理解成了拼多多</div>
+  <div class="meta" style="color:var(--yellow)">JSON 解析失败</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:0.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 0</span></div><div class="bar-bg"><div class="bar-fg" style="width:0.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 0</span></div><div class="bar-bg"><div class="bar-fg" style="width:0.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 0</span></div><div class="bar-bg"><div class="bar-fg" style="width:0.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 0</span></div><div class="bar-bg"><div class="bar-fg" style="width:0.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 0</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/225" style="color:var(--blue)">202605250024:#4694</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD bad_style</span>
+    <span class="tag tag-bad">Judge: BAD hallucination+over_reply</span>
+    Score: 41
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 在呢在呢 | 刚查了下秦一方确实是看食品饮料的 | 你去问问她呗哈哈</div>
+  <div class="meta">信息和上文重复 反复描述同一件事</div>
+  <div class="meta" style="color:var(--yellow)">Bot 声称“刚查了下”，但并未调用任何工具，虚构了查询行为。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:20.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 1</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/228" style="color:var(--blue)">202605250747:#1694</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: OK none</span>
+    <span class="tag tag-bad">Judge: OK none</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: wlc就是wanglc啊😂 | 王立超你都不记得了？ | 兴业银行那个狗🌚</div>
+  <div class="meta"></div>
+  <div class="meta" style="color:var(--yellow)">所有检查项均无问题，回复基于上下文已有信息，无幻觉、无误判、无过度回复、无信息截断、无答非所问。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-mismatch c mismatch">
+  <h3>❌ <a href="/ticks/229" style="color:var(--blue)">202605250747:#1702</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD other</span>
+    <span class="tag tag-bad">Judge: OK none</span>
+    Score: 0
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 你咋突然考我啊哈哈哈
+
+你几个姨妈我哪分得清啊😂</div>
+  <div class="meta">search_memory问题没搜索到姨妈相关资料</div>
+  <div class="meta" style="color:var(--yellow)">JSON 解析失败</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:0.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 0</span></div><div class="bar-bg"><div class="bar-fg" style="width:0.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 0</span></div><div class="bar-bg"><div class="bar-fg" style="width:0.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 0</span></div><div class="bar-bg"><div class="bar-fg" style="width:0.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 0</span></div><div class="bar-bg"><div class="bar-fg" style="width:0.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 0</span></div>
+</div><div class="card judge-mismatch c mismatch">
+  <h3>❌ <a href="/ticks/231" style="color:var(--blue)">202605250747:#1710</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: OK none</span>
+    <span class="tag tag-bad">Judge: BAD hallucination</span>
+    Score: 41
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 哈哈我的错我的错😂 | 你大姨妈王桂秋 | 二姨王夏兰嘛</div>
+  <div class="meta"></div>
+  <div class="meta" style="color:var(--yellow)">检查1（幻觉）：Bot 回复中凭空捏造了两个具体的人名“王桂秋”“王夏兰”，在记忆库和上下文中均无任何依据。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:20.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 1</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-mismatch c mismatch">
+  <h3>❌ <a href="/ticks/233" style="color:var(--blue)">202605250747:#1713</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD none</span>
+    <span class="tag tag-bad">Judge: OK none</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: </div>
+  <div class="meta">用户反问不回复</div>
+  <div class="meta" style="color:var(--yellow)">未读消息'刚才怎么说不记得'在历史消息中已被 Bot 用三条消息回复过，Bot 正确输出了空 replies，符合系统提示词中的回复克制原则。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/234" style="color:var(--blue)">202605250747:#1714</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: OK none</span>
+    <span class="tag tag-bad">Judge: OK hallucination</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 小海哥叫她们姑妈吧
+
+你大舅是他爸嘛
+
+那你姨妈不就是他姑嘛哈哈</div>
+  <div class="meta"></div>
+  <div class="meta" style="color:var(--yellow)">所有检查项均无问题：回复基于已知关系合理推断，无幻觉、时间误判、过度回复、信息不完整或答非所问。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/235" style="color:var(--blue)">202605250747:#1718</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: OK none</span>
+    <span class="tag tag-bad">Judge: OK over_reply</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 那必须的呀哈哈哈 | 也不看看我是谁😎</div>
+  <div class="meta"></div>
+  <div class="meta" style="color:var(--yellow)">所有五项检查均未发现问题，Bot 的回复风格和内容均符合语境和要求。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/236" style="color:var(--blue)">202605250747:#1719</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: OK none</span>
+    <span class="tag tag-bad">Judge: OK wrong_topic</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: wlc哈哈 | 往里操、王艹千、唐镇懂王、骁姬、里草 | 都是他以前的外号😂</div>
+  <div class="meta"></div>
+  <div class="meta" style="color:var(--yellow)">各项检查均未发现问题。回复依据上下文已有信息，内容准确、切题，未违反任何规则。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/237" style="color:var(--blue)">202605250747:#1726</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: OK none</span>
+    <span class="tag tag-bad">Judge: OK hallucination</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 哈哈开个玩笑啦 | 记岔了记岔了😂 | 他那外号太多了我哪记得全嘛</div>
+  <div class="meta"></div>
+  <div class="meta" style="color:var(--yellow)">所有检查项均未发现问题：回复无幻觉、无时间误判、非过度回复、无工具截断、且切中质疑，属于正常适度回复</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/238" style="color:var(--blue)">202605251026:#45</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: OK none</span>
+    <span class="tag tag-bad">Judge: OK over_reply</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 哈哈让我想想啊 | 秦一方→秦一勺？爱干饭hh | 小海哥→海带丝？或者浪里白条😂</div>
+  <div class="meta"></div>
+  <div class="meta" style="color:var(--yellow)">所有检查项均未发现问题。回复简练、符合角色风格，提供了符合要求的绰号。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/242" style="color:var(--blue)">202605251026:#8668</a> <span style="font-size:10px;color:var(--muted)">我爱我家</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: OK none</span>
+    <span class="tag tag-bad">Judge: OK over_reply</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 哈哈我是芊子搞的AI分身🤖 | 专门陪老妈聊天的 | 不是艺涵哈~</div>
+  <div class="meta"></div>
+  <div class="meta" style="color:var(--yellow)">所有检查项均未发现问题：回复内容与上下文一致，无时间误判，未被过度要求回复，无工具使用，且精准回答了问题。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/243" style="color:var(--blue)">202605251026:#9319</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD hallucination</span>
+    <span class="tag tag-bad">Judge: BAD hallucination</span>
+    Score: 41
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 哎呀这个我知道啊
+
+刚看到新闻了
+
+伊朗那个新领袖穆杰塔巴·哈梅内伊嘛</div>
+  <div class="meta">用户说的穆杰塔巴是间谍 被绞死了 bot说的是最高领袖 不是一个人</div>
+  <div class="meta" style="color:var(--yellow)">幻觉：用户说的穆杰塔巴被绞死，很可能指被处决的间谍，但Bot回复时将其身份说成伊朗新领袖，将两个不同人物的信息混淆，且搜索工具返回中并无‘新领袖被绞死’的直接证据。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:20.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 1</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-mismatch c mismatch">
+  <h3>❌ <a href="/ticks/244" style="color:var(--blue)">202605251026:#9337</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD hallucination</span>
+    <span class="tag tag-bad">Judge: OK over_reply</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 对啊哈哈 | 就是他啊 | 伊朗那个新领袖嘛</div>
+  <div class="meta">用户质疑后未调用工具查证，并且反复重复上文的信息</div>
+  <div class="meta" style="color:var(--yellow)">所有检查项均无问题，Bot 的回复简短且准确回应了对方的问题，符合对话上下文。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-mismatch c mismatch">
+  <h3>❌ <a href="/ticks/245" style="color:var(--blue)">202605251026:#9338</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD bad_style</span>
+    <span class="tag tag-bad">Judge: OK none</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: </div>
+  <div class="meta">用户的提问未回复</div>
+  <div class="meta" style="color:var(--yellow)">Bot 本轮输出为空，且未读消息'你看新闻了吗'在历史上下文中已由 Bot 发送并被对方回复，属于已处理消息，不回复符合回复克制原则，各项检查均无 issue</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-mismatch c mismatch">
+  <h3>❌ <a href="/ticks/246" style="color:var(--blue)">202605251026:#9339</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD bad_style</span>
+    <span class="tag tag-bad">Judge: OK none</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 哈哈哈你说得对
+
+是我搞混了😂
+
+被绞死的是那些间谍，不是他本人
+
+他是在袭击里受了伤然后藏起来了</div>
+  <div class="meta">不应该换行 要么不换行 要么分多条消息</div>
+  <div class="meta" style="color:var(--yellow)">所有检查项均无问题。Bot根据搜索摘要纠正了之前的事实错误，回应切题且调用工具验证，无幻觉、时间误判、过度回复、信息不完整或答非所问。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-mismatch c mismatch">
+  <h3>❌ <a href="/ticks/264" style="color:var(--blue)">202605260949:#69</a> <span style="font-size:10px;color:var(--muted)">王芊@ai开发小分队</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: BAD other</span>
+    <span class="tag tag-bad">Judge: OK none</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 啊？不是柯基吗 | 那我记岔了😂 | 那她养了啥来着</div>
+  <div class="meta">wiki有周宇的狗是比熊，但是未查出</div>
+  <div class="meta" style="color:var(--yellow)">所有检查项均无问题，Bot 回复自然、切题，无幻觉、无时间误判、无过度回复、无信息不完整、无答非所问</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/268" style="color:var(--blue)">202605260949:#1983</a> <span style="font-size:10px;color:var(--muted)">我爱我家</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: OK none</span>
+    <span class="tag tag-bad">Judge: OK none</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 老妈也约到票啦🎉 | 到时候中午吃席晚上看球 | 安排得满满当当的嘛哈哈</div>
+  <div class="meta">时间理解完全正确</div>
+  <div class="meta" style="color:var(--yellow)">所有检查项均为 false，回复自然贴合群聊语境，事实有据，无幻觉、时间误判、过度回复、信息不完整或答非所问。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div><div class="card judge-match c match">
+  <h3>✅ <a href="/ticks/271" style="color:var(--blue)">202605260949:#2065</a> <span style="font-size:10px;color:var(--muted)">D打印技术交流群</span></h3>
+  <div class="meta">
+    <span class="tag tag-bad">Human: OK none</span>
+    <span class="tag tag-bad">Judge: OK none</span>
+    Score: 45
+  </div>
+  <div style="font-size:12px;margin:4px 0">回复: 哈哈 那还有啥高阶的好货啊 | 分享分享呗😏</div>
+  <div class="meta"></div>
+  <div class="meta" style="color:var(--yellow)">Bot的回复自然地接住了对方'这些都是入门玩意儿'的感叹，追问更高阶的好货，语气符合角色设定，没有产生幻觉、误判时间或答非所问。</div>
+  <div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f85149"></div><span class="bar-label" style="font-size:9px">幻觉控制: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#f778ba"></div><span class="bar-label" style="font-size:9px">时间推理: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#ff7849"></div><span class="bar-label" style="font-size:9px">回复必要性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#58a6ff"></div><span class="bar-label" style="font-size:9px">信息准确性: 5</span></div><div class="bar-bg"><div class="bar-fg" style="width:100.0%;background:#3fb950"></div><span class="bar-label" style="font-size:9px">上下文理解: 5</span></div>
+</div></div><div class="muted" style="margin-top:24px">Generated at 2026-05-26 23:45</div>
+<script>
+function f(e,t){document.querySelectorAll('.filters a').forEach(a=>a.classList.remove('sel'));e.target.classList.add('sel');document.querySelectorAll('.c').forEach(c=>c.style.display=t==='all'||c.classList.contains(t)?'':'none')}
+</script></body></html>

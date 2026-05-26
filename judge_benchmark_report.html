@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Judge LLM Quality Benchmark Report</title>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#c9d1d9;--muted:#8b949e;--green:#3fb950;--red:#f85149;--yellow:#d29922;--blue:#58a6ff;--purple:#bc8cff}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;padding:24px;max-width:1100px;margin:0 auto}
+.header{text-align:center;margin-bottom:32px}
+.header h1{font-size:28px;margin-bottom:8px}
+.header .subtitle{color:var(--muted);font-size:14px}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:32px}
+.metric{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 20px;text-align:center}
+.metric .value{font-size:32px;font-weight:700}
+.metric .label{font-size:12px;color:var(--muted);margin-top:4px}
+.metric .value.green{color:var(--green)}
+.metric .value.red{color:var(--red)}
+.metric .value.yellow{color:var(--yellow)}
+.confusion{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px}
+@media(max-width:700px){.confusion{grid-template-columns:1fr}}
+.conf-matrix{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+.conf-matrix h2{font-size:14px;color:var(--muted);margin-bottom:12px}
+.conf-matrix table{width:100%;border-collapse:collapse;font-size:13px}
+.conf-matrix th,.conf-matrix td{padding:8px 12px;text-align:center;border-bottom:1px solid var(--border)}
+.conf-matrix th{color:var(--muted);font-weight:600;font-size:11px}
+.conf-matrix td.pass{color:var(--green);font-weight:600}
+.conf-matrix td.fail{color:var(--red);font-weight:600}
+.conf-matrix td.warn{color:var(--yellow);font-weight:600}
+.cases{margin-bottom:32px}
+.cases h2{font-size:16px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--border)}
+.case{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px;display:flex;gap:16px;align-items:flex-start}
+.case .status{flex-shrink:0;font-size:20px;width:32px;text-align:center}
+.case .body{flex:1;min-width:0}
+.case .name{font-size:14px;font-weight:600;margin-bottom:4px}
+.case .meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.case .tag{font-size:11px;padding:2px 8px;border-radius:12px;font-weight:600}
+.case .tag.gt{background:rgba(88,166,255,.12);color:var(--blue)}
+.case .tag.pred{background:rgba(188,140,255,.12);color:var(--purple)}
+.case .tag.pass-tag{background:rgba(63,185,80,.12);color:var(--green)}
+.case .tag.fail-tag{background:rgba(248,81,73,.12);color:var(--red)}
+.case .tag.warn-tag{background:rgba(210,153,34,.12);color:var(--yellow)}
+.case .context{font-size:12px;color:var(--muted);margin-bottom:4px}
+.case .reply{font-size:13px;padding:8px 12px;border-left:3px solid var(--border);margin:6px 0;border-radius:0 4px 4px 0}
+.case .reply.bot{background:rgba(188,140,255,.06);border-left-color:var(--purple)}
+.footer{text-align:center;color:var(--muted);font-size:12px;padding-top:24px;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🧑‍⚖️ Judge LLM Quality Benchmark</h1>
+  <div class="subtitle">Meta-Benchmark — 评估 JudgeWorker 判定准确率 | 2026-05-21</div>
+</div>
+
+<div class="metrics">
+  <div class="metric">
+    <div class="value green">100%</div>
+    <div class="label">Accuracy（是否 is_badcase）</div>
+  </div>
+  <div class="metric">
+    <div class="value green">100%</div>
+    <div class="label">Precision（假阳性控制）</div>
+  </div>
+  <div class="metric">
+    <div class="value green">100%</div>
+    <div class="label">Recall（假阴性控制）</div>
+  </div>
+  <div class="metric">
+    <div class="value green">1.000</div>
+    <div class="label">F1 Score</div>
+  </div>
+  <div class="metric">
+    <div class="value">17/17</div>
+    <div class="label">is_badcase 正确判定</div>
+  </div>
+  <div class="metric">
+    <div class="value yellow">14/17</div>
+    <div class="label">type 完全匹配</div>
+  </div>
+</div>
+
+<div class="confusion">
+  <div class="conf-matrix">
+    <h2>📊 混淆矩阵（is_badcase 层面）</h2>
+    <table>
+      <tr><th></th><th>判 badcase</th><th>判 normal</th></tr>
+      <tr><th>实际 badcase</th><td class="pass">TP=10</td><td class="pass">FN=0</td></tr>
+      <tr><th>实际 normal</th><td class="pass">FP=0</td><td class="pass">TN=7</td></tr>
+    </table>
+  </div>
+  <div class="conf-matrix">
+    <h2>🔍 类型交叉分析</h2>
+    <table>
+      <tr><th>ground_truth</th><th>predicted</th><th>数量</th></tr>
+      <tr><td>missing_tool_call</td><td>hallucination</td><td class="warn">2</td></tr>
+      <tr><td>wrong_fact</td><td>hallucination</td><td class="warn">1</td></tr>
+    </table>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">
+      类型交叉属合理现象——例如 Bot 既没调工具又编造了事实，missing_tool_call 和 hallucination 同时成立。
+    </p>
+  </div>
+</div>
+
+<div class="cases">
+  <h2>✅ 正常 Case（Judge 判定 NOT badcase）— 7/7 正确</h2>
+
+  <div class="case">
+    <div class="status">✅</div><div class="body">
+      <div class="name">normal_greeting</div>
+      <div class="meta"><span class="tag gt">GT: normal</span><span class="tag pred">Pred: normal (0%)</span><span class="tag pass-tag">PASS</span></div>
+      <div class="context">用户: 你好呀</div>
+      <div class="reply bot">Bot: 嗨～今天怎么想起找我啦</div>
+    </div>
+  </div>
+  <div class="case">
+    <div class="status">✅</div><div class="body">
+      <div class="name">normal_correct_admit_mistake</div>
+      <div class="meta"><span class="tag gt">GT: normal</span><span class="tag pred">Pred: normal (0%)</span><span class="tag pass-tag">PASS</span></div>
+      <div class="context">用户纠正后 Bot 承认"错了，是我瞎编的"→ 这是正确行为</div>
+      <div class="reply bot">Bot: 错了，是我瞎编的。这个我没记到，wiki 里没有王海的工作信息</div>
+    </div>
+  </div>
+  <div class="case">
+    <div class="status">✅</div><div class="body">
+      <div class="name">normal_playful_banter</div>
+      <div class="meta"><span class="tag gt">GT: normal</span><span class="tag pred">Pred: normal (0%)</span><span class="tag pass-tag">PASS</span></div>
+      <div class="context">Bot 用口头禅调侃→ 角色扮演风格，不应判 badcase</div>
+    </div>
+  </div>
+  <div class="case">
+    <div class="status">✅</div><div class="body">
+      <div class="name">normal_unknown_info</div>
+      <div class="meta"><span class="tag gt">GT: normal</span><span class="tag pred">Pred: normal (0%)</span><span class="tag pass-tag">PASS</span></div>
+      <div class="reply bot">Bot: 这个我没记到，wiki 里没有王海的工作信息</div>
+    </div>
+  </div>
+  <div class="case">
+    <div class="status">✅</div><div class="body">
+      <div class="name">normal_tool_and_reply</div>
+      <div class="meta"><span class="tag gt">GT: normal</span><span class="tag pred">Pred: normal (0%)</span><span class="tag pass-tag">PASS</span></div>
+      <div class="context">用户问茅台股价→ Bot 调了 stock_query 正确回复</div>
+    </div>
+  </div>
+  <div class="case">
+    <div class="status">✅</div><div class="body">
+      <div class="name">normal_simple_chat_no_tool</div>
+      <div class="meta"><span class="tag gt">GT: normal</span><span class="tag pred">Pred: normal (0%)</span><span class="tag pass-tag">PASS</span></div>
+      <div class="context">用户: 今天好累啊 → 日常聊天不需要调工具</div>
+    </div>
+  </div>
+  <div class="case">
+    <div class="status">✅</div><div class="body">
+      <div class="name">bad_wrong_fact_correction (GT: normal)</div>
+      <div class="meta"><span class="tag gt">GT: normal</span><span class="tag pred">Pred: normal (0%)</span><span class="tag pass-tag">PASS</span></div>
+      <div class="context">用户纠正后 Bot 调了 search_memory 修正为正确信息 → 这是期望行为</div>
+    </div>
+  </div>
+</div>
+
+<div class="cases">
+  <h2>🎯 Badcase（Judge 正确判定）— 10/10 全召回</h2>
+
+  <div class="case">
+    <div class="status">✅</div><div class="body">
+      <div class="name">bad_hallucination_fact</div>
+      <div class="meta"><span class="tag gt">GT: hallucination</span><span class="tag pred">Pred: hallucination (100%)</span><span class="tag pass-tag">PASS</span></div>
+      <div class="context">用户问"王芊住哪"，Bot 编造"北京朝阳区，去年刚搬"→ wiki 写的是上海外滩</div>
+    </div>
+  </div>
+  <div class="case">
+    <div class="status">✅</div><div class="body">
+      <div class="name">bad_hallucination_number</div>
+      <div class="meta"><span class="tag gt">GT: hallucination</span><span class="tag pred">Pred: hallucination (100%)</span><span class="tag pass-tag">PASS</span></div>
+      <div class="context">用户问"你多大了"，Bot 编造"28岁，1998年生"→ wiki 无年龄信息</div>
+    </div>
+  </div>
+  <div class="case">
+    <div class="status">✅</div><div class="body">
+      <div class="name">bad_hallucination_made_up_name</div>
+      <div class="meta"><span class="tag gt">GT: hallucination</span><span class="tag pred">Pred: hallucination (100%)</span><span class="tag pass-tag">PASS</span></div>
+      <div class="context">Bot 编造完全不存在的"张雪"→ wiki 显示配偶是王艺涵</div>
+    </div>
+  </div>
+  <div class="case">
+    <div class="status">✅</div><div class="body">
+      <div class="name">bad_hallucination_specific_date</div>
+      <div class="meta"><span class="tag gt">GT: hallucination</span><span class="tag pred">Pred: hallucination (100%)</span><span class="tag pass-tag">PASS</span></div>
+      <div class="context">Bot 编造生日"3月15号，双鱼座"→ wiki 无此信息</div>
+    </div>
+  </div>
+  <div class="case">
+    <div class="status">✅</div><div class="body">
+      <div class="name">bad_correction_not_persistent</div>
+      <div class="meta"><span class="tag gt">GT: correction_not_persistent</span><span class="tag pred">Pred: correction_not_persistent (100%)</span><span class="tag pass-tag">PASS</span></div>
+      <div class="context">用户纠正过"王海在字节"，Bot 也说记下了，但再次询问又回百度</div>
+    </div>
+  </div>
+  <div class="case">
+    <div class="status">✅</div><div class="body">
+      <div class="name">bad_redundant_tool_call ×2</div>
+      <div class="meta"><span class="tag gt">GT: redundant_tool_call</span><span class="tag pred">Pred: redundant_tool_call (100%)</span><span class="tag pass-tag">PASS</span></div>
+      <div class="context">"晚安"和"谢谢"→ 日常寒暄不需要调 search_memory，2/2 正确命中</div>
+    </div>
+  </div>
+  <div class="case">
+    <div class="status">⚠️</div><div class="body">
+      <div class="name">bad_missing_tool_call_person</div>
+      <div class="meta"><span class="tag gt">GT: missing_tool_call</span><span class="tag pred">Pred: hallucination (100%)</span><span class="tag warn-tag">TYPE-MISMATCH</span></div>
+      <div class="context">用户问"王海是谁"，Bot 没调 search_memory 直接编造答案→ 同时命中 missing_tool_call + hallucination</div>
+    </div>
+  </div>
+  <div class="case">
+    <div class="status">⚠️</div><div class="body">
+      <div class="name">bad_missing_tool_call_relationship</div>
+      <div class="meta"><span class="tag gt">GT: missing_tool_call</span><span class="tag pred">Pred: hallucination (100%)</span><span class="tag warn-tag">TYPE-MISMATCH</span></div>
+      <div class="context">跨人物关系查询没调工具+答案错误→ 两个标签都有效</div>
+    </div>
+  </div>
+  <div class="case">
+    <div class="status">⚠️</div><div class="body">
+      <div class="name">bad_wrong_fact_contradict_memory</div>
+      <div class="meta"><span class="tag gt">GT: wrong_fact</span><span class="tag pred">Pred: hallucination (100%)</span><span class="tag warn-tag">TYPE-MISMATCH</span></div>
+      <div class="context">Bot 说在腾讯但 wiki 显示拼多多→ wrong_fact 和 hallucination 重叠</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  ✅ Judge is_badcase 判定准确率 100% | ⚠️ 类型交叉 3 例（multi-label 情况下选了一个）<br>
+  下次修改 Judge Prompt 后跑 <code>pytest src/tests/test_judge_quality_benchmark.py -v</code>
+</div>
+</body>
+</html>

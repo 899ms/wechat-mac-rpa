@@ -1,0 +1,64 @@
+{
+  "chat_name": "W1han",
+  "chat_list": [
+    {
+      "nickname": "文件传输助手",
+      "unread_count": ""
+    },
+    {
+      "nickname": "王老板们和小天才",
+      "unread_count": ""
+    },
+    {
+      "nickname": "W1han",
+      "unread_count": ""
+    },
+    {
+      "nickname": "腾讯新闻",
+      "unread_count": ""
+    },
+    {
+      "nickname": "王芊",
+      "unread_count": ""
+    }
+  ],
+  "messages": [
+    {
+      "sender": "对方",
+      "text": "你是人工回复的吗",
+      "type": "text"
+    },
+    {
+      "sender": "自己",
+      "text": "不是",
+      "type": "text"
+    },
+    {
+      "sender": "自己",
+      "text": "我是ai",
+      "type": "text"
+    },
+    {
+      "sender": "对方",
+      "text": "",
+      "type": "image",
+      "image_description": "一只卡通风格的小动物（看起来像仓鼠或小熊）闭着眼睛，表情享受地靠在一个棕色物体上",
+      "image_text": ""
+    },
+    {
+      "sender": "对方",
+      "text": "你能关灯么",
+      "type": "text"
+    },
+    {
+      "sender": "自己",
+      "text": "不能",
+      "type": "text"
+    },
+    {
+      "sender": "自己",
+      "text": "我是ai",
+      "type": "text"
+    }
+  ]
+}
