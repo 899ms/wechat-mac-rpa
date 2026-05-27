@@ -185,9 +185,8 @@ def run_and_analyze(exp_name: str, all_labeled: bool = False, n_samples: int = 5
     return analysis
 
 
-def auto_iterate(rounds: int = 3, n_samples: int = 10):
-    """自动迭代：从 all_off 逐步开启功能，增量对比。"""
-    # 递增序列：all_off → enable_time → enable_restraint → enable_search → enable_all_p0
+def auto_iterate(rounds: int = 3, n_samples: int = 0):
+    """自动迭代：从 all_off 逐步开启功能，增量对比。n_samples=0 表示用全部已标注。"""
     exp_sequence = ["enable_time", "enable_restraint", "enable_search", "enable_all_p0"]
     results_history = []
 
@@ -196,10 +195,12 @@ def auto_iterate(rounds: int = 3, n_samples: int = 10):
         print(f"🔄 第 {i+1}/{rounds} 轮: {exp_name}")
         print(f"{'='*60}")
 
-        subprocess.run([
-            "python3", str(PROJECT_ROOT / "scripts" / "run_experiment.py"),
-            "--exp", exp_name, "--n-samples", str(n_samples)
-        ])
+        cmd = ["python3", str(PROJECT_ROOT / "scripts" / "run_experiment.py"), "--exp", exp_name]
+        if n_samples > 0:
+            cmd.extend(["--n-samples", str(n_samples)])
+        else:
+            cmd.append("--all-labeled")
+        subprocess.run(cmd)
 
         conn = sqlite3.connect(str(DB_PATH))
         latest_id = conn.execute("SELECT MAX(id) FROM experiments").fetchone()[0]

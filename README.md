@@ -12,16 +12,29 @@
 graph TB
     subgraph Perception["感知层 Perception"]
         P1["窗口截图"]
-        P2["像素 Diff 预判<br/>消息区 + 聊天列表区"]
+        P2["像素 Diff 预判"]
         P3["多模态 API"]
         P4["布局解析"]
+        P5["WeFlow API"]
     end
 
     subgraph Reasoning["推理层 Reasoning"]
         R1["状态机 ChatState"]
-        R2["动态计算路由"]
+        R2["Skills 路由<br/>deepseek / Hermes"]
         R3["ReAct 循环"]
-        R4["记忆检索"]
+    end
+
+    subgraph Tools["工具层 Tools"]
+        T1["search_memory"]
+        T2["web_search / weather / stock"]
+        T3["browse_url"]
+    end
+
+    subgraph Memory["记忆系统 Memory"]
+        M1["LLM Wiki"]
+        M2["BM25 召回"]
+        M3["增量更新"]
+        M4["Overrides"]
     end
 
     subgraph Action["行动层 Action"]
@@ -29,11 +42,6 @@ graph TB
         A2["消息发送"]
         A3["聊天切换"]
         A4["登录恢复"]
-    end
-
-    subgraph Logging["结构化日志 Logging"]
-        L1["bot_logger"]
-        L2["debug_logger"]
     end
 
     subgraph Data["数据层 Data"]
@@ -48,18 +56,23 @@ graph TB
     P2 -->|有变化| P3
     P2 -->|无变化| P4
     P3 --> P4
+    P5 -->|全量历史注入| M1
     P4 -->|PerceptionResult| R1
     R1 --> R2
-    R2 --> R3
-    R3 -->|tool_call| R4
-    R4 --> R3
+    R2 -->|日常| R3
+    R2 -->|复杂 Skill| R3
+    R3 -->|tool_call| T1
+    T1 --> M2
+    M2 --> M1
+    M1 -->|召回| R3
+    R3 -->|tool_call| T2
+    T2 -->|结果| R3
     R3 -->|reply| A1
     R1 -->|switch| A1
     A1 --> A2
     A1 --> A3
     A1 --> A4
-    A2 --> L1
-    L1 --> D1
+    A2 --> D1
     D1 --> D2
     D2 --> D3
     D3 -->|回归验证| P2
@@ -81,7 +94,7 @@ Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知
 
 - **SmartPipeline**（主力）：本地预判 + 多模态 API 兜底。先用像素 Diff 判断截图是否有实质变化，无变化时零 API 调用直接跳过；有变化时调用多模态大模型提取消息内容，同时用本地 OCR 做几何定位。
 - **VisionPipeline**（Fallback）：纯本地 OCR 备用管道，在多模态 API 不可用时降级运行。
-- **WeFlowPipeline**（实验性）：直接读取 WeChat 数据库驱动感知，启动时用于历史注入，运行时可辅助未读检测。
+- **WeFlowPipeline**（实验性）：直接读取 WeChat 数据库驱动感知。启动时用于**全量历史注入**（将存量聊天记录批量注入记忆系统），运行时可辅助未读检测。
 
 #### 多模态视觉理解
 
@@ -110,28 +123,56 @@ Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知
 
 我们用 **LCS（最长公共子序列）**做跨 tick 消息对齐，对齐基于多维度模糊匹配：精确哈希匹配、文字相似度、图片 2-gram Jaccard 相似度。对齐后只有真正的新消息进入后续流程，旧消息被静默丢弃。这解决了"重复回复"这个致命错误。
 
-#### 动态计算路由
+#### Skills 路由与双模型切换
 
-ReplyGenerator 内部有一个二级路由决策：先用轻量调用判断用户意图是否匹配某个复杂 Skill，再决定后续投入多少计算资源。
+ReplyGenerator 内部有一个二级路由决策：先用轻量调用判断用户意图是否匹配某个复杂 Skill，再决定后续模型和计算资源。
 
-- **日常路径**：绝大多数闲聊、问候、简单问答走超轻量单轮生成，不加载 Skill，不启用工具调用。
-- **深度路径**：匹配到复杂 Skill 时，切换长上下文模型，加载 Skill 正文，启用完整工具链。
+```
+用户消息
+    │
+    ▼
+轻量路由判断（几十 token）
+    │
+    ├── 未匹配 Skill → deepseek 路径（日常对话）
+    │   ├── 不加载 Skill
+    │   ├── 由 Bot 注入工具列表和可用 skill 摘要
+    │   └── 启用 ReAct 工具循环
+    │
+    └── 匹配 Skill 且 complex_llm_client 存在 → Hermes 路径（复杂任务）
+        ├── 切换长上下文模型（Hermes）
+        ├── Hermes 自行加载完整 Skill 正文
+        └── 不启用 ReAct（单轮深度推理）
+```
+
+- **deepseek 路径**：日常闲聊、简单问答。超轻量单轮生成为主，Bot 负责注入工具列表和 skill 摘要。匹配到 skill 时由 Bot 将 skill 正文拼接进 prompt。
+- **Hermes 路径**：复杂 Skill 任务。切换长上下文模型，Hermes 自行加载完整 Skill 正文进行深度推理，不启用 ReAct 工具循环。
 
 这种"先轻量判断、再决定投入"的设计，让大部分日常对话保持毫秒级响应，只有复杂任务才走重型路径。Skills 是可插拔的 Markdown 文件，新增一个 Skill 只需要丢一个文件进目录，零代码改动。
 
 #### ReAct 工具循环
 
-当进入日常路径且需要外部信息时，ReplyGenerator 运行完整的 **ReAct 循环**：
+当进入 deepseek 路径且需要外部信息时，ReplyGenerator 运行完整的 **ReAct 循环**：
 
 ```
 [思考] 分析意图 → [行动] 调用工具 → [观察] 注入结果 → [再思考] 重新推理
 ```
 
-循环内置防失控机制：工具调用有轮次上限，单条链路有超时保护，同一对话内的工具结果会被缓存避免重复查询。
+工具通过统一注册表管理，Bot 维护一套内置工具集：
 
-#### 记忆系统（LLM Wiki）
+| 工具 | 用途 |
+|------|------|
+| `get_current_time` | 获取当前日期和时间 |
+| `get_weather` | 查询指定城市天气 |
+| `web_search` | 网页搜索实时信息 |
+| `browse_url` | 提取链接网页正文 |
+| `stock_query` | 查询股票实时行情 |
+| `search_memory` | 搜索本地 LLM Wiki 记忆库 |
 
-Bot 不是无状态聊天机器人。每个联系人、群聊都有独立的 **Wiki**（Markdown 格式），通过 `search_memory` 工具在对话中实时召回。
+新增工具只需实现函数 + 注册，零改动现有代码。循环内置防失控机制：工具调用有轮次上限，单条链路有超时保护，同一对话内的工具结果会被缓存避免重复查询。
+
+### 记忆系统（Memory）
+
+Bot 不是无状态聊天机器人。记忆系统是一个独立子系统，每个联系人、群聊都有独立的 **Wiki**（Markdown 格式）。
 
 ```mermaid
 graph LR
@@ -142,9 +183,11 @@ graph LR
     E --> F["ReplyGenerator"]
 ```
 
-**全量构建**：从存量聊天记录批量生成 wiki，按全局用户索引聚合跨聊天消息，自动发现别名，分轮次增量构建。Bot 上线时即可拥有完整背景知识，不需要从零积累。
+**启动时全量注入**：Bot 启动时，WeFlowPipeline 从微信数据库导出全量历史聊天记录，按聊天聚合后注入 GlobalStore。这一步让 Bot 上线第一天就拥有完整的背景知识，不需要从零积累。
 
-**增量构建**：运行中新对话被后台异步队列消费，LLM 接收「现有 wiki + 新对话」，输出更新后的完整 wiki。所有新增事实标注来源，严禁删除现有内容。
+**全量构建（逆向初始化）**：从存量聊天记录（微信导出或 WeFlow 备份）批量生成 wiki，按全局用户索引聚合跨聊天消息，自动发现别名，分轮次增量构建。
+
+**增量构建（运行时更新）**：运行中新对话被后台异步队列消费，LLM 接收「现有 wiki + 新对话」，输出更新后的完整 wiki。所有新增事实标注来源，严禁删除现有内容。
 
 **人工 Overrides**：通过外挂 JSON 实现任意字段覆写，LLM 更新时不会破坏人工修改。
 
@@ -252,21 +295,6 @@ Badcase → Benchmark 复现 → 根因分析 → 通用规则修复 → Benchma
 ### 全链路 Profile 监控
 
 整个链路植入统一的性能打点，覆盖截图、OCR、布局、生成、记忆、发送各阶段。基于日志数据驱动优化。
-
----
-
-## 内置工具
-
-工具通过统一注册表管理，新增工具只需实现函数 + 注册，零改动现有代码。
-
-| 工具 | 用途 |
-|------|------|
-| `get_current_time` | 获取当前日期和时间 |
-| `get_weather` | 查询指定城市天气 |
-| `web_search` | 网页搜索实时信息 |
-| `browse_url` | 提取链接网页正文 |
-| `stock_query` | 查询股票实时行情 |
-| `search_memory` | 搜索本地 LLM Wiki 记忆库 |
 
 ---
 

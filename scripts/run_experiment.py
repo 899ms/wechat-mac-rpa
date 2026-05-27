@@ -57,61 +57,62 @@ CONTROL = BotConfig(name="control", description="当前生产配置（基线）"
 
 # 实验组
 BOT_EXPERIMENTS = {
+    # ====== 消融实验：逐个关闭功能，衡量损失 ======
     "no_time": BotConfig(
         name="no_time",
-        description="关闭时间感知",
+        description="【消融】关闭时间感知：去掉每条消息的时间标签（如'3分钟前''昨晚23:15'），去掉会话头部的当前时间+星期+时段说明，去掉时间戳说明。预期：时间推理维度退化，把昨晚消息当现在发的。",
         enable_time_awareness=False, enable_timestamps=False,
     ),
     "no_restraint": BotConfig(
         name="no_restraint",
-        description="关闭回复克制",
+        description="【消融】关闭回复克制：删除 persona 中的'回复克制原则'（OK/表情/确认词不回复），删除回复去重提示（历史已回复的消息标记为可跳过）。预期：对表情包/OK消息过度回复增加。",
         enable_reply_restraint=False,
     ),
     "no_dedup": BotConfig(
         name="no_dedup",
-        description="关闭未读去重",
+        description="【消融】关闭未读去重：去掉未读消息后的'已回复可跳过'标记，去掉检查历史回复的逻辑。预期：重复回复已处理过的消息增加。",
         enable_unread_dedup=False,
     ),
     "no_search_page": BotConfig(
         name="no_search_page",
-        description="关闭 search_in_page",
+        description="【消融】关闭 search_in_page 工具：browse_url 后无法对页面内容进行关键词搜索，只能依赖截断的前3000字。预期：browse后信息不完整导致幻觉增加。",
         enable_search_in_page=False,
     ),
     "short_truncate": BotConfig(
         name="short_truncate",
-        description="browse 截断 1000 字",
+        description="【消融】缩短截断：browse_url 返回1000字（正常12000），工具结果500字（正常12000）。模拟信息受限环境。预期：信息准确性退化。",
         browse_truncate=1000, tool_result_truncate=500,
     ),
     "all_off": BotConfig(
         name="all_off",
-        description="关闭所有 P0 改进（基线）",
+        description="【基线】关闭所有改进：无时间标签、无回复克制、无未读去重、无search_in_page、信息截断到最小值。回到项目初始状态。每次增量实验对比此基线。",
         enable_time_awareness=False, enable_timestamps=False,
         enable_reply_restraint=False, enable_unread_dedup=False,
         enable_search_in_page=False, browse_truncate=1000, tool_result_truncate=500,
     ),
-    # 增量实验：从 all_off 逐步开启功能
+    # ====== 增量实验：从基线逐步开启，量化每项收益 ======
     "enable_time": BotConfig(
         name="enable_time",
-        description="只开启时间感知",
+        description="【增量】仅开启时间感知（其余保持基线关闭状态）：给每条聊天消息注入相对时间标签（如'3分钟前''昨晚23:15'），在会话头注入'当前时间+星期+时段'，告诉Bot消息时间戳的含义。预期：减少时间误判（把昨晚的'好困'当通宵），幻觉控制改善。",
         enable_time_awareness=True, enable_timestamps=True,
         enable_reply_restraint=False, enable_unread_dedup=False, enable_search_in_page=False,
     ),
     "enable_restraint": BotConfig(
         name="enable_restraint",
-        description="只开启回复克制",
+        description="【增量】仅开启回复克制（其余保持基线关闭状态）：Persona增加'回复克制原则'（OK/表情包/确认词/已回复过的消息不回复），未读消息标记'历史中已有回复可跳过'。预期：减少过度回复，回复必要性维度改善。",
         enable_reply_restraint=True, enable_unread_dedup=True,
         enable_time_awareness=False, enable_timestamps=False, enable_search_in_page=False,
     ),
     "enable_search": BotConfig(
         name="enable_search",
-        description="只开启 search_in_page",
+        description="【增量】仅开启信息增强（其余保持基线关闭状态）：browse_url返回12000字（原3000），工具结果不截断（原500），开启search_in_page（browse后可在页面内关键词搜索，前后各200字上下文）。预期：信息准确性+幻觉控制双提升。",
         enable_search_in_page=True, browse_truncate=12000, tool_result_truncate=12000,
         enable_time_awareness=False, enable_timestamps=False,
         enable_reply_restraint=False, enable_unread_dedup=False,
     ),
     "enable_all_p0": BotConfig(
         name="enable_all_p0",
-        description="开启所有 P0 功能",
+        description="【全开】同时开启所有P0改进：时间感知+回复克制+未读去重+search_in_page+信息不截断。验证功能组合的效果——是否存在互相抵消或1+1>2的协同效应。",
         enable_time_awareness=True, enable_timestamps=True,
         enable_reply_restraint=True, enable_unread_dedup=True,
         enable_search_in_page=True, browse_truncate=12000, tool_result_truncate=12000,
@@ -123,17 +124,15 @@ BOT_EXPERIMENTS = {
 # Bot 回复生成（用相同 prompt 调 LLM 重新生成）
 # =============================================================================
 
-def generate_reply(system_prompt: str, user_prompt: str, config: BotConfig) -> str:
-    """根据 Bot 配置，用原始 prompt 调 LLM 生成回复。"""
+def generate_reply(system_prompt: str, user_prompt: str, config: BotConfig):
+    """根据 Bot 配置，用原始 prompt 调 LLM 生成回复。返回 (reply, modified_sp, modified_up)。"""
     from src.utils.qwen_client import QwenClient
+    import re
 
-    # 按配置修改 prompt
     sp = system_prompt
     up = user_prompt
 
     if not config.enable_time_awareness:
-        # 去掉时间上下文
-        import re
         up = re.sub(r'当前时间：[^\n]+\n', '', up)
         up = re.sub(r'⚠️ 消息时间戳说明[^\n]*\n', '', up)
         up = re.sub(r'（[^）]*(?:分钟前|昨晚|今早|\d{2}:\d{2})[^）]*）', '', up)
@@ -153,19 +152,21 @@ def generate_reply(system_prompt: str, user_prompt: str, config: BotConfig) -> s
     messages = [{"role": "system", "content": sp[:8000]}]
     messages.append({"role": "user", "content": up[:12000]})
 
+    reply = ""
     try:
         client = QwenClient(model=config.model)
         raw = client.chat(messages=messages, temperature=config.temperature, max_tokens=500, timeout=30)
         text = raw if isinstance(raw, str) else getattr(raw, "content", str(raw))
-        # 解析 JSON replies
         try:
             data = json.loads(text.strip().lstrip("```json").rstrip("```"))
-            replies = data.get("replies", [])
-            return " | ".join(replies) if replies else text[:200]
+            rlist = data.get("replies", [])
+            reply = " | ".join(rlist) if rlist else text[:200]
         except:
-            return text[:200]
+            reply = text[:200]
     except Exception as e:
-        return f"[生成失败: {e}]"
+        reply = f"[生成失败: {e}]"
+
+    return reply, sp[:8000], up[:12000]
 
 
 # =============================================================================
@@ -220,15 +221,15 @@ def run_experiment(exp_config: BotConfig, tick_ids: list):
         up = d.get("user_prompt", "") or ""
 
         # 对照组：用基线配置重新生成
-        control_reply = generate_reply(sp, up, CONTROL)
+        control_reply, control_sp, control_up = generate_reply(sp, up, CONTROL)
         control_judge = judge_reply(d, control_reply)
 
         # 实验组：用实验配置重新生成
-        exp_reply = generate_reply(sp, up, exp_config)
+        exp_reply, exp_sp, exp_up = generate_reply(sp, up, exp_config)
         exp_judge = judge_reply(d, exp_reply)
 
-        control_results.append({"tick_id": tid, "reply": control_reply, "judge": control_judge})
-        exp_results.append({"tick_id": tid, "reply": exp_reply, "judge": exp_judge})
+        control_results.append({"tick_id": tid, "reply": control_reply, "sp": control_sp, "up": control_up, "judge": control_judge})
+        exp_results.append({"tick_id": tid, "reply": exp_reply, "sp": exp_sp, "up": exp_up, "judge": exp_judge})
 
         c_bc = "BAD" if control_judge.get("is_badcase") else "OK"
         e_bc = "BAD" if exp_judge.get("is_badcase") else "OK"
@@ -277,13 +278,15 @@ def run_experiment(exp_config: BotConfig, tick_ids: list):
         for r, cfg in [(c, "control"), (e, exp_config.name)]:
             conn.execute("""INSERT OR REPLACE INTO experiment_results
                 (experiment_id, tick_id, config_name, bot_reply,
-                 judge_is_badcase, judge_score, judge_dimensions_json, judge_reason)
-                VALUES (?,?,?,?,?,?,?,?)""", (
+                 judge_is_badcase, judge_score, judge_dimensions_json, judge_reason,
+                 system_prompt, user_prompt)
+                VALUES (?,?,?,?,?,?,?,?,?,?)""", (
                 exp_id, r["tick_id"], cfg, r["reply"][:500],
                 1 if r["judge"].get("is_badcase") else 0,
                 r["judge"].get("overall_score", 0),
                 json.dumps(r["judge"].get("dimensions", {}), ensure_ascii=False),
                 r["judge"].get("reason", ""),
+                r.get("sp", ""), r.get("up", ""),
             ))
     conn.commit(); conn.close()
     print(f"实验 ID={exp_id} 已保存")

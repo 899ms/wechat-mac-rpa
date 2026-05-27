@@ -625,11 +625,36 @@ def experiment_detail(exp_id: int):
 
     dims = json.loads(exp["dimension_diffs_json"] or "{}")
 
+    # Config params diff
+    exp_name = exp['name'] or ''
+    config_params = {
+        "enable_time": {"时间感知": "✅", "时间戳注入": "✅", "回复克制": "❌", "未读去重": "❌", "search_in_page": "❌"},
+        "enable_restraint": {"时间感知": "❌", "时间戳注入": "❌", "回复克制": "✅", "未读去重": "✅", "search_in_page": "❌"},
+        "enable_search": {"时间感知": "❌", "时间戳注入": "❌", "回复克制": "❌", "未读去重": "❌", "search_in_page": "✅"},
+        "enable_all_p0": {"时间感知": "✅", "时间戳注入": "✅", "回复克制": "✅", "未读去重": "✅", "search_in_page": "✅"},
+        "all_off": {"时间感知": "❌", "时间戳注入": "❌", "回复克制": "❌", "未读去重": "❌", "search_in_page": "❌"},
+    }
+    params = config_params.get(exp_name, {})
+    param_html = ""
+    if params:
+        param_html = '<div class="card"><b>⚙️ 实验参数（基线=全❌ → 实验组）：</b><br>'
+        for k, v in params.items():
+            param_html += f'<span style="margin:4px 8px;font-size:12px">{k}: <b>{v}</b></span>'
+        param_html += '</div>'
+
+    # 实验策略详细说明
+    exp_desc = exp['description'] or ''
+    content = f"""<div class="card" style="border-left:3px solid var(--blue);margin-bottom:16px">
+  <h2>🧪 实验: {exp['name']}</h2>
+  <div style="font-size:13px;line-height:1.7;color:var(--text);margin:8px 0">{exp_desc}</div>
+  <div style="font-size:11px;color:var(--muted);margin-top:8px">N={exp['n_samples']} · 对照组=all_off(基线) · 固定Judge=v4-pro</div>
+</div>""" + param_html
+
     # Summary
     bc_diff = (exp['control_badcase_rate'] or 0) - (exp['exp_badcase_rate'] or 0)
     score_diff = (exp['exp_avg_score'] or 0) - (exp['control_avg_score'] or 0)
-    content = f"""
-    <div class="card"><b>🧪 {exp['name']}</b> — {exp['description'] or ''} · N={exp['n_samples']} · 固定 Judge: v4-pro</div>
+    content += f"""
+    <div class="card"><b>📊 结果</b></div>
     <div class="metrics">
       <div class="metric"><div class="val">{(exp['control_badcase_rate'] or 0)*100:.0f}% → {(exp['exp_badcase_rate'] or 0)*100:.0f}%</div><div class="lbl">Badcase 率（{bc_diff:+.0%}）</div></div>
       <div class="metric"><div class="val">{exp['control_avg_score']:.1f} → {exp['exp_avg_score']:.1f}</div><div class="lbl">均分（{score_diff:+.1f}）</div></div>
@@ -654,16 +679,36 @@ def experiment_detail(exp_id: int):
                MAX(CASE WHEN c.config_name='control' THEN c.bot_reply END) as c_reply,
                MAX(CASE WHEN c.config_name='control' THEN c.judge_dimensions_json END) as c_dims,
                MAX(CASE WHEN c.config_name='control' THEN c.judge_reason END) as c_reason,
+               MAX(CASE WHEN c.config_name='control' THEN c.system_prompt END) as c_sp,
+               MAX(CASE WHEN c.config_name='control' THEN c.user_prompt END) as c_up,
                MAX(CASE WHEN c.config_name!='control' THEN c.judge_score END) as e_score,
                MAX(CASE WHEN c.config_name!='control' THEN c.judge_is_badcase END) as e_bc,
                MAX(CASE WHEN c.config_name!='control' THEN c.bot_reply END) as e_reply,
                MAX(CASE WHEN c.config_name!='control' THEN c.judge_dimensions_json END) as e_dims,
-               MAX(CASE WHEN c.config_name!='control' THEN c.judge_reason END) as e_reason
+               MAX(CASE WHEN c.config_name!='control' THEN c.judge_reason END) as e_reason,
+               MAX(CASE WHEN c.config_name!='control' THEN c.system_prompt END) as e_sp,
+               MAX(CASE WHEN c.config_name!='control' THEN c.user_prompt END) as e_up
         FROM experiment_results c
         WHERE c.experiment_id=?
         GROUP BY c.tick_id ORDER BY c.tick_id
     """, (exp_id,)).fetchall()
     conn.close()
+
+    # 第一个 case 展示 prompt diff
+    first_case_prompt_diff = ""
+    if results:
+        first = dict(results[0])
+        c_up = first.get("c_up") or ""
+        e_up = first.get("e_up") or ""
+        # Simple diff: find lines that differ
+        c_lines = c_up.split('\n')
+        e_lines = e_up.split('\n')
+        if c_lines != e_lines:
+            first_case_prompt_diff = '<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--blue)">📝 提示词 Diff（基线 vs 实验，第一个 case #' + str(first['tick_id']) + '）</summary><div style="display:flex;gap:8px;margin-top:8px">'
+            first_case_prompt_diff += '<div style="flex:1"><b style="color:var(--green)">基线 Prompt:</b><pre style="font-size:9px;max-height:400px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:6px;border-radius:3px">' + c_up[:6000] + '</pre></div>'
+            first_case_prompt_diff += '<div style="flex:1"><b style="color:var(--yellow)">实验 Prompt:</b><pre style="font-size:9px;max-height:400px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:6px;border-radius:3px">' + e_up[:6000] + '</pre></div>'
+            first_case_prompt_diff += '</div></details>'
+    content += first_case_prompt_diff
 
     content += '<h2>📋 逐 Tick 对比</h2>'
     # 获取上下文数据
