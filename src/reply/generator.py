@@ -306,6 +306,9 @@ class ReplyGenerator:
                                 for tc in raw_tool_calls
                             ],
                         }
+                        # DeepSeek thinking mode 需要回传 reasoning_content，否则 round 1 会空返
+                        if hasattr(raw, "reasoning_content") and raw.reasoning_content:
+                            assistant_msg["reasoning_content"] = raw.reasoning_content
                         messages.append(assistant_msg)
 
                         for tc in raw_tool_calls:
@@ -518,6 +521,11 @@ class ReplyGenerator:
             replies = data.get("replies", [])
             return [str(r).strip() for r in replies if str(r).strip() not in ("收到", "好的", "嗯", "OK", "1")][:3]
         except Exception:
+            # fallback: 按段落拆分，不再整段当一条发
+            for sep in ("\n\n", "\n"):
+                parts = [p.strip() for p in text.split(sep) if p.strip()]
+                if len(parts) > 1:
+                    return [p for p in parts if p not in ("收到", "好的", "嗯", "OK", "1")]
             return [text] if text not in ("收到", "好的", "嗯", "OK", "1") else []
 
     def _load_skill_manifest(self) -> List[Dict[str, str]]:
@@ -924,6 +932,6 @@ class ReplyGenerator:
 
         if skipped_hint:
             lines_local.append(f"提示：第{','.join(skipped_hint)}条未读消息在历史中已有回复，可能不需要再次回复。仅回复真正未处理的新消息。")
-        lines_local.append("回复重点：仅回复真正需要回应的未读消息。纯表情/OK/好的等确认性消息可以不回复。如果所有未读消息都已处理或不需要回复，输出空 replies。")
+        lines_local.append("回复重点：仅回复真正需要回应的未读消息。纯表情/OK/好的等确认性消息可以不回复。")
 
         return "\n".join(lines_local)

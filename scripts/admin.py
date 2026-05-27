@@ -29,14 +29,10 @@ th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)}th{
 #lightbox img{max-width:95vw;max-height:95vh;object-fit:contain}
 #lightbox.show{display:flex}
 /* diff styles */
-table.diff{font-family:monospace;font-size:10px;border-collapse:collapse;width:100%}
-.diff_header{background:rgba(255,255,255,.05);color:var(--muted);font-weight:700}
-.diff_next{background:rgba(255,255,255,.03)}
-.diff_add{background:rgba(63,185,80,.15)}
-.diff_chg{background:rgba(210,153,34,.15)}
-.diff_sub{background:rgba(248,81,73,.15)}
-.diff_add span{color:#3fb950}
-.diff_sub span{color:#f85149}
+.ln{color:var(--muted);text-align:right;padding:0 4px;width:30px;font-size:9px;user-select:none}
+.eq{color:var(--text);padding:0 4px}.del{background:rgba(248,81,73,.2);color:#ff9999;padding:0 4px}
+.add{background:rgba(63,185,80,.2);color:#99ff99;padding:0 4px}
+.empty{background:rgba(255,255,255,.02)}.skip{color:var(--muted);text-align:center;padding:4px}
 </style></head><body>
 <div id="lightbox" onclick="this.classList.remove('show')"><img id="lightbox-img" src=""></div>
 <nav>
@@ -745,35 +741,62 @@ def experiment_detail(exp_id: int):
             color = "var(--green)" if d > 0 else ("var(--red)" if d < 0 else "var(--muted)")
             dim_comparison += f'<span style="margin:2px 6px;font-size:10px">{dim_name}: {cv}→{ev} <b style="color:{color}">{d:+d}</b></span>'
 
-        # 提示词 Diff — 只显示变化行
+        # 提示词 Diff — 对比完整 prompt（system + user）
         rd = dict(r)
-        c_up = rd.get("c_up") or ""; e_up = rd.get("e_up") or ""
+        c_full = (rd.get('c_sp') or '') + '\n---\n' + (rd.get('c_up') or '')
+        e_full = (rd.get('e_sp') or '') + '\n---\n' + (rd.get('e_up') or '')
         prompt_diff = ""
-        if c_up and e_up and c_up != e_up:
-            cl = c_up.split('\n'); el = e_up.split('\n')
-            diff_lines = []
-            max_len = max(len(cl), len(el))
-            # 简单逐行对比：找不同
-            i = 0
-            while i < max_len:
-                cline = cl[i] if i < len(cl) else None
-                eline = el[i] if i < len(el) else None
-                if cline != eline:
-                    # 显示前后各1行上下文
-                    ctx_start = max(0, i-1)
-                    for ctx_i in range(ctx_start, i):
-                        if ctx_i < len(cl):
-                            diff_lines.append(f'<span style="color:var(--muted)">  {ctx_i+1:>4}  {cl[ctx_i][:120]}</span>')
-                    if cline is not None:
-                        diff_lines.append(f'<span style="background:rgba(248,81,73,.15);display:block;font-family:monospace;font-size:10px;padding:1px 4px">- {i+1:>4}  {cline[:200]}</span>')
-                    if eline is not None:
-                        diff_lines.append(f'<span style="background:rgba(63,185,80,.15);display:block;font-family:monospace;font-size:10px;padding:1px 4px">+ {i+1:>4}  {eline[:200]}</span>')
-                i += 1
-            if diff_lines:
-                diff_html = ''.join(diff_lines)
-                change_count = sum(1 for l in diff_lines if 'background:rgba' in l)
-                prompt_diff = '<details style="margin-top:4px"><summary style="cursor:pointer;font-size:11px;color:var(--blue)">📝 提示词 Diff (' + str(change_count) + ' 处变化)</summary>'
-                prompt_diff += '<div style="font-size:10px;max-height:300px;overflow:auto;margin-top:4px;border:1px solid var(--border);border-radius:4px;padding:4px;background:rgba(0,0,0,.3)">' + diff_html + '</div></details>'
+        if c_full.strip() and e_full.strip() and c_full != e_full:
+            import difflib
+            cl = c_full.splitlines(); el = e_full.splitlines()
+            sm = difflib.SequenceMatcher(None, cl, el)
+            left_rows = []; right_rows = []
+            for tag, i1, i2, j1, j2 in sm.get_opcodes():
+                if tag == 'equal':
+                    # 显示少量上下文，大量相同行折叠
+                    lines = cl[i1:i2]
+                    if len(lines) <= 5:
+                        for ln in lines:
+                            left_rows.append(f'<tr><td class="ln">{i1+1}</td><td class="eq">{ln[:150]}</td></tr>')
+                            right_rows.append(f'<tr><td class="ln">{j1+1}</td><td class="eq">{ln[:150]}</td></tr>')
+                            i1+=1; j1+=1
+                    else:
+                        for ln in lines[:2]:
+                            left_rows.append(f'<tr><td class="ln">{i1+1}</td><td class="eq">{ln[:150]}</td></tr>')
+                            right_rows.append(f'<tr><td class="ln">{j1+1}</td><td class="eq">{ln[:150]}</td></tr>')
+                            i1+=1; j1+=1
+                        left_rows.append('<tr><td colspan="2" class="skip">···</td></tr>')
+                        right_rows.append('<tr><td colspan="2" class="skip">···</td></tr>')
+                        for ln in lines[-2:]:
+                            left_rows.append(f'<tr><td class="ln">{i1+len(lines)-2}</td><td class="eq">{ln[:150]}</td></tr>')
+                            right_rows.append(f'<tr><td class="ln">{j1+len(lines)-2}</td><td class="eq">{ln[:150]}</td></tr>')
+                            i1+=1; j1+=1
+                elif tag == 'delete':
+                    for ln in cl[i1:i2]:
+                        left_rows.append(f'<tr><td class="ln">{i1+1}</td><td class="del">{ln[:150]}</td></tr>')
+                        right_rows.append(f'<tr><td class="ln"></td><td class="empty"></td></tr>')
+                        i1+=1
+                elif tag == 'insert':
+                    for ln in el[j1:j2]:
+                        left_rows.append(f'<tr><td class="ln"></td><td class="empty"></td></tr>')
+                        right_rows.append(f'<tr><td class="ln">{j1+1}</td><td class="add">{ln[:150]}</td></tr>')
+                        j1+=1
+                elif tag == 'replace':
+                    for ln in cl[i1:i2]:
+                        left_rows.append(f'<tr><td class="ln">{i1+1}</td><td class="del">{ln[:150]}</td></tr>')
+                        right_rows.append(f'<tr><td class="ln"></td><td class="empty"></td></tr>')
+                        i1+=1
+                    for ln in el[j1:j2]:
+                        left_rows.append(f'<tr><td class="ln"></td><td class="empty"></td></tr>')
+                        right_rows.append(f'<tr><td class="ln">{j1+1}</td><td class="add">{ln[:150]}</td></tr>')
+                        j1+=1
+
+            change_count = sum(1 for row in left_rows if 'class="del"' in row or 'class="add"' in row)
+            prompt_diff = '<details style="margin-top:4px"><summary style="cursor:pointer;font-size:11px;color:var(--blue)">\U0001f4dd 提示词 Diff (' + str(change_count) + ' 行变化)</summary>'
+            prompt_diff += '<div style="display:flex;gap:0;margin-top:4px;max-height:400px;overflow:auto;font-size:10px;font-family:monospace;border:1px solid var(--border);border-radius:4px">'
+            prompt_diff += '<div style="flex:1;min-width:0;overflow:hidden"><table style="width:100%;border-collapse:collapse"><tr><th style="width:30px;color:var(--muted)">#</th><th style="color:var(--red)">基线(all_off)</th></tr>' + ''.join(left_rows) + '</table></div>'
+            prompt_diff += '<div style="flex:1;min-width:0;overflow:hidden;border-left:2px solid var(--border)"><table style="width:100%;border-collapse:collapse"><tr><th style="width:30px;color:var(--muted)">#</th><th style="color:var(--green)">' + exp_name + '</th></tr>' + ''.join(right_rows) + '</table></div>'
+            prompt_diff += '</div></details>'
 
         content += f"""<div class="card {cls}">
   <h3><a href="/ticks/{r['tick_id']}" style="color:var(--blue)">#{r['tick_id']}</a> {arrow} {diff:+.0f}分</h3>

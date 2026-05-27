@@ -57,9 +57,7 @@ class QwenClient:
                 kwargs["tools"] = tools
             if response_format:
                 kwargs["response_format"] = response_format
-            # DeepSeek 官方平台：wiki 生成开启 thinking 以提升提取能力
-            if self.is_deepseek_official:
-                kwargs["extra_body"] = {"thinking": {"type": "enabled"}}
+            # DeepSeek 官方平台：thinking 仅 reasoner 支持，flash/pro 开了会空回复
             _logger = logging.getLogger("src.llm.qwen")
             _logger.info("[Qwen] request start: model=%s tools=%s timeout=%s",
                          kwargs.get("model"), bool(kwargs.get("tools")), kwargs.get("timeout"))
