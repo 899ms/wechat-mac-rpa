@@ -196,10 +196,7 @@ def auto_iterate(rounds: int = 3, n_samples: int = 0):
         print(f"{'='*60}")
 
         cmd = ["python3", str(PROJECT_ROOT / "scripts" / "run_experiment.py"), "--exp", exp_name]
-        if n_samples > 0:
-            cmd.extend(["--n-samples", str(n_samples)])
-        else:
-            cmd.append("--all-labeled")
+        cmd.extend(["--n-samples", str(n_samples if n_samples > 0 else 30)])  # 从全部 tick 随机采样
         subprocess.run(cmd)
 
         conn = sqlite3.connect(str(DB_PATH))

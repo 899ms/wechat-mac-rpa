@@ -15,13 +15,14 @@ graph TB
         P2["像素 Diff 预判"]
         P3["多模态 API"]
         P4["布局解析"]
-        P5["WeFlow API"]
     end
 
     subgraph Reasoning["推理层 Reasoning"]
         R1["状态机 ChatState"]
-        R2["Skills 路由<br/>deepseek / Hermes"]
-        R3["ReAct 循环"]
+        R2["Skills 路由"]
+        R3["日常路径"]
+        R4["轻量化 Agent"]
+        R5["ReAct 循环"]
     end
 
     subgraph Tools["工具层 Tools"]
@@ -31,10 +32,14 @@ graph TB
     end
 
     subgraph Memory["记忆系统 Memory"]
+        M0["WeFlow<br/>全量历史注入"]
         M1["LLM Wiki"]
         M2["BM25 召回"]
-        M3["增量更新"]
-        M4["Overrides"]
+        M3["RAG 检索"]
+        M4["重排 Rerank"]
+        M5["增量更新"]
+        M6["Overrides"]
+        M7["Skills 加载"]
     end
 
     subgraph Action["行动层 Action"]
@@ -48,33 +53,42 @@ graph TB
         D1["tick_log"]
         D2["cases"]
         D3["benchmark_cases"]
-        D4["experiments"]
-        D5["daily_metrics"]
+        D4["LLM as Judge"]
+        D5["AB 实验"]
+        D6["daily_metrics"]
     end
 
     P1 --> P2
     P2 -->|有变化| P3
     P2 -->|无变化| P4
     P3 --> P4
-    P5 -->|全量历史注入| M1
     P4 -->|PerceptionResult| R1
     R1 --> R2
     R2 -->|日常| R3
-    R2 -->|复杂 Skill| R3
-    R3 -->|tool_call| T1
+    R2 -->|复杂 Skill| R4
+    R4 -->|加载| M7
+    M7 -->|Skill 正文| R4
+    R3 -->|需要工具| R5
+    R5 -->|tool_call| T1
     T1 --> M2
-    M2 --> M1
-    M1 -->|召回| R3
-    R3 -->|tool_call| T2
-    T2 -->|结果| R3
-    R3 -->|reply| A1
+    M2 --> M3
+    M3 --> M4
+    M4 --> M1
+    M1 -->|召回| R5
+    R5 -->|tool_call| T2
+    T2 -->|结果| R5
+    R5 -->|reply| A1
+    R4 -->|reply| A1
     R1 -->|switch| A1
     A1 --> A2
     A1 --> A3
     A1 --> A4
     A2 --> D1
     D1 --> D2
-    D2 --> D3
+    D2 --> D4
+    D4 --> D3
+    D3 --> D5
+    D5 -->|反馈| R2
     D3 -->|回归验证| P2
 ```
 
@@ -90,11 +104,12 @@ Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知
 
 感知层的任务是**把像素变成结构化数据**。它不"理解"对话，只负责忠实还原界面上的文字、布局和状态。
 
-当前有三条感知管道：
+当前有两条感知管道：
 
 - **SmartPipeline**（主力）：本地预判 + 多模态 API 兜底。先用像素 Diff 判断截图是否有实质变化，无变化时零 API 调用直接跳过；有变化时调用多模态大模型提取消息内容，同时用本地 OCR 做几何定位。
 - **VisionPipeline**（Fallback）：纯本地 OCR 备用管道，在多模态 API 不可用时降级运行。
-- **WeFlowPipeline**（实验性）：直接读取 WeChat 数据库驱动感知。启动时用于**全量历史注入**（将存量聊天记录批量注入记忆系统），运行时可辅助未读检测。
+
+WeFlowPipeline 不直接参与感知，而是作为**记忆系统的初始化来源**：启动时从微信数据库导出全量历史聊天记录，按聊天聚合后注入 GlobalStore，让 Bot 上线第一天就拥有完整的背景知识。运行时可辅助未读检测。
 
 #### 多模态视觉理解
 
@@ -123,9 +138,9 @@ Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知
 
 我们用 **LCS（最长公共子序列）**做跨 tick 消息对齐，对齐基于多维度模糊匹配：精确哈希匹配、文字相似度、图片 2-gram Jaccard 相似度。对齐后只有真正的新消息进入后续流程，旧消息被静默丢弃。这解决了"重复回复"这个致命错误。
 
-#### Skills 路由与双模型切换
+#### Skills 路由与双路径切换
 
-ReplyGenerator 内部有一个二级路由决策：先用轻量调用判断用户意图是否匹配某个复杂 Skill，再决定后续模型和计算资源。
+ReplyGenerator 内部有一个二级路由决策：先用轻量调用判断用户意图是否匹配某个复杂 Skill，再决定后续路径。
 
 ```
 用户消息
@@ -133,19 +148,17 @@ ReplyGenerator 内部有一个二级路由决策：先用轻量调用判断用�
     ▼
 轻量路由判断（几十 token）
     │
-    ├── 未匹配 Skill → deepseek 路径（日常对话）
-    │   ├── 不加载 Skill
-    │   ├── 由 Bot 注入工具列表和可用 skill 摘要
+    ├── 未匹配 Skill → 日常路径
+    │   ├── Bot 注入工具列表和可用 skill 摘要
     │   └── 启用 ReAct 工具循环
     │
-    └── 匹配 Skill 且 complex_llm_client 存在 → Hermes 路径（复杂任务）
-        ├── 切换长上下文模型（Hermes）
-        ├── Hermes 自行加载完整 Skill 正文
-        └── 不启用 ReAct（单轮深度推理）
+    └── 匹配 Skill → 轻量化 Agent 路径
+        ├── 从记忆系统加载完整 Skill 正文
+        └── 单轮深度推理（不启用 ReAct）
 ```
 
-- **deepseek 路径**：日常闲聊、简单问答。超轻量单轮生成为主，Bot 负责注入工具列表和 skill 摘要。匹配到 skill 时由 Bot 将 skill 正文拼接进 prompt。
-- **Hermes 路径**：复杂 Skill 任务。切换长上下文模型，Hermes 自行加载完整 Skill 正文进行深度推理，不启用 ReAct 工具循环。
+- **日常路径**：绝大多数闲聊、问候、简单问答。超轻量单轮生成，Bot 负责注入工具列表和 skill 摘要。需要外部信息时进入 ReAct 工具循环。
+- **轻量化 Agent 路径**：匹配到复杂 Skill 时，加载完整 Skill 正文进行深度推理。Agent 自行决定调用哪些工具、如何组合结果，单轮完成复杂任务。
 
 这种"先轻量判断、再决定投入"的设计，让大部分日常对话保持毫秒级响应，只有复杂任务才走重型路径。Skills 是可插拔的 Markdown 文件，新增一个 Skill 只需要丢一个文件进目录，零代码改动。
 
@@ -177,17 +190,23 @@ Bot 不是无状态聊天机器人。记忆系统是一个独立子系统，每�
 ```mermaid
 graph LR
     A["用户消息"] --> B["search_memory 工具"]
-    B --> C["关键词匹配<br/>BM25 + 标题匹配"]
-    C --> D["LLM Wiki 召回"]
-    D --> E["结果注入 prompt 上下文"]
-    E --> F["ReplyGenerator"]
+    B --> C["BM25 粗排"]
+    C --> D["RAG 向量检索"]
+    D --> E["重排 Rerank"]
+    E --> F["LLM Wiki 召回"]
+    F --> G["结果注入 prompt"]
+    G --> H["ReplyGenerator"]
 ```
 
-**启动时全量注入**：Bot 启动时，WeFlowPipeline 从微信数据库导出全量历史聊天记录，按聊天聚合后注入 GlobalStore。这一步让 Bot 上线第一天就拥有完整的背景知识，不需要从零积累。
+**启动时全量注入（WeFlow）**：Bot 启动时，WeFlowPipeline 从微信数据库导出全量历史聊天记录，按聊天聚合后注入 GlobalStore。这一步让 Bot 上线第一天就拥有完整的背景知识，不需要从零积累。
 
-**全量构建（逆向初始化）**：从存量聊天记录（微信导出或 WeFlow 备份）批量生成 wiki，按全局用户索引聚合跨聊天消息，自动发现别名，分轮次增量构建。
+**全量构建（逆向初始化）**：从存量聊天记录批量生成 wiki，按全局用户索引聚合跨聊天消息，自动发现别名，分轮次增量构建。
 
 **增量构建（运行时更新）**：运行中新对话被后台异步队列消费，LLM 接收「现有 wiki + 新对话」，输出更新后的完整 wiki。所有新增事实标注来源，严禁删除现有内容。
+
+**RAG 检索与重排**：记忆召回不是简单的关键词匹配。先用 BM25 做粗排召回候选段落，再用向量相似度做 RAG 精排，最后通过重排模型（Rerank）按相关性排序，确保注入 prompt 的内容真正有用。
+
+**Skills 加载**：复杂 Skill 以 Markdown 文件形式存储在记忆系统中。轻量化 Agent 路径触发时，从记忆系统加载完整 Skill 正文注入上下文，Agent 自行决定如何调用工具、组合结果。
 
 **人工 Overrides**：通过外挂 JSON 实现任意字段覆写，LLM 更新时不会破坏人工修改。
 
@@ -240,6 +259,47 @@ graph LR
 8. **回归验证**：修复后跑全量 benchmark，全部通过才能上生产
 
 生产环境中的每一条异常都被自动捕获、评估、归档。不是"修完就忘"，而是形成**可追溯、可回归的 case 资产**。随着 case 库的增长，Bot 的鲁棒性持续提升。
+
+---
+
+## LLM as Judge
+
+人工逐条评估生产回复质量成本极高，我们让 LLM 担任"评判员"。JudgeWorker 是一个异步后台服务，消费 tick_log 中的生产记录，按结构化 Rubric 多维度打分。
+
+**评判维度**：每条回复从多个独立维度评估——相关性（是否答非所问）、准确性（事实有无错误）、语气（是否符合人设）、克制（是否过度回复）、工具使用（是否该用工具时没用）。每个维度 1-5 分，总分加权后判定是否为 badcase。
+
+**Meta-benchmark**：Judge 自身也可能误判。我们建立了 Judge Quality benchmark，用已知标准答案的 case 检验 Judge 的评判准确率。当 Judge 的误判率上升时，触发 Rubric 迭代或模型切换。
+
+**人工 GT 修正**：开发者可在管理后台对 Judge 判定进行人工确认（`human_is_badcase`、`human_badcase_type`）。人工标注直接打在 tick 上，作为 Judge 校准的 ground truth。人工与 Judge 分歧率持续监控，超过阈值时暂停自动评估，等待人工复核。
+
+Judge 不是黑盒——每条评分都附带详细理由，可追溯、可质疑、可修正。
+
+---
+
+## AB 实验框架
+
+生产环境的改动（prompt 调整、功能开关、模型切换）不能凭直觉上线，必须用实验量化验证。
+
+**实验设计**：每条实验定义一个实验组配置和一个对照组（通常是 `all_off` 基线）。实验组可以开启某个功能（如时间感知、回复克制）、调整某个参数（如截断长度）、或切换某个模型。
+
+```
+基线（all_off） → 实验组（enable_time）
+       ↓                ↓
+   同批 case        同批 case
+       ↓                ↓
+   Judge 评分       Judge 评分
+       ↓                ↓
+   Badcase 率       Badcase 率
+       └────── 对比 ──────┘
+```
+
+**消融实验**：我们不仅测"加了什么好"，还测"少了什么坏"。`no_time`、`no_restraint`、`no_dedup` 等消融实验逐个关闭功能，精确衡量每个功能的质量贡献。
+
+**自动迭代**：`auto_iterate` 支持多轮实验自动运行。从基线开始，逐轮开启功能，每轮对比上一轮，直到找到最优组合。支持 `n_samples=0`（使用全部已标注样本）确保统计显著性。
+
+**结果归档**：实验结果自动写入 SQLite（`data/experiments/`），包含每组 case 的逐条对比、prompt diff、维度差异分析。管理后台提供可视化对比界面。
+
+实验结论直接反馈到推理层策略优化，形成"假设 → 实验 → 验证 → 上线"的数据驱动闭环。
 
 ---
 
