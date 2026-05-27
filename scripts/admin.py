@@ -745,20 +745,35 @@ def experiment_detail(exp_id: int):
             color = "var(--green)" if d > 0 else ("var(--red)" if d < 0 else "var(--muted)")
             dim_comparison += f'<span style="margin:2px 6px;font-size:10px">{dim_name}: {cv}→{ev} <b style="color:{color}">{d:+d}</b></span>'
 
-        # 提示词 Diff
+        # 提示词 Diff — 只显示变化行
         rd = dict(r)
         c_up = rd.get("c_up") or ""; e_up = rd.get("e_up") or ""
         prompt_diff = ""
         if c_up and e_up and c_up != e_up:
-            import difflib
-            differ = difflib.HtmlDiff(wrapcolumn=80)
-            diff_table = differ.make_table(
-                c_up.splitlines(keepends=True),
-                e_up.splitlines(keepends=True),
-                '基线(all_off)', exp_name, context=True, numlines=3
-            )
-            prompt_diff = f"""<details style="margin-top:4px" open><summary style="cursor:pointer;font-size:11px;color:var(--blue)">📝 提示词 Diff</summary>
-<div style="font-size:10px;max-height:350px;overflow:auto;margin-top:4px">{diff_table}</div></details>"""
+            cl = c_up.split('\n'); el = e_up.split('\n')
+            diff_lines = []
+            max_len = max(len(cl), len(el))
+            # 简单逐行对比：找不同
+            i = 0
+            while i < max_len:
+                cline = cl[i] if i < len(cl) else None
+                eline = el[i] if i < len(el) else None
+                if cline != eline:
+                    # 显示前后各1行上下文
+                    ctx_start = max(0, i-1)
+                    for ctx_i in range(ctx_start, i):
+                        if ctx_i < len(cl):
+                            diff_lines.append(f'<span style="color:var(--muted)">  {ctx_i+1:>4}  {cl[ctx_i][:120]}</span>')
+                    if cline is not None:
+                        diff_lines.append(f'<span style="background:rgba(248,81,73,.15);display:block;font-family:monospace;font-size:10px;padding:1px 4px">- {i+1:>4}  {cline[:200]}</span>')
+                    if eline is not None:
+                        diff_lines.append(f'<span style="background:rgba(63,185,80,.15);display:block;font-family:monospace;font-size:10px;padding:1px 4px">+ {i+1:>4}  {eline[:200]}</span>')
+                i += 1
+            if diff_lines:
+                diff_html = ''.join(diff_lines)
+                change_count = sum(1 for l in diff_lines if 'background:rgba' in l)
+                prompt_diff = '<details style="margin-top:4px"><summary style="cursor:pointer;font-size:11px;color:var(--blue)">📝 提示词 Diff (' + str(change_count) + ' 处变化)</summary>'
+                prompt_diff += '<div style="font-size:10px;max-height:300px;overflow:auto;margin-top:4px;border:1px solid var(--border);border-radius:4px;padding:4px;background:rgba(0,0,0,.3)">' + diff_html + '</div></details>'
 
         content += f"""<div class="card {cls}">
   <h3><a href="/ticks/{r['tick_id']}" style="color:var(--blue)">#{r['tick_id']}</a> {arrow} {diff:+.0f}分</h3>

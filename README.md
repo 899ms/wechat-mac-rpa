@@ -20,14 +20,18 @@ graph TB
     subgraph Reasoning["推理层 Reasoning"]
         R1["状态机 ChatState"]
         R2["Skills 路由"]
-        R3["日常路径"]
-        R4["轻量化 Agent<br/>ReAct + Skills"]
+        R3["轻量化 Agent"]
+        R4["Hermes"]
     end
 
     subgraph Tools["工具层 Tools"]
         T1["search_memory"]
         T2["web_search / weather / stock"]
         T3["browse_url"]
+    end
+
+    subgraph Skills["Skills"]
+        S1["可插拔 Skill<br/>Markdown"]
     end
 
     subgraph Memory["记忆系统 Memory"]
@@ -38,7 +42,6 @@ graph TB
         M4["重排<br/>含 BM25"]
         M5["增量更新"]
         M6["Overrides"]
-        M7["Skills 加载"]
     end
 
     subgraph Action["行动层 Action"]
@@ -66,11 +69,12 @@ graph TB
     R2 -->|日常| R3
     R2 -->|复杂 Skill| R4
 
+    R3 -->|tool_call| T1
     R3 -->|tool_call| T2
-    R4 -->|tool_call| T1
-    R4 -->|tool_call| T2
-    R4 -->|加载| M7
-    M7 -->|Skill 正文| R4
+    R3 -->|加载| S1
+    R4 -->|加载| S1
+    S1 -->|skill 正文| R3
+    S1 -->|skill 正文| R4
 
     T1 --> M2
     T1 --> M3
@@ -78,10 +82,9 @@ graph TB
     M1 --> M3
     M2 --> M4
     M3 --> M4
-    M4 -->|召回| R4
+    M4 -->|召回| R3
 
     T2 -->|结果| R3
-    T2 -->|结果| R4
 
     R3 -->|reply| A1
     R4 -->|reply| A1
@@ -157,22 +160,35 @@ ReplyGenerator 内部有一个二级路由决策：先用轻量调用判断用�
 用户消息
     │
     ▼
-轻量路由判断（几十 token）
+Skills 路由（几十 token）
     │
-    ├── 未匹配 Skill → 日常路径
-    │   └── 简单工具调用（时间 / 天气 / 搜索）
+    ├── 未匹配 Skill → 轻量化 Agent 路径（日常）
+    │   ├── ReAct 循环
+    │   ├── 工具调用（search / web / browse）
+    │   └── 可加载 Skills
     │
-    └── 匹配 Skill → 轻量化 Agent 路径
-        ├── 从记忆系统加载完整 Skill 正文
-        └── ReAct 循环（思考 → 行动 → 观察 → 再思考）
+    └── 匹配 Skill 且 Hermes 可用 → Hermes 路径
+        ├── Hermes 加载完整 Skill 正文
+        └── 单轮深度推理（不走 ReAct）
 ```
 
-- **日常路径**：绝大多数闲聊、问候、简单问答。模型按需调用简单工具（天气、时间、网页搜索），单轮生成直接回复，不走 ReAct 循环。
-- **轻量化 Agent 路径**：匹配到复杂 Skill 时，Agent 运行完整的 **ReAct 循环**——分析意图 → 调用工具 → 观察结果 → 重新推理。Agent 自行决定调用 `search_memory`、`web_search`、`browse_url` 等工具，加载 Skill 正文进行深度组合推理。
+- **轻量化 Agent（日常路径）**：Bot 的主要推理引擎。运行完整的 **ReAct 循环**——分析意图 → 调用工具 → 观察结果 → 重新推理。Agent 自行决定调用 `search_memory`、`web_search`、`browse_url` 等工具，也可以加载 Skills 进行深度组合推理。
+- **Hermes 路径**：匹配到复杂 Skill 且 Hermes 模型可用时，切换长上下文模型，加载完整 Skill 正文进行单轮深度推理，不启用 ReAct 工具循环。
 
-这种"先轻量判断、再决定投入"的设计，让大部分日常对话保持毫秒级响应，只有复杂任务才走重型路径。Skills 是可插拔的 Markdown 文件，新增一个 Skill 只需要丢一个文件进目录，零代码改动。
+这种"先轻量判断、再决定投入"的设计，让大部分日常对话保持毫秒级响应，只有复杂任务才走重型路径。
 
-工具通过统一注册表管理：
+#### Skills 与 Tools
+
+**Skills** 和 **Tools** 在架构层级上并列，都是 Agent 可调用的能力，但定位不同：
+
+| | Skills | Tools |
+|--|--------|-------|
+| **形态** | Markdown 文件（可插拔） | Python 函数（统一注册） |
+| **作用** | 定义复杂任务的推理策略和流程 | 获取外部信息或执行具体操作 |
+| **例子** | "股票分析助手"、"日程管理" | `web_search`、`get_weather`、`search_memory` |
+| **谁加载** | 轻量化 Agent 或 Hermes 按需加载 | Agent 在 ReAct 循环中自行调用 |
+
+Skills 是可插拔的 Markdown 文件，新增一个 Skill 只需要丢一个文件进目录，零代码改动。Tools 通过统一注册表管理：
 
 | 工具 | 用途 |
 |------|------|
@@ -208,7 +224,7 @@ graph LR
 
 **多路召回与重排**：记忆召回走两条并行的路——关键词召回从 Wiki 中做文本匹配，RAG 向量检索做语义相似度匹配。两路结果汇总后进入重排阶段，BM25 是重排的相关性因子之一，最终选出 top-k 段落注入 Agent 上下文。
 
-**Skills 加载**：复杂 Skill 以 Markdown 文件形式存储在记忆系统中。轻量化 Agent 路径触发时，从记忆系统加载完整 Skill 正文注入上下文，Agent 在 ReAct 循环中自行决定如何调用工具、组合结果。
+**Skills 存储**：复杂 Skill 以 Markdown 文件形式存储在 `data/skills/` 目录下。Skills 路由在第一步判断用户意图是否匹配某个 Skill，匹配后由轻量化 Agent 或 Hermes 加载完整正文注入上下文。
 
 **人工 Overrides**：通过外挂 JSON 实现任意字段覆写，LLM 更新时不会破坏人工修改。
 
