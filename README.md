@@ -21,8 +21,7 @@ graph TB
         R1["状态机 ChatState"]
         R2["Skills 路由"]
         R3["日常路径"]
-        R4["轻量化 Agent"]
-        R5["ReAct 循环"]
+        R4["轻量化 Agent<br/>ReAct + Skills"]
     end
 
     subgraph Tools["工具层 Tools"]
@@ -32,11 +31,11 @@ graph TB
     end
 
     subgraph Memory["记忆系统 Memory"]
-        M0["WeFlow<br/>全量历史注入"]
+        M0["WeFlow<br/>全量注入"]
         M1["LLM Wiki"]
-        M2["BM25 召回"]
+        M2["关键词召回"]
         M3["RAG 检索"]
-        M4["重排 Rerank"]
+        M4["重排<br/>含 BM25"]
         M5["增量更新"]
         M6["Overrides"]
         M7["Skills 加载"]
@@ -66,23 +65,31 @@ graph TB
     R1 --> R2
     R2 -->|日常| R3
     R2 -->|复杂 Skill| R4
+
+    R3 -->|tool_call| T2
+    R4 -->|tool_call| T1
+    R4 -->|tool_call| T2
     R4 -->|加载| M7
     M7 -->|Skill 正文| R4
-    R3 -->|需要工具| R5
-    R5 -->|tool_call| T1
+
     T1 --> M2
-    M2 --> M3
+    T1 --> M3
+    M1 --> M2
+    M1 --> M3
+    M2 --> M4
     M3 --> M4
-    M4 --> M1
-    M1 -->|召回| R5
-    R5 -->|tool_call| T2
-    T2 -->|结果| R5
-    R5 -->|reply| A1
+    M4 -->|召回| R4
+
+    T2 -->|结果| R3
+    T2 -->|结果| R4
+
+    R3 -->|reply| A1
     R4 -->|reply| A1
     R1 -->|switch| A1
     A1 --> A2
     A1 --> A3
     A1 --> A4
+
     A2 --> D1
     D1 --> D2
     D2 --> D4
@@ -90,6 +97,10 @@ graph TB
     D3 --> D5
     D5 -->|反馈| R2
     D3 -->|回归验证| P2
+
+    M0 -->|注入| M1
+    M5 -->|更新| M1
+    M6 -->|覆盖| M1
 ```
 
 Bot 的核心是一个**认知循环**：定期对微信窗口做快照，感知层提取当前对话状态，推理层决定如何回复，行动层执行界面操作。三个层之间通过严格的数据契约（`PerceptionResult`、`ChatState`、`ActionResult`）通信，底层细节完全隔离。
@@ -149,28 +160,19 @@ ReplyGenerator 内部有一个二级路由决策：先用轻量调用判断用�
 轻量路由判断（几十 token）
     │
     ├── 未匹配 Skill → 日常路径
-    │   ├── Bot 注入工具列表和可用 skill 摘要
-    │   └── 启用 ReAct 工具循环
+    │   └── 简单工具调用（时间 / 天气 / 搜索）
     │
     └── 匹配 Skill → 轻量化 Agent 路径
         ├── 从记忆系统加载完整 Skill 正文
-        └── 单轮深度推理（不启用 ReAct）
+        └── ReAct 循环（思考 → 行动 → 观察 → 再思考）
 ```
 
-- **日常路径**：绝大多数闲聊、问候、简单问答。超轻量单轮生成，Bot 负责注入工具列表和 skill 摘要。需要外部信息时进入 ReAct 工具循环。
-- **轻量化 Agent 路径**：匹配到复杂 Skill 时，加载完整 Skill 正文进行深度推理。Agent 自行决定调用哪些工具、如何组合结果，单轮完成复杂任务。
+- **日常路径**：绝大多数闲聊、问候、简单问答。模型按需调用简单工具（天气、时间、网页搜索），单轮生成直接回复，不走 ReAct 循环。
+- **轻量化 Agent 路径**：匹配到复杂 Skill 时，Agent 运行完整的 **ReAct 循环**——分析意图 → 调用工具 → 观察结果 → 重新推理。Agent 自行决定调用 `search_memory`、`web_search`、`browse_url` 等工具，加载 Skill 正文进行深度组合推理。
 
 这种"先轻量判断、再决定投入"的设计，让大部分日常对话保持毫秒级响应，只有复杂任务才走重型路径。Skills 是可插拔的 Markdown 文件，新增一个 Skill 只需要丢一个文件进目录，零代码改动。
 
-#### ReAct 工具循环
-
-当进入 deepseek 路径且需要外部信息时，ReplyGenerator 运行完整的 **ReAct 循环**：
-
-```
-[思考] 分析意图 → [行动] 调用工具 → [观察] 注入结果 → [再思考] 重新推理
-```
-
-工具通过统一注册表管理，Bot 维护一套内置工具集：
+工具通过统一注册表管理：
 
 | 工具 | 用途 |
 |------|------|
@@ -189,24 +191,24 @@ Bot 不是无状态聊天机器人。记忆系统是一个独立子系统，每�
 
 ```mermaid
 graph LR
-    A["用户消息"] --> B["search_memory 工具"]
-    B --> C["BM25 粗排"]
-    C --> D["RAG 向量检索"]
-    D --> E["重排 Rerank"]
-    E --> F["LLM Wiki 召回"]
-    F --> G["结果注入 prompt"]
-    G --> H["ReplyGenerator"]
+    A["search_memory 工具"] --> B["关键词召回"]
+    A --> C["RAG 向量检索"]
+    D["LLM Wiki"] --> B
+    D --> C
+    B --> E["重排<br/>含 BM25"]
+    C --> E
+    E --> F["召回结果注入 Agent"]
 ```
 
-**启动时全量注入（WeFlow）**：Bot 启动时，WeFlowPipeline 从微信数据库导出全量历史聊天记录，按聊天聚合后注入 GlobalStore。这一步让 Bot 上线第一天就拥有完整的背景知识，不需要从零积累。
+**启动时全量注入（WeFlow）**：Bot 启动时，WeFlowPipeline 从微信数据库导出全量历史聊天记录，直接写入 LLM Wiki。这一步让 Bot 上线第一天就拥有完整的背景知识，不需要从零积累。
 
 **全量构建（逆向初始化）**：从存量聊天记录批量生成 wiki，按全局用户索引聚合跨聊天消息，自动发现别名，分轮次增量构建。
 
 **增量构建（运行时更新）**：运行中新对话被后台异步队列消费，LLM 接收「现有 wiki + 新对话」，输出更新后的完整 wiki。所有新增事实标注来源，严禁删除现有内容。
 
-**RAG 检索与重排**：记忆召回不是简单的关键词匹配。先用 BM25 做粗排召回候选段落，再用向量相似度做 RAG 精排，最后通过重排模型（Rerank）按相关性排序，确保注入 prompt 的内容真正有用。
+**多路召回与重排**：记忆召回走两条并行的路——关键词召回从 Wiki 中做文本匹配，RAG 向量检索做语义相似度匹配。两路结果汇总后进入重排阶段，BM25 是重排的相关性因子之一，最终选出 top-k 段落注入 Agent 上下文。
 
-**Skills 加载**：复杂 Skill 以 Markdown 文件形式存储在记忆系统中。轻量化 Agent 路径触发时，从记忆系统加载完整 Skill 正文注入上下文，Agent 自行决定如何调用工具、组合结果。
+**Skills 加载**：复杂 Skill 以 Markdown 文件形式存储在记忆系统中。轻量化 Agent 路径触发时，从记忆系统加载完整 Skill 正文注入上下文，Agent 在 ReAct 循环中自行决定如何调用工具、组合结果。
 
 **人工 Overrides**：通过外挂 JSON 实现任意字段覆写，LLM 更新时不会破坏人工修改。
 

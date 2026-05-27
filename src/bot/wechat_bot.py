@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """L5 Bot Orchestrator - 主循环编排"""
 
-import json
 import os
-import re
 import time
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Callable, Optional
 
 from src.models.base import ActionResult, ChatMessage, PerceptionResult, SenderType
 from src.perception.vision_pipeline import VisionPipeline
@@ -82,14 +80,14 @@ class WeChatBot:
         self._switch_debounce_seconds: float = 10.0
 
         # 全局状态持久化目录
-        Path("data").mkdir(parents=True, exist_ok=True)
+        project_root = Path(__file__).parent.parent.parent
+        (project_root / "data").mkdir(parents=True, exist_ok=True)
 
         # ===== WeFlow 全量初始化 =====
         self._weflow_mode = os.getenv("WEFLOW_MODE", "ocr")
         print(f"[WeFlow] 模式检测: WEFLOW_MODE={self._weflow_mode}")
         if self._weflow_mode in ("weflow", "hybrid"):
             try:
-                from src.perception.weflow_pipeline import WeFlowPipeline
                 has_wf = hasattr(self.perception, '_weflow_pipeline')
                 wf_val = getattr(self.perception, '_weflow_pipeline', None)
                 print(f"[WeFlow] pipeline检查: hasattr={has_wf}, value={wf_val}")
@@ -500,7 +498,6 @@ class WeChatBot:
         # ===== WeFlow 模式：API 轮询检测未读 =====
         if self._weflow_mode in ("weflow", "hybrid"):
             try:
-                from src.perception.weflow_pipeline import WeFlowPipeline
                 weflow = getattr(self.perception, '_weflow_pipeline', None)
                 self.logger.info(f"[WeFlow] 切换检测: weflow={weflow is not None}, initialized={getattr(weflow, '_initialized', False)}")
                 if weflow and weflow._initialized:

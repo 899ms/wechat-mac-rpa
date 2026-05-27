@@ -11,7 +11,7 @@ import pytest
 
 from src.memory.engine import MemoryEngine
 
-REAL_WIKI_DIR = Path("/Users/yihanwang/wechat-mac-rpa/data/memory/wiki")
+REAL_WIKI_DIR = Path(__file__).parent.parent.parent / "data" / "memory" / "wiki"
 
 
 def copy_real_wiki(engine, names: list[str]):

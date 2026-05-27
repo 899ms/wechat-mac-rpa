@@ -3,6 +3,7 @@
 
 import logging
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from src.models.base import ChatMessage, SenderType
@@ -521,7 +522,6 @@ class ReplyGenerator:
 
     def _load_skill_manifest(self) -> List[Dict[str, str]]:
         """扫描 skills/ 目录，返回技能清单（name + trigger 描述），不含正文。"""
-        from pathlib import Path
         skills_dir = Path(__file__).parent.parent.parent / "skills"
         if not skills_dir.exists():
             return []
@@ -542,7 +542,6 @@ class ReplyGenerator:
 
     def _load_skill_content(self, skill_name: str) -> str:
         """加载指定 skill 的完整 SKILL.md 内容。"""
-        from pathlib import Path
         md_file = Path(__file__).parent.parent.parent / "skills" / skill_name / "SKILL.md"
         if md_file.exists():
             return md_file.read_text(encoding="utf-8").strip()
@@ -632,7 +631,6 @@ class ReplyGenerator:
     def _load_skill_one_liners(self) -> str:
         """加载所有 skill 的一句话摘要（始终放在 system prompt 中，极简）。
         从 SKILL.md 的'触发条件'段落提取第一句话。"""
-        from pathlib import Path
         skills_dir = Path(__file__).parent.parent.parent / "skills"
         if not skills_dir.exists():
             return ""
@@ -669,7 +667,6 @@ class ReplyGenerator:
 
     def _system_prompt(self) -> str:
         """核心 system prompt：读 prompts/persona.md（DT 风格），注入工具描述 + 检索案例。"""
-        from pathlib import Path
         prompt_path = Path(__file__).parent.parent.parent / "prompts" / "persona.md"
         if prompt_path.exists():
             prompt = prompt_path.read_text(encoding="utf-8")

@@ -158,14 +158,15 @@ class MemoryEngine:
 
     def __init__(self, llm_client=None):
         self.llm_client = llm_client
-        self.wiki_dir = Path("data/memory/wiki")
+        project_root = Path(__file__).parent.parent.parent
+        self.wiki_dir = project_root / "data" / "memory" / "wiki"
         self.wiki_dir.mkdir(parents=True, exist_ok=True)
         (self.wiki_dir / "users").mkdir(exist_ok=True)
         (self.wiki_dir / "groups").mkdir(exist_ok=True)
         (self.wiki_dir / "topics").mkdir(exist_ok=True)
 
         # 外挂配置
-        self.overrides_dir = Path("data/memory/overrides")
+        self.overrides_dir = project_root / "data" / "memory" / "overrides"
         self.overrides_dir.mkdir(parents=True, exist_ok=True)
         self._aliases: Dict[str, List[str]] = {}      # 用户名 -> [别名列表]
         self._facts: Dict[str, List[dict]] = {}       # 用户名 -> [事实列表]

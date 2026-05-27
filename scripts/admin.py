@@ -28,6 +28,15 @@ th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)}th{
 #lightbox{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.9);z-index:9999;cursor:zoom-out;align-items:center;justify-content:center}
 #lightbox img{max-width:95vw;max-height:95vh;object-fit:contain}
 #lightbox.show{display:flex}
+/* diff styles */
+table.diff{font-family:monospace;font-size:10px;border-collapse:collapse;width:100%}
+.diff_header{background:rgba(255,255,255,.05);color:var(--muted);font-weight:700}
+.diff_next{background:rgba(255,255,255,.03)}
+.diff_add{background:rgba(63,185,80,.15)}
+.diff_chg{background:rgba(210,153,34,.15)}
+.diff_sub{background:rgba(248,81,73,.15)}
+.diff_add span{color:#3fb950}
+.diff_sub span{color:#f85149}
 </style></head><body>
 <div id="lightbox" onclick="this.classList.remove('show')"><img id="lightbox-img" src=""></div>
 <nav>
@@ -694,21 +703,6 @@ def experiment_detail(exp_id: int):
     """, (exp_id,)).fetchall()
     conn.close()
 
-    # 第一个 case 展示 prompt diff
-    first_case_prompt_diff = ""
-    if results:
-        first = dict(results[0])
-        c_up = first.get("c_up") or ""
-        e_up = first.get("e_up") or ""
-        # Simple diff: find lines that differ
-        c_lines = c_up.split('\n')
-        e_lines = e_up.split('\n')
-        if c_lines != e_lines:
-            first_case_prompt_diff = '<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--blue)">📝 提示词 Diff（基线 vs 实验，第一个 case #' + str(first['tick_id']) + '）</summary><div style="display:flex;gap:8px;margin-top:8px">'
-            first_case_prompt_diff += '<div style="flex:1"><b style="color:var(--green)">基线 Prompt:</b><pre style="font-size:9px;max-height:400px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:6px;border-radius:3px">' + c_up[:6000] + '</pre></div>'
-            first_case_prompt_diff += '<div style="flex:1"><b style="color:var(--yellow)">实验 Prompt:</b><pre style="font-size:9px;max-height:400px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:6px;border-radius:3px">' + e_up[:6000] + '</pre></div>'
-            first_case_prompt_diff += '</div></details>'
-    content += first_case_prompt_diff
 
     content += '<h2>📋 逐 Tick 对比</h2>'
     # 获取上下文数据
@@ -751,8 +745,24 @@ def experiment_detail(exp_id: int):
             color = "var(--green)" if d > 0 else ("var(--red)" if d < 0 else "var(--muted)")
             dim_comparison += f'<span style="margin:2px 6px;font-size:10px">{dim_name}: {cv}→{ev} <b style="color:{color}">{d:+d}</b></span>'
 
+        # 提示词 Diff
+        rd = dict(r)
+        c_up = rd.get("c_up") or ""; e_up = rd.get("e_up") or ""
+        prompt_diff = ""
+        if c_up and e_up and c_up != e_up:
+            import difflib
+            differ = difflib.HtmlDiff(wrapcolumn=80)
+            diff_table = differ.make_table(
+                c_up.splitlines(keepends=True),
+                e_up.splitlines(keepends=True),
+                '基线(all_off)', exp_name, context=True, numlines=3
+            )
+            prompt_diff = f"""<details style="margin-top:4px" open><summary style="cursor:pointer;font-size:11px;color:var(--blue)">📝 提示词 Diff</summary>
+<div style="font-size:10px;max-height:350px;overflow:auto;margin-top:4px">{diff_table}</div></details>"""
+
         content += f"""<div class="card {cls}">
   <h3><a href="/ticks/{r['tick_id']}" style="color:var(--blue)">#{r['tick_id']}</a> {arrow} {diff:+.0f}分</h3>
+  {prompt_diff}
   <table><tr>
     <th style="width:50%">基线 {c_icon} {c_s:.0f}分</th>
     <th style="width:50%">实验组 {e_icon} {e_s:.0f}分</th>

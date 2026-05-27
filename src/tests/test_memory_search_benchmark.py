@@ -34,7 +34,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.memory.engine import MemoryEngine
 
-REAL_WIKI_DIR = Path("/Users/yihanwang/wechat-mac-rpa/data/memory/wiki")
+REAL_WIKI_DIR = Path(__file__).parent.parent.parent / "data" / "memory" / "wiki"
 
 
 # ========== Data Models ==========

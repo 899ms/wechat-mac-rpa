@@ -5,7 +5,7 @@ import logging
 import subprocess
 import time
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 
 import Quartz
 import AppKit

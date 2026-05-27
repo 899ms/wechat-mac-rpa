@@ -220,8 +220,8 @@ def run_experiment(exp_config: BotConfig, tick_ids: list):
         sp = d.get("system_prompt", "") or ""
         up = d.get("user_prompt", "") or ""
 
-        # 对照组：用基线配置重新生成
-        control_reply, control_sp, control_up = generate_reply(sp, up, CONTROL)
+        # 对照组：统一用 all_off 基线（全关）
+        control_reply, control_sp, control_up = generate_reply(sp, up, BOT_EXPERIMENTS["all_off"])
         control_judge = judge_reply(d, control_reply)
 
         # 实验组：用实验配置重新生成
@@ -319,7 +319,10 @@ def main():
         conn.close()
     else:
         conn = sqlite3.connect(str(DB_PATH))
-        all_ids = [r[0] for r in conn.execute("SELECT tick_id FROM tick_log WHERE should_reply=1 ORDER BY RANDOM() LIMIT ?", (args.n_samples,)).fetchall()]
+        # 等距采样，跨实验可对比
+        total = conn.execute("SELECT COUNT(*) FROM tick_log WHERE should_reply=1").fetchone()[0]
+        step = max(1, total // args.n_samples)
+        all_ids = [r[0] for r in conn.execute(f"SELECT tick_id FROM tick_log WHERE should_reply=1 ORDER BY id LIMIT {args.n_samples * step}").fetchall()[::step]]
         conn.close()
         tick_ids = all_ids
 

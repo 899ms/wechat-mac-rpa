@@ -50,7 +50,7 @@ class BotLogger:
 
     def __init__(self, logs_dir: Optional[str] = None, max_bytes: int = 5 * 1024 * 1024, backup_count: int = 3):
         if logs_dir is None:
-            logs_dir = os.path.expanduser("~/wechat-mac-rpa/data/logs")
+            logs_dir = str(Path(__file__).parent.parent.parent / "data" / "logs")
         self.logs_dir = Path(logs_dir)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
 
