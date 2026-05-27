@@ -17,6 +17,7 @@ from src.utils.chat_utils import _is_group_chat_name, _normalize_chat_name
 from src.reply.generator import ReplyGenerator
 from src.action.message_sender import WeChatMessageSender
 from src.action.chat_list_clicker import ChatListClicker
+import logging as _logging
 from src.logging.bot_logger import BotLogger, get_logger
 from src.utils.debug_logger import DebugLogger
 from src.memory import MemoryEngine
@@ -27,7 +28,8 @@ def _try_create_openclaw_client():
     try:
         from src.llm.openclaw_client import OpenClawClient
         return OpenClawClient.from_openclaw_config()
-    except Exception:
+    except Exception as e:
+        _logging.warning("[bot] OpenClaw 客户端创建失败，退化为单模型模式: %s", e)
         return None
 
 
@@ -56,8 +58,8 @@ class WeChatBot:
             from scripts.sync_knowledge import sync
             if sync():
                 print("[knowledge] 已自动同步 knowledge_source.md")
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[knowledge] 同步失败: {e}")
 
         # 先创建记忆引擎（ReplyGenerator 初始化时需要）
         self.memory_engine: MemoryEngine = MemoryEngine(llm_client=actual_llm)
@@ -67,7 +69,8 @@ class WeChatBot:
         self.on_message = on_message
         self.logger: BotLogger = get_logger()
         self.running = False
-        self._tick_id = 0
+        self.session_id = __import__('time').strftime("%Y%m%d%H%M%S") + "_" + str(os.getpid())
+        self._tick_id = int(time.time())  # 跨重启唯一
         self.debug_mode = debug_mode
         self.debug_logger = DebugLogger()
         # 免回复聊天列表：公众号、系统账号等不需要回复的聊天
@@ -184,8 +187,8 @@ class WeChatBot:
                     result.screenshot_path = str(saved_path)
                     if self.debug_logger.current is not None:
                         self.debug_logger.current.screenshot_path = str(saved_path)
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.logger.warning("截图保存失败: %s", e)
 
             messages = result.messages
             raw_chat_name = result.chat_name or ""
@@ -308,6 +311,39 @@ class WeChatBot:
                 all_messages = []
             replies = self.generator.generate(to_reply, all_messages, is_group=is_group, tick_id=tick_id)
             reply_text = " | ".join(replies) if replies else ""
+            # 写 tick_log
+            try:
+                import json as _json
+                from src.badcase.case_db import get_db
+                conn = get_db()._get_conn()
+                # 提取工具执行结果（从 generation_trace 中过滤 tool_execution 事件）
+                trace = getattr(self.generator, 'last_generation_trace', []) or []
+                tool_results = [
+                    {"tool": t.get("tool_name", ""), "args": t.get("arguments", ""), "result": str(t.get("result", ""))[:2000]}
+                    for t in trace if t.get("type") == "tool_execution"
+                ]
+
+                conn.execute("""INSERT INTO tick_log
+                    (session_id, tick_id, chat_name, is_group,
+                     messages_count, new_messages_count,
+                     system_prompt, user_prompt, raw_response, tool_calls_json, tool_results_json,
+                     should_reply, replies_sent_json, screenshot_path)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?,?)""", (
+                    self.session_id,
+                    tick_id, chat_name, 1 if is_group else 0,
+                    len(all_messages) if all_messages else 0,
+                    len(unreplied),
+                    getattr(self.generator, 'last_system_prompt', '') or '',
+                    getattr(self.generator, 'last_user_prompt', '') or '',
+                    getattr(self.generator, 'last_raw_response', '') or '',
+                    _json.dumps(getattr(self.generator, 'last_tool_calls', []) or [], ensure_ascii=False),
+                    _json.dumps(tool_results, ensure_ascii=False),
+                    _json.dumps(replies, ensure_ascii=False),
+                    result.screenshot_path or '',
+                ))
+                conn.commit(); conn.close()
+            except Exception as e:
+                self.logger.warning("tick_log 写入失败: %s", e)
             self.logger.log_decision(
                 tick_id, should_reply=True,
                 reason=f"触发回复条件 (未读 {len(unreplied)} 条，需回复 {len(to_reply)} 条，生成 {len(replies)} 条回复)",
@@ -385,6 +421,8 @@ class WeChatBot:
             for msg in to_reply:
                 self.global_store.mark_replied(chat_name, msg, reply_text)
 
+            # Judge 评分已由 generator._submit_to_judge 异步处理（唯一路径）
+
             # 触发记忆更新（异步，不阻塞）
             if self.memory_engine is not None:
                 if is_group:
@@ -423,8 +461,8 @@ class WeChatBot:
                 try:
                     path = self.debug_logger.save()
                     self.logger.debug(f"调试日志已保存: {path}")
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.logger.warning("调试日志保存失败: %s", e)
                 self.debug_logger.current = None
             self.save_sessions()
 

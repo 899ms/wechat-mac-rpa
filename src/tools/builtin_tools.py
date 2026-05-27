@@ -1,6 +1,5 @@
 """内置工具 - 时间、天气、搜索"""
 
-import html
 import json
 import re
 from datetime import datetime
@@ -42,6 +41,8 @@ def _web_search(query: str = "") -> str:
     if not query:
         return "请提供搜索关键词"
     try:
+        from bs4 import BeautifulSoup
+
         url = "https://www.so.com/s"
         params = {"q": query}
         headers = {
@@ -51,50 +52,40 @@ def _web_search(query: str = "") -> str:
             ),
         }
         resp = requests.get(url, params=params, headers=headers, timeout=10)
-        text = resp.text
+        soup = BeautifulSoup(resp.text, "html.parser")
 
         results = []
-        # 360 结果在 <li class="res-list"> 中
-        for block in re.finditer(r'<li[^>]*class=["\']res-list["\'][^>]*>(.*?)</li>', text, re.DOTALL | re.IGNORECASE):
-            block_html = block.group(1)
-
+        for li in soup.find_all("li", class_="res-list"):
             # 标题和链接
             title = ""
             link = ""
-            hm = re.search(r'<h3[^>]*>(.*?)</h3>', block_html, re.DOTALL | re.IGNORECASE)
-            if hm:
-                am = re.search(r'<a[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', hm.group(1), re.DOTALL | re.IGNORECASE)
-                if am:
-                    link = html.unescape(am.group(1)).strip()
-                    title = re.sub(r'<[^>]+>', '', am.group(2)).strip()
-                    # 优先从 data-mdurl 拿真实URL（360 跳转链接是加密的，无法直接访问）
-                    mdurl = re.search(r'data-mdurl=["\']([^"\']+)["\']', block_html)
-                    if mdurl:
-                        real = html.unescape(mdurl.group(1)).strip()
-                        if real.startswith(("http://", "https://")):
-                            link = real
-                    else:
-                        # 兜底：360 旧版跳转链接解码（url= 参数）
-                        if link.startswith("https://www.so.com/link?"):
-                            m = re.search(r'[?&]url=([^&]+)', link)
-                            if m:
-                                from urllib.parse import unquote
-                                link = unquote(m.group(1))
-            if not title or len(title) <= 3 or '360' in title.lower():
+            h3 = li.find("h3")
+            if h3:
+                a = h3.find("a")
+                if a:
+                    title = a.get_text(strip=True)
+                    link = a.get("href", "")
+                    # 优先从 data-mdurl 拿真实 URL（360 跳转链接是加密的）
+                    mdurl = a.get("data-mdurl", "")
+                    if mdurl and mdurl.startswith(("http://", "https://")):
+                        link = mdurl
+                    elif link.startswith("https://www.so.com/link?"):
+                        from urllib.parse import unquote
+                        m = re.search(r'[?&]url=([^&]+)', link)
+                        if m:
+                            link = unquote(m.group(1))
+
+            if not title or len(title) <= 3 or "360" in title.lower():
                 continue
 
             # 摘要
             snippet = ""
-            sm = re.search(r'<p[^>]*class=["\']res-desc["\'][^>]*>(.*?)</p>', block_html, re.DOTALL | re.IGNORECASE)
-            if sm:
-                snippet = re.sub(r'<[^>]+>', '', sm.group(1)).strip()
-
-            # 清理
-            title = html.unescape(title)
-            snippet = html.unescape(snippet)
-            snippet = re.sub(r'\s+', ' ', snippet)
-            if len(snippet) > 200:
-                snippet = snippet[:200] + "..."
+            desc = li.find("p", class_="res-desc")
+            if desc:
+                snippet = desc.get_text(strip=True)
+                snippet = re.sub(r'\s+', ' ', snippet)
+                if len(snippet) > 200:
+                    snippet = snippet[:200] + "..."
 
             line = title
             if link:
@@ -113,14 +104,28 @@ def _web_search(query: str = "") -> str:
         return f"搜索失败: {e}"
 
 
+# 页面缓存：URL -> 页面全文（用于 search_in_page 工具）
+_PAGE_CACHE: dict = {}
+
+MAX_CACHE_SIZE = 20
+
+def _add_to_cache(url: str, text: str):
+    """缓存页面全文，大小限制。"""
+    _PAGE_CACHE[url] = text
+    if len(_PAGE_CACHE) > MAX_CACHE_SIZE:
+        oldest = next(iter(_PAGE_CACHE))
+        del _PAGE_CACHE[oldest]
+
+
 def _browse_url(url: str = "") -> str:
-    """打开指定链接，提取网页正文内容。"""
+    """打开指定链接，提取网页正文内容。同时缓存全文供 search_in_page 使用。"""
     if not url:
         return "请提供要浏览的链接"
-    # 补全协议头
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
     try:
+        from bs4 import BeautifulSoup
+
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -131,47 +136,44 @@ def _browse_url(url: str = "") -> str:
         }
         resp = requests.get(url, headers=headers, timeout=15, allow_redirects=True)
         resp.encoding = resp.apparent_encoding or "utf-8"
-        html_text = resp.text
+        soup = BeautifulSoup(resp.text, "html.parser")
 
-        # 1. 尝试提取 <title>
-        title = ""
-        tm = re.search(r"<title[^>]*>(.*?)</title>", html_text, re.DOTALL | re.IGNORECASE)
-        if tm:
-            title = re.sub(r"<[^>]+>", "", tm.group(1)).strip()
+        # 1. 提取 <title>
+        title = soup.title.get_text(strip=True) if soup.title else ""
 
-        # 2. 尝试提取正文（优先 article/main/content 区域）
+        # 2. 提取正文：按优先级尝试
         body = ""
-        # 微信公众号文章
         if "mp.weixin.qq.com" in url:
-            m = re.search(r'<div[^>]*id=["\']js_content["\'][^>]*>(.*?)</div>\s*</div>\s*<script', html_text, re.DOTALL | re.IGNORECASE)
-            if m:
-                body = m.group(1)
-        # 通用：article / main / [role=main]
+            # 微信公众号文章
+            content_div = soup.find("div", id="js_content")
+            if content_div:
+                body = str(content_div)
+
         if not body:
-            for tag in ["article", "main", 'div[^>]*role=["\']main["\']', 'div[^>]*class=["\']content["\']']:
-                pat = rf'<{tag}[^>]*>(.*?)</{tag.split("[")[0].strip()}>'
-                m = re.search(pat, html_text, re.DOTALL | re.IGNORECASE)
-                if m and len(m.group(1)) > 200:
-                    body = m.group(1)
+            for selector in ["article", "main", '[role="main"]', 'div.content']:
+                tag = soup.select_one(selector)
+                if tag and len(tag.get_text(strip=True)) > 200:
+                    body = str(tag)
                     break
-        # 兜底：body 标签
-        if not body:
-            bm = re.search(r"<body[^>]*>(.*?)</body>", html_text, re.DOTALL | re.IGNORECASE)
-            if bm:
-                body = bm.group(1)
 
-        # 3. 清理 HTML 标签和脚本/style
-        body = re.sub(r"<script[^>]*>.*?</script>", "", body, flags=re.DOTALL | re.IGNORECASE)
-        body = re.sub(r"<style[^>]*>.*?</style>", "", body, flags=re.DOTALL | re.IGNORECASE)
-        body = re.sub(r"<[^>]+>", "", body)
-        body = html.unescape(body)
-        body = re.sub(r"\s+", " ", body).strip()
+        if not body and soup.body:
+            body = str(soup.body)
 
-        # 4. 截断到 3000 字
-        max_len = 3000
-        result = body[:max_len]
-        if len(body) > max_len:
-            result += "..."
+        # 3. 用 BeautifulSoup 清理标签和脚本/style
+        clean_soup = BeautifulSoup(body, "html.parser") if body else BeautifulSoup("", "html.parser")
+        for tag in clean_soup(["script", "style", "nav", "footer", "header"]):
+            tag.decompose()
+        text = clean_soup.get_text(separator="\n")
+        text = re.sub(r'\n\s*\n', '\n', text)
+        text = re.sub(r' +', ' ', text).strip()
+
+        # 4. 缓存全文（供 search_in_page 后续搜索），截断返回
+        _add_to_cache(url, text)
+
+        max_len = 12000
+        result = text[:max_len]
+        if len(text) > max_len:
+            result += f"\n\n[全文 {len(text)} 字，已截断。用 search_in_page(url, keyword) 搜索页面内特定内容]"
 
         preview = f"标题：{title}\n" if title else ""
         preview += f"链接：{url}\n"
@@ -179,6 +181,49 @@ def _browse_url(url: str = "") -> str:
         return preview
     except Exception as e:
         return f"浏览链接失败: {e}"
+
+
+def _search_in_page(url: str = "", keyword: str = "") -> str:
+    """在已缓存的页面中搜索关键词，返回上下文。"""
+    if not url or not keyword:
+        return "请提供 url 和 keyword 参数"
+    if url not in _PAGE_CACHE:
+        return f"页面未缓存。请先用 browse_url 打开 {url}"
+    text = _PAGE_CACHE[url]
+    # 查找关键词位置，返回前后各 200 字的上下文
+    import re
+    results = []
+    for m in re.finditer(re.escape(keyword), text, re.IGNORECASE):
+        start = max(0, m.start() - 200)
+        end = min(len(text), m.end() + 200)
+        ctx = text[start:end]
+        if start > 0:
+            ctx = "..." + ctx
+        if end < len(text):
+            ctx = ctx + "..."
+        results.append(f"[位置 {m.start()}]: {ctx}")
+        if len(results) >= 5:
+            break
+    if not results:
+        # 模糊搜索：按空格拆词
+        words = keyword.split()
+        for w in words:
+            for m in re.finditer(re.escape(w), text, re.IGNORECASE):
+                start = max(0, m.start() - 200)
+                end = min(len(text), m.end() + 200)
+                ctx = text[start:end]
+                if start > 0:
+                    ctx = "..." + ctx
+                if end < len(text):
+                    ctx = ctx + "..."
+                results.append(f"[关键词'{w}' 位置 {m.start()}]: {ctx}")
+                if len(results) >= 5:
+                    break
+            if results:
+                break
+    if not results:
+        return f"在页面中未找到 '{keyword}'。可尝试其他关键词，或查看缓存页面有 {len(text)} 字。"
+    return f"在 {url} 中搜索 '{keyword}'（全文 {len(text)} 字）：\n" + "\n\n".join(results)
 
 
 def register_builtin_tools():
@@ -229,6 +274,26 @@ def register_builtin_tools():
             "required": ["url"],
         },
         func=_browse_url,
+    )
+
+    registry.register(
+        name="search_in_page",
+        description="在已浏览的网页中搜索关键词，返回上下文（前后各200字）。browse_url 后发现信息被截断时使用。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "已浏览过的链接地址",
+                },
+                "keyword": {
+                    "type": "string",
+                    "description": "要搜索的关键词，如'泰州队'、'积分榜'",
+                },
+            },
+            "required": ["url", "keyword"],
+        },
+        func=_search_in_page,
     )
 
     registry.register(

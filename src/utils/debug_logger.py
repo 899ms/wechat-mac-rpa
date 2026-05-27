@@ -95,7 +95,9 @@ class TickDebugInfo:
 class DebugLogger:
     """统一管理 tick 级调试信息的收集和落盘。"""
 
-    def __init__(self, base_dir: str = "data/debug"):
+    def __init__(self, base_dir: str = None):
+        if base_dir is None:
+            base_dir = str(Path(__file__).parent.parent.parent / "data" / "debug")
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.current: Optional[TickDebugInfo] = None

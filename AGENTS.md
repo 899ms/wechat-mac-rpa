@@ -59,13 +59,16 @@
 Badcase → Benchmark 复现 → 根因分析 → 通用规则修复 → Benchmark 回归验证 → 上生产
 ```
 
-现有 6 个 benchmark：
+现有 8 个 benchmark：
 - `src/tests/test_ocr_quality_benchmark.py` — 33 cases
 - `src/tests/test_reply_quality_benchmark.py` — 24 cases
+- `src/tests/test_reply_quality_benchmark_v2.py` — 回复质量多维度评估
+- `src/tests/test_reply_stability_benchmark.py` — 回复稳定性一致性
 - `src/tests/test_tool_decision_benchmark.py` — 27 cases
 - `src/tests/test_memory_search_benchmark.py` — 29 cases
 - `src/tests/test_chat_list_unread_benchmark.py` — 23 cases
 - `src/tests/test_judge_quality_benchmark.py` — 18 cases（meta-benchmark：评估 Judge LLM 自身准确率）
+- `src/tests/test_judge_quality_benchmark_v2.py` — Judge 质量多维度 Rubric 评估
 
 **运行方式：**
 ```bash
@@ -75,6 +78,25 @@ python3 -m pytest src/tests/test_xxx_benchmark.py -v
 # 真实 API（更新缓存）
 python3 -m pytest src/tests/test_xxx_benchmark.py -v --run-api
 ```
+
+### 迭代流程守则
+
+所有开发工作必须按 `docs/03-guides/WORKFLOW.md` 执行，禁止跳过验证环节：
+
+1. **Bug 修复**：Badcase → Benchmark 复现 → 根因分析 → 通用规则修复 → 小样本验证 → 全量回归 → 提交
+2. **测试排查**：线上异常 → 查 tick_log → 查 debug JSON → 查截图 → 按 MODULE_INDEX 定位文件 → 修复
+3. **AB 实验**：假设 → 基线采集 → 实验组运行 → Judge 评估 → 结果入库 → Dashboard 查看 → 决策
+4. **文档同步**：修改代码后必须在同一 commit 中更新对应文档
+
+### 目录整洁纪律
+
+**运行时生成的文件严禁放在根目录。**
+
+根目录只允许白名单中的文件（详见 WORKFLOW.md）。
+每次提交前检查：
+- 根目录无 `.html` 文件 → 应放入 `data/reports/`
+- 根目录无 `.out` 文件 → 已被 `.gitignore` 忽略
+- 根目录无旧版脚本 → 应放入 `scripts/`
 
 ### Prompt 修改规范
 
@@ -106,7 +128,9 @@ src/
 ├── session/global_store.py        # L4 消息去重 + 持久化
 ├── memory/engine.py               # L4 长期记忆（LLM Wiki + Overrides）
 ├── tools/tool_registry.py         # L4 工具注册
+├── action/ui_interactor.py        # L4 UI 交互抽象
 ├── action/message_sender.py       # L4 消息发送
+├── action/chat_list_clicker.py    # L4 聊天列表切换
 ├── layout/layout_parser.py        # L3 布局解析
 ├── message/extractor.py           # L3 消息提取
 ├── capture/window_capture.py      # L2 截图
@@ -114,9 +138,10 @@ src/
 ├── models/base.py                 # L1 领域模型
 ├── llm/openclaw_client.py         # LLM 客户端（Kimi 本地代理）
 ├── llm/qwen_client.py             # LLM 客户端（DashScope API）
-├── badcase/                       # Badcase 闭环（生成器 / Judge Worker / 审核服务）
-├── utils/                         # 共享工具（chat_utils / text_utils / xml_utils / debug_logger / llm_client / qwen_client）
-└── tests/test_*_benchmark.py      # 5 个 benchmark
+├── logging/bot_logger.py          # 结构化日志与全链路追踪
+├── badcase/                       # Badcase 闭环（数据库 / 生成器 / Judge Worker / 审核服务）
+├── utils/                         # 共享工具
+└── tests/test_*_benchmark.py      # 8 个 benchmark
 ```
 
 完整模块索引见 `docs/02-architecture/MODULE_INDEX.md`。

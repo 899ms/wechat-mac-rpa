@@ -8,7 +8,9 @@ __pycache__/
 # 运行时数据
 data/debug/
 data/logs/
+data/reports/
 *.log
+*.out
 
 # IDE
 .vscode/
@@ -22,7 +24,6 @@ data/logs/
 # pytest
 .pytest_cache/
 # 运行时生成的数据
-data/logs/
 data/screenshots/
 data/global_state.json
 data/memory/

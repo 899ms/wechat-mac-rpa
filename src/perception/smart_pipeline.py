@@ -261,6 +261,7 @@ class SmartPerceptionPipeline:
         self.always_use_api = always_use_api
         self._last_screenshot: Optional[Path] = None
         self._last_hash: Optional[str] = None
+        self._last_perception: Optional[PerceptionResult] = None
 
         # 连续低差异计数：连续 N 帧差异 < 阈值，进入稳定模式进一步降低阈值
         self._consecutive_low_diff = 0
@@ -406,7 +407,9 @@ class SmartPerceptionPipeline:
             f"[SmartPipeline] 触发API调用: api_count={self.api_call_count}, "
             f"skip_count={self.skip_count}"
         )
-        return self._run_with_api(image_path, window_rect, scale_factor)
+        result = self._run_with_api(image_path, window_rect, scale_factor)
+        _logger.info(f'[DEBUG] _run_with_api returned OK, msgs={len(result.messages) if result else 0}')
+        return result
 
     # -----------------------------------------------------------------------
     # 内部方法
@@ -524,25 +527,30 @@ class SmartPerceptionPipeline:
     def _run_local_only(
         self, image_path: str, window_rect: Rect, scale_factor: float
     ) -> PerceptionResult:
-        """无显著变化时：只跑本地 LayoutParser，messages 为空。
-        session 会沿用上一次 API 路径提取的完整消息，本地 OCR 结果不混入上文。"""
-        _logger.info("[SmartPipeline] 进入本地路径(跳过API)")
+        """无显著变化时：复用上次缓存，不跑 OCR。"""
+        _logger.info("[SmartPipeline] 进入本地路径(跳过API+OCR)")
+        if self._last_perception:
+            _logger.info("[SmartPipeline] 复用上次感知结果(跳过OCR)")
+            return PerceptionResult(
+                chat_name=self._last_perception.chat_name,
+                messages=[],
+                chat_list_items=self._last_perception.chat_list_items,
+                screenshot_path=image_path,
+                is_group=self._last_perception.is_group,
+                window_rect=window_rect,
+                scale_factor=scale_factor,
+            )
+        # 首次运行没有缓存，需要跑 OCR 建立基线
+        _logger.info("[SmartPipeline] 首次运行，跑本地OCR建立缓存")
         t0 = time.time()
-        t_ocr_start = time.time()
         elements = self.ocr.recognize(image_path)
-        t_ocr_ms = (time.time() - t_ocr_start) * 1000
-        t_layout_start = time.time()
         layout = self.layout.parse(elements, image_path)
-        t_layout_ms = (time.time() - t_layout_start) * 1000
-        local_ms = (time.time() - t0) * 1000
         _logger.info(
-            f"[SmartPipeline] 本地处理完成: chat_name='{layout.chat_name}', "
+            f"[SmartPipeline] 缓存建立: chat_name='{layout.chat_name}', "
             f"chat_list={len(layout.chat_list_items)}项, "
-            f"messages=0条(跳过), "
-            f"耗时={local_ms:.0f}ms ocr={t_ocr_ms:.0f}ms layout={t_layout_ms:.0f}ms"
-        )
+            f"耗时={(time.time()-t0)*1000:.0f}ms")
         debug_info = self._build_debug_info(layout)
-        return PerceptionResult(
+        result = PerceptionResult(
             chat_name=layout.chat_name or "",
             messages=[],
             chat_list_items=layout.chat_list_items,
@@ -552,6 +560,8 @@ class SmartPerceptionPipeline:
             scale_factor=scale_factor,
             debug_info=debug_info,
         )
+        self._last_perception = result
+        return result
 
     def _build_chat_list_items_from_api(
         self, api_chat_list: list, window_width: int, window_height: int, chat_name: str
@@ -659,7 +669,7 @@ class SmartPerceptionPipeline:
 
         debug_info = self._build_debug_info(layout, api_prompt, api_response, messages)
         debug_info["api_chat_list"] = api_chat_list
-        return PerceptionResult(
+        result = PerceptionResult(
             chat_name=api_chat_name,
             messages=messages,
             chat_list_items=chat_list_items,
@@ -669,6 +679,8 @@ class SmartPerceptionPipeline:
             scale_factor=scale_factor,
             debug_info=debug_info,
         )
+        self._last_perception = result
+        return result
 
     def _merge_chat_list(
         self, local_chat_list: list, api_chat_list: list
@@ -813,7 +825,8 @@ class SmartPerceptionPipeline:
         try:
             prev = np.array(Image.open(prev_path).convert("RGB"), dtype=np.int16)
             curr = np.array(Image.open(curr_path).convert("RGB"), dtype=np.int16)
-        except Exception:
+        except Exception as e:
+            _logger.warning("[SmartPipeline] 像素 diff 计算失败: %s，视为有变化", e)
             return 1.0  # 出错时视为有变化
 
         if prev.shape != curr.shape:
@@ -877,6 +890,18 @@ class SmartPerceptionPipeline:
             if not text and not is_media:
                 continue
 
+            # 从 API 返回提取时间戳（如果有），否则用当前时间
+            msg_ts = m.get("timestamp", "") or m.get("time", "") or ""
+            create_time = None
+            if msg_ts:
+                try:
+                    from datetime import datetime
+                    create_time = int(datetime.strptime(msg_ts.replace('  ',' '), "%Y-%m-%d %H:%M:%S").timestamp())
+                except: pass
+            if not create_time:
+                import time
+                create_time = int(time.time())
+
             messages.append(
                 ChatMessage(
                     text=text,
@@ -886,6 +911,8 @@ class SmartPerceptionPipeline:
                     message_type=msg_type,
                     image_description=image_description,
                     image_text=image_text,
+                    timestamp=msg_ts,
+                    create_time=create_time,
                 )
             )
         return messages

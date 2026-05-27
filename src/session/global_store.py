@@ -223,7 +223,9 @@ def _lcs_match(history: List[ChatMessage], tick: List[ChatMessage], chat_name: s
 class GlobalStore:
     """全局存储：管理所有聊天的状态，统一去重、持久化."""
 
-    def __init__(self, max_messages: int = 200, state_file: str = "data/global_state.json"):
+    def __init__(self, max_messages: int = 200, state_file: str = None):
+        if state_file is None:
+            state_file = str(Path(__file__).parent.parent.parent / "data" / "global_state.json")
         self.chats: Dict[str, ChatState] = {}
         self.max_messages = max_messages
         self._state_file = Path(state_file)

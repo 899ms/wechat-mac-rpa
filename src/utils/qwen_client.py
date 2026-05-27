@@ -35,7 +35,7 @@ class QwenClient:
         self.model = model
         self.is_deepseek_official = "deepseek.com" in base_url
 
-    def chat(self, messages=None, user_id=None, message=None, system_prompt=None, tools=None, temperature=None, max_tokens=None, timeout=None) -> str:
+    def chat(self, messages=None, user_id=None, message=None, system_prompt=None, tools=None, temperature=None, max_tokens=None, timeout=None, response_format=None) -> str:
         """生成回复，支持 tools（function calling）
 
         支持两种调用方式：
@@ -43,10 +43,10 @@ class QwenClient:
         2. 旧接口: chat(user_id="xxx", message="...", system_prompt="...")
         """
         if messages is not None:
-            return self._chat_with_messages(messages, tools=tools, temperature=temperature, max_tokens=max_tokens, timeout=timeout)
+            return self._chat_with_messages(messages, tools=tools, temperature=temperature, max_tokens=max_tokens, timeout=timeout, response_format=response_format)
         return self._chat_with_user_id(user_id, message, system_prompt)
 
-    def _chat_with_messages(self, messages: List[dict], tools=None, temperature=None, max_tokens=None, timeout=None) -> str:
+    def _chat_with_messages(self, messages: List[dict], tools=None, temperature=None, max_tokens=None, timeout=None, response_format=None) -> str:
         """直接透传 messages 列表调用大模型，支持 tools 和自定义参数"""
         try:
             kwargs = {
@@ -58,6 +58,8 @@ class QwenClient:
             }
             if tools:
                 kwargs["tools"] = tools
+            if response_format:
+                kwargs["response_format"] = response_format
             # DeepSeek 官方平台：wiki 生成开启 thinking 以提升提取能力
             if self.is_deepseek_official:
                 kwargs["extra_body"] = {"thinking": {"type": "enabled"}}

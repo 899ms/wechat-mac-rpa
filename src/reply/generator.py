@@ -3,7 +3,7 @@
 
 import logging
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from src.models.base import ChatMessage, SenderType
 from src.tools import get_registry, register_builtin_tools
@@ -80,6 +80,7 @@ class ReplyGenerator:
 
     def _submit_to_judge(self, tick_id: int, replies: List[str], unreplied: List[ChatMessage], all_messages: List[ChatMessage], is_group: bool):
         """把当前 tick 的数据提交给 JudgeWorker 异步判定"""
+        import json
         try:
             worker = _get_judge_worker()
             if worker is None:
@@ -106,6 +107,11 @@ class ReplyGenerator:
                 "full_system_prompt": self.last_system_prompt,
                 "full_tools_context": self.last_tools_context,
                 "full_llm_messages": self.last_llm_messages,
+                "created_at": __import__('datetime').datetime.now().isoformat(),
+                "tool_results_json": json.dumps(
+                    [{"tool": t.get("tool_name", ""), "args": t.get("arguments", ""), "result": str(t.get("result_preview", ""))}
+                     for t in (self.last_tool_calls or [])], ensure_ascii=False
+                ),
             }
             worker.submit(tick_data)
         except Exception as e:
@@ -200,8 +206,8 @@ class ReplyGenerator:
         trace: List[Dict] = []
 
         max_retries = 2
-        max_tool_seconds = 20.0  # 工具调用阶段最多 20 秒
-        max_total_seconds = 600.0 if is_hermes else 35.0  # Hermes 给足 10 分钟
+        max_tool_seconds = 25.0  # 工具调用阶段最多 25 秒
+        max_total_seconds = 600.0 if is_hermes else 60.0  # deepseek 给 60 秒，给工具调用留余量
         overall_start_time = time.time()
 
         # 构建 messages：system（人设）+ system（工具缓存）+ user（上下文）
@@ -326,7 +332,7 @@ class ReplyGenerator:
                                 "tool_call_id": tc.id,
                                 "tool_name": tool_name,
                                 "arguments": tool_args,
-                                "result_preview": str(result)[:500] if result else "",
+                                "result_preview": str(result) if result else "",
                             })
 
                             # 记录完整 trace（工具执行）
@@ -487,65 +493,31 @@ class ReplyGenerator:
         return truncated
 
     def _parse_replies(self, text: str) -> List[str]:
-        """解析 AI 的 JSON 回复，提取 replies 数组。最多3条。"""
-        import json
-        import re
-
+        """解析 LLM 回复：{"replies": ["msg1", "msg2"]}。prompt 已要求此格式。"""
+        import json, re
         text = text.strip()
         if not text:
             return []
-
-        # 尝试提取 JSON（可能混在 markdown 代码块中）
-        # 先找 ```json ... ```
+        # 去掉 markdown 代码块
         m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
         if m:
             text = m.group(1)
-        else:
-            # 找最外层的大括号：用计数字符串匹配完整 JSON，避免 .*? 在嵌套 {} 时提前截断
-            start = text.find("{")
-            if start >= 0:
-                depth = 0
-                in_string = False
-                escape_next = False
-                for i in range(start, len(text)):
-                    ch = text[i]
-                    if escape_next:
-                        escape_next = False
-                        continue
-                    if ch == "\\":
-                        escape_next = True
-                        continue
-                    if ch == '"' and not escape_next:
-                        in_string = not in_string
-                        continue
-                    if in_string:
-                        continue
-                    if ch == "{":
-                        depth += 1
-                    elif ch == "}":
-                        depth -= 1
-                        if depth == 0:
-                            text = text[start:i+1]
-                            break
-
+        # 找 JSON 边界
+        start = text.find("{")
+        if start >= 0:
+            depth = 0
+            for i in range(start, len(text)):
+                ch = text[i]
+                if ch == "{": depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0: text = text[start:i+1]; break
         try:
             data = json.loads(text)
             replies = data.get("replies", [])
-            if not isinstance(replies, list):
-                replies = []
-            # 过滤空字符串和敷衍词
-            filtered = []
-            for r in replies:
-                r = str(r).strip()
-                if not r or r in ("收到", "好的", "嗯", "OK", "1"):
-                    continue
-                filtered.append(r)
-            return filtered[:3]
-        except (json.JSONDecodeError, Exception):
-            # JSON 解析失败，回退：把整段文本当作单条回复
-            if text and text not in ("收到", "好的", "嗯", "OK", "1"):
-                return [text]
-            return []
+            return [str(r).strip() for r in replies if str(r).strip() not in ("收到", "好的", "嗯", "OK", "1")][:3]
+        except Exception:
+            return [text] if text not in ("收到", "好的", "嗯", "OK", "1") else []
 
     def _load_skill_manifest(self) -> List[Dict[str, str]]:
         """扫描 skills/ 目录，返回技能清单（name + trigger 描述），不含正文。"""
@@ -696,48 +668,29 @@ class ReplyGenerator:
         return ""
 
     def _system_prompt(self) -> str:
-        """核心 system prompt：人设 + 可用工具 + 规则。精简版。"""
-        skill_hint = self._load_skill_one_liners()
+        """核心 system prompt：读 prompts/persona.md（DT 风格），注入工具描述 + 检索案例。"""
+        from pathlib import Path
+        prompt_path = Path(__file__).parent.parent.parent / "prompts" / "persona.md"
+        if prompt_path.exists():
+            prompt = prompt_path.read_text(encoding="utf-8")
+        else:
+            prompt = "你是王芊本人。用户不是在跟AI聊天，是在微信上给王芊发消息。"
 
-        lines_local = [
-            "核心人设与风格",
-            "你叫'不爱说话'，是王芊的小号/分身，可以访问本地 wiki 记忆库。prompt 中提供的 [对方信息] 只是该用户记忆的部分摘要，涉及跨用户的关系、身份、单位等信息时，必须先调用 search_memory 搜索完整记忆库。",
-            "回复时以王芊的视角说话，自称'我'，参照对方的说话风格自然融入对话。",
-            '风格：casual，不用"您"，略带傲娇，适当幽默反转。',
-            '口头禅：对方炫富/晒成就时可用"羡慕你们这些有钱人"、"被你装到了"等。',
-            "不要重复自己之前说过的梗，每次回复都是新的。",
-            "",
-            "可用工具（系统会自动执行并返回结果）",
-            "- get_current_time：获取当前日期和时间",
-            "- get_weather(city, date)：查询天气",
-            "- web_search(query)：搜索网页获取实时信息",
-            "- browse_url(url)：打开链接提取网页正文。用户分享链接时使用。",
-            "- stock_query(stock_code)：查询股票。支持A股sh600519、港股hk00700、美股AAPL",
-            "- search_memory(query)：搜索本地长期记忆。当用户的问题涉及任何人物相关的事实信息（如身份、职业、单位、地点、年龄、mbti、关系等）时，必须调用。"
-            "",
-            "输出格式",
-            "需要工具时：按 function calling 格式输出 tool_calls。",
-            "不需要工具时：直接输出 JSON {\"replies\": [\"回复1\"]}，不要 markdown 代码块。",
-            "replies 数组包含 0-3 条，不需要回复时为空数组 []。",
-            "绝对不要输出思考过程。",
-            "",
-            "规则",
-            "1. 每条回复简洁自然，不超过50字",
-            "2. 【强制】私聊必须回复，不得空 replies []",
-            "3. 群聊视情况回复，被@时必须回复",
-            "5. 禁止敷衍词：收到、好的、嗯、OK、1",
-            "6. 不要重复之前的内容",
-            "7. 【重要】历史消息中标记为'我：'的内容是你自己之前说的，**可能存在严重错误或幻觉，严禁当作事实引用**。如果你之前说的和 wiki 记忆冲突，**必须以 wiki 记忆为准，承认自己之前的错误**。",
-            "8. 【强制】如果用户指出你前后矛盾或在纠正你，**必须首先明确承认错误**（如'错了'、'记错了'、'是我瞎编的'），然后修正。**承认错误优先于调侃和傲娇**，不能嘴硬、不能转移话题、不能用玩笑回避",
-            "9. 对方发图片/表情包时，可以针对图片内容调侃或评价",
-            "10. 对方发重复图片/表情包时，不要重复之前的评价",
-            "11. 不知道就说不知道：如果 prompt 中的记忆没有你要的信息，必须先调用 search_memory 搜索；搜索后 wiki 中仍没有明确记录，才回答'这个我没记到'或'不知道'。严禁跳过搜索直接说不知道，严禁猜测、推断或编造。",
-            "12. 【禁止编造】即使是以王芊/第一人称视角说话，关于任何具体事实（生日、日期、数字、金额、身高、年龄等），如果 wiki 记忆中没有明确记录，你也不知道。绝对不能为了调侃或接梗而编造具体事实。"
-        ]
+        # 注入工具描述
+        tools_desc = "\n".join(
+            f"- {t.name}：{t.description}"
+            for t in self.tool_registry._tools.values()
+        )
+        prompt = prompt.replace("{tools_description}", tools_desc)
+
+        # 注入检索 few-shot
+        prompt = prompt.replace("{dynamic_few_shot}", "（无相关历史对话）")
+
+        # 保留 skill hint
+        skill_hint = self._load_skill_one_liners()
         if skill_hint:
-            lines_local.append("")
-            lines_local.append(skill_hint.strip())
-        return "\n".join(lines_local)
+            prompt += "\n\n" + skill_hint.strip()
+        return prompt
 
     def _build_tools_context(self, chat_name: str) -> str:
         """构建工具上下文：已缓存数据 + 工具结果提示。"""
@@ -749,79 +702,89 @@ class ReplyGenerator:
         lines_local.append("")
         return "\n".join(lines_local)
 
-    def _hermes_system_prompt(self) -> str:
-        """hermes 专用 system prompt：不含 tool 列表，只保留风格+格式。"""
-        return (
-            "核心人设与风格\n"
-            "你叫'不爱说话'，是王芊的小号/分身，可以访问本地 wiki 记忆库。prompt 中提供的 [对方信息] 只是该用户记忆的部分摘要，涉及跨用户的关系、身份、单位等信息时，必须先调用 search_memory 搜索完整记忆库。\n"
-            "回复时以王芊的视角说话，自称'我'，参照对方的说话风格自然融入对话。\n"
-            '风格：casual，不用"您"，略带傲娇，适当幽默反转。\n'
-            '口头禅：对方炫富/晒成就时可用"羡慕你们这些有钱人"、"被你装到了"等。\n'
-            "不要重复自己之前说过的梗，每次回复都是新的。\n"
-            "\n"
-            "你可以使用 skills_list 查看可用技能，用 skill_view 加载需要的技能。"
-            "遇到专业领域的问题，先加载对应 skill 再回答。"
-            "回复开头请用【Skill: xxx】标注使用了哪些 skill。"
-            "\n\n"
-            "输出格式\n"
-            "直接输出 JSON（不要 markdown 代码块）：\n"
-            '{\"replies\": [\"回复内容1\", \"回复内容2\"]}\n'
-            "replies 数组包含 0-5 条，不需要回复时为空数组 []。\n"
-            "绝对不要输出思考过程。\n"
-            "\n"
-            "规则\n"
-            "1. 每条回复简洁自然，不超过300字\n"
-            "2. 【强制】私聊必须回复，不得空 replies []\n"
-            "3. 群聊视情况回复，被@时必须回复\n"
-            "5. 禁止敷衍词：收到、好的、嗯、OK、1\n"
-            "6. 参照对方语气回复，不要延续自己的风格\n"
-            "7. 【重要】历史消息中标记为'我：'的内容是你自己之前说的，**可能存在严重错误或幻觉，严禁当作事实引用**。如果你之前说的和 wiki 记忆冲突，**必须以 wiki 记忆为准，承认自己之前的错误**。\n"
-            "8. 如果用户指出你前后矛盾或在纠正你，直接承认错误并修正，不要嘴硬\n"
-            "9. 对方发图片/表情包时，可以针对图片内容调侃或评价\n"
-            "10. 对方发重复图片/表情包时，不要重复之前的评价\n"
-            "11. 不知道就说不知道：如果 search_memory 后 wiki 中没有明确记录相关信息，直接回答'这个我没记到'或'不知道'，严禁猜测、推断或编造。宁愿说不知道，也不要说可能错误的话。\n"
-        )
+    @staticmethod
+    def _format_time_tag(ts: Optional[int], now_ts: float) -> str:
+        """根据时间戳生成可读的时间标签。"""
+        if not ts:
+            return ""
+        delta_sec = now_ts - ts
+        if delta_sec < 60:
+            return "刚刚"
+        elif delta_sec < 3600:
+            return f"{int(delta_sec/60)}分钟前"
+        elif delta_sec < 7200:
+            return "1小时前"
+        elif delta_sec < 86400:
+            # 同一天内
+            tm = time.localtime(ts)
+            return f"{tm.tm_hour:02d}:{tm.tm_min:02d}"
+        elif delta_sec < 172800:
+            tm = time.localtime(ts)
+            return f"昨晚 {tm.tm_hour:02d}:{tm.tm_min:02d}"
+        elif delta_sec < 604800:
+            tm = time.localtime(ts)
+            return f"{tm.tm_mon}月{tm.tm_mday}日 {tm.tm_hour:02d}:{tm.tm_min:02d}"
+        else:
+            tm = time.localtime(ts)
+            return f"{tm.tm_year}年{tm.tm_mon}月{tm.tm_mday}日"
+
     @staticmethod
     def _format_message_line(m: ChatMessage) -> str:
-        """将单条消息渲染为 prompt 中的一行文本。"""
+        """将单条消息渲染为 prompt 中的一行文本，含时间戳。"""
         sender_name = "我" if m.sender_type == SenderType.SELF else m.sender
         msg_type = m.message_type or "text"
+        now_ts = time.time()
+
+        # 时间标签（优先 create_time int，fallback timestamp str）
+        ts = getattr(m, 'create_time', None)
+        if not ts:
+            ts_str = getattr(m, 'timestamp', None)
+            if ts_str:
+                try:
+                    from datetime import datetime
+                    ts = int(datetime.strptime(ts_str.replace('  ', ' '), "%Y-%m-%d %H:%M:%S").timestamp())
+                except: pass
+        time_tag = ReplyGenerator._format_time_tag(ts, now_ts) if ts else ""
+
+        def _line(body: str) -> str:
+            if time_tag:
+                return f"{sender_name}（{time_tag}）：{body}"
+            return f"{sender_name}：{body}"
 
         if msg_type == "image":
             desc = m.image_description or "图片"
             text_part = m.image_text or m.text or ""
             if text_part:
-                return f"{sender_name}：[图片] {desc}（图上文字：{text_part}）"
-            return f"{sender_name}：[图片] {desc}"
+                return _line(f"[图片] {desc}（图上文字：{text_part}）")
+            return _line(f"[图片] {desc}")
 
         elif msg_type == "sticker":
             desc = m.image_description or "表情包"
             text_part = m.image_text or m.text or ""
             if text_part:
-                return f"{sender_name}：[表情包] {desc}（配字：{text_part}）"
-            return f"{sender_name}：[表情包] {desc}"
+                return _line(f"[表情包] {desc}（配字：{text_part}）")
+            return _line(f"[表情包] {desc}")
 
         elif msg_type == "mixed":
             desc = m.image_description or ""
             text_part = m.text or ""
             if desc:
-                return f"{sender_name}：[图片+文字] {text_part} | 图片描述：{desc}"
-            return f"{sender_name}：[图片+文字] {text_part}"
+                return _line(f"[图片+文字] {text_part} | 图片描述：{desc}")
+            return _line(f"[图片+文字] {text_part}")
 
         elif msg_type == "link_card":
             desc = m.image_description or "链接卡片"
-            return f"{sender_name}：[链接卡片] {desc}"
+            return _line(f"[链接卡片] {desc}")
 
         elif msg_type == "video":
             desc = m.image_description or "视频"
             text_part = m.image_text or m.text or ""
             if text_part:
-                return f"{sender_name}：[视频] {desc}（视频文字：{text_part}）"
-            return f"{sender_name}：[视频] {desc}"
+                return _line(f"[视频] {desc}（视频文字：{text_part}）")
+            return _line(f"[视频] {desc}")
 
         else:
-            # text 或默认
-            return f"{sender_name}：{m.text}"
+            return _line(m.text)
 
     def _build_user_prompt(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage], is_group: bool = False) -> str:
         """构建结构化 user prompt：会话信息 + 记忆 + 历史 + 未读。"""
@@ -830,14 +793,21 @@ class ReplyGenerator:
         now = datetime.now().strftime("%Y年%m月%d日 %H:%M")
         lines_local = []
 
-        # 会话信息
+        # 会话信息（含时间上下文）
         is_at = any(getattr(m, "is_at_me", False) for m in unreplied)
         chat_type = "群聊" if is_group else "私聊"
+        now_dt = datetime.now()
+        now = now_dt.strftime("%Y年%m月%d日 %H:%M")
+        weekday = ["周一","周二","周三","周四","周五","周六","周日"][now_dt.weekday()]
+        hour = now_dt.hour
+        time_period = "凌晨" if hour < 6 else ("早上" if hour < 9 else ("上午" if hour < 12 else ("下午" if hour < 18 else ("晚上" if hour < 22 else "深夜"))))
         lines_local.append("[会话]")
-        lines_local.append(f"时间：{now}")
+        lines_local.append(f"当前时间：{now} {weekday} {time_period}")
         lines_local.append(f"聊天：{chat_name}")
         lines_local.append(f"类型：{chat_type}")
         lines_local.append(f"被@：{'是' if is_at else '否'}")
+        lines_local.append("")
+        lines_local.append("⚠️ 消息时间戳说明：每条消息后面标注的时间是消息发出的时间。如果消息是'昨晚'或几小时前发的，说明用户当时的状态（如'好困'）不代表现在。请根据消息时间戳推断语境，不要假设消息是刚刚发的。")
         lines_local.append("")
 
         # wiki 记忆
@@ -845,7 +815,7 @@ class ReplyGenerator:
         if self.memory_engine is not None and unreplied:
             # 固定注入 Bot 自己的 wiki，避免 LLM 被对方的 wiki 淹没后混淆身份
             t_m1 = time.time()
-            self_memory = self.memory_engine.get_user_memory("王芊", max_chars=1200)
+            self_memory = self.memory_engine.get_user_memory("王芊", max_chars=4000)
             t_mem_ms["self"] = (time.time() - t_m1) * 1000
             if self_memory and "（暂无）" not in self_memory:
                 lines_local.append("[我的信息]（来自长期记忆，Bot 自己的身份背景）")
@@ -857,7 +827,7 @@ class ReplyGenerator:
             clean_sender = last_sender.split(" @")[0] if last_sender and " @" in last_sender else last_sender
             if clean_sender and clean_sender != "我":
                 t_m2 = time.time()
-                memory_text = self.memory_engine.get_user_memory(clean_sender, max_chars=2000)
+                memory_text = self.memory_engine.get_user_memory(clean_sender, max_chars=6000)
                 t_mem_ms["other"] = (time.time() - t_m2) * 1000
                 if memory_text and "（暂无）" not in memory_text:
                     lines_local.append("[对方信息]（来自长期记忆，仅为该用户记忆的部分摘要）")
@@ -865,7 +835,7 @@ class ReplyGenerator:
                     lines_local.append("")
             if is_group and chat_name:
                 t_m3 = time.time()
-                group_text = self.memory_engine.get_group_memory(chat_name, max_chars=2000)
+                group_text = self.memory_engine.get_group_memory(chat_name, max_chars=6000)
                 t_mem_ms["group"] = (time.time() - t_m3) * 1000
                 if group_text and "（暂无）" not in group_text:
                     lines_local.append("[本群信息]（来自长期记忆）")
@@ -877,7 +847,7 @@ class ReplyGenerator:
                 t_m4 = time.time()
                 mention_text = " ".join(m.text or "" for m in unreplied)
                 related = self.memory_engine.search_related_mentions(
-                    mention_text, exclude_user=clean_sender if clean_sender and clean_sender != "我" else None, max_files=3
+                    mention_text, exclude_user=clean_sender if clean_sender and clean_sender != "我" else None, max_files=10
                 )
                 t_mem_ms["mentions"] = (time.time() - t_m4) * 1000
                 if related:
@@ -926,23 +896,37 @@ class ReplyGenerator:
                 lines_local.append(f"（共 {len(all_messages)} 条历史，显示 {len(recent)} 条：最近20条 + 10分钟内）")
             lines_local.append("")
 
-        # 未读消息
+        # 未读消息（带去重检查：如果历史中已有相似消息且 Bot 已回复，标记为'可能已处理'）
         lines_local.append("[未读消息]（重点回复）")
+        # 从历史中提取 Bot 已回复的消息文本（用于去重判断）
+        replied_in_history = set()
+        if all_messages:
+            for m in all_messages:
+                if m.sender_type == SenderType.SELF and m.reply_time and m.text:
+                    # 提取 Bot 回复之前最后一个非 Bot 消息的文本作为"已处理"标记
+                    pass
+            # 简化：如果[未读消息]中的某条在[历史消息]中能找到 Bot 的回复且 Bot 回复在未读消息时间之前
+            # 则标记为"可能已回复"
+
+        skipped_hint = []
         for i, m in enumerate(unreplied, 1):
-            lines_local.append(f"{i}. {self._format_message_line(m)}")
+            ts = getattr(m, 'create_time', None)
+            # 检查历史中是否有 Bot 在未读消息时间之后回复的
+            already_handled = False
+            if ts and all_messages:
+                for hm in all_messages:
+                    if hm.sender_type == SenderType.SELF and hm.reply_time and hm.reply_time > ts:
+                        # Bot 在未读消息之后回复了，说明这条可能已经处理过
+                        already_handled = True
+                        break
+            tag = " ⚠️(历史中已有回复，可跳过)" if already_handled else ""
+            lines_local.append(f"{i}. {self._format_message_line(m)}{tag}")
+            if already_handled:
+                skipped_hint.append(str(i))
         lines_local.append("")
-        lines_local.append("提示：回复重点放在[未读消息]，历史只是背景。当前必须回复，不得空 replies。")
+
+        if skipped_hint:
+            lines_local.append(f"提示：第{','.join(skipped_hint)}条未读消息在历史中已有回复，可能不需要再次回复。仅回复真正未处理的新消息。")
+        lines_local.append("回复重点：仅回复真正需要回应的未读消息。纯表情/OK/好的等确认性消息可以不回复。如果所有未读消息都已处理或不需要回复，输出空 replies。")
 
         return "\n".join(lines_local)
-    def _clean_reply(self, text: str) -> str:
-        """不再做思考内容过滤。若 LLM 输出思考过程，问题应在 prompt/LLM 层解决。"""
-        text = text.strip()
-        # 如果 LLM 返回空或只包含被禁止的敷衍词，视为无效回复
-        if not text or text in ("收到", "好的", "嗯", "OK", "1"):
-            return ""
-        return text
-
-    def _fallback_reply(self, msg: ChatMessage) -> str:
-        """兜底回复：已废弃，直接返回空字符串（不回复）。
-        经验表明，硬编的兜底话术不如不说。"""
-        return ""

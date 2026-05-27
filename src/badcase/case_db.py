@@ -29,133 +29,109 @@ DB_PATH = PROJECT_ROOT / "data" / "cases.db"
 # =============================================================================
 
 SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS cases (
+-- wechat-twin v1.1 schema
+
+CREATE TABLE IF NOT EXISTS tick_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    draft_id TEXT UNIQUE NOT NULL,
-    tick_id INTEGER,
-    chat_name TEXT,
-    source TEXT,                    -- 'committed' | 'pending' | 'dismissed'
-    status TEXT DEFAULT 'pending',  -- pending | committed | dismissed
-    badcase_type TEXT,
-    severity TEXT,                  -- P0 | P1 | P2
-    confidence REAL,
-    overall_score REAL,
-    is_badcase INTEGER DEFAULT 0,
-    auto_commit INTEGER DEFAULT 0,
-    judge_reason TEXT,
-    expected_behavior TEXT,
-    screenshot_path TEXT,
-    committed_at TEXT,
-    committed_by TEXT,              -- 'auto' | 'manual'
-    dismissed_at TEXT,
-    dismiss_reason TEXT,
-    created_at TEXT DEFAULT (datetime('now', 'localtime')),
-    git_commit TEXT
+    session_id TEXT NOT NULL DEFAULT '',
+    tick_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now','localtime')),
+    skip_reason TEXT,
+    chat_name TEXT, is_group INTEGER DEFAULT 0, screenshot_path TEXT,
+    messages_count INTEGER, new_messages_count INTEGER DEFAULT 0,
+    system_prompt TEXT, user_prompt TEXT, raw_response TEXT, tool_calls_json TEXT, tool_results_json TEXT DEFAULT '[]',
+    should_reply INTEGER DEFAULT 0,
+    replies_sent_json TEXT, send_success INTEGER DEFAULT 0, send_duration_ms INTEGER,
+    judge_score REAL, judge_is_badcase INTEGER, judge_dimensions_json TEXT,
+    human_is_badcase INTEGER, human_badcase_type TEXT, human_notes TEXT,
+    tokens_estimated INTEGER DEFAULT 0, duration_ms INTEGER,
+    human_labeled_at TEXT, judge_badcase_type TEXT, judge_reason TEXT
 );
 
-CREATE TABLE IF NOT EXISTS case_conversations (
+CREATE TABLE IF NOT EXISTS cases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    case_id INTEGER NOT NULL REFERENCES cases(id),
-    turn_order INTEGER,
-    role TEXT,                      -- 'user' | 'bot'
-    sender TEXT,
-    text TEXT,
-    UNIQUE(case_id, turn_order)
+    draft_id TEXT UNIQUE NOT NULL, tick_id INTEGER, chat_name TEXT,
+    status TEXT DEFAULT 'pending', badcase_type TEXT, severity TEXT,
+    confidence REAL, overall_score REAL, is_badcase INTEGER DEFAULT 0,
+    screenshot_path TEXT, judge_reason TEXT, created_at TEXT DEFAULT (datetime('now','localtime'))
 );
 
 CREATE TABLE IF NOT EXISTS case_prompts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    case_id INTEGER NOT NULL UNIQUE REFERENCES cases(id),
-    system_prompt TEXT,
-    user_prompt TEXT,
-    tools_context TEXT,
-    memory_injected TEXT
-);
-
-CREATE TABLE IF NOT EXISTS case_tool_calls (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    case_id INTEGER NOT NULL REFERENCES cases(id),
-    call_order INTEGER,
-    tool_name TEXT,
-    arguments TEXT,
-    result_preview TEXT             -- 截断到 500 字
+    case_id INTEGER PRIMARY KEY REFERENCES cases(id),
+    system_prompt TEXT, user_prompt TEXT
 );
 
 CREATE TABLE IF NOT EXISTS case_dimensions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    case_id INTEGER NOT NULL REFERENCES cases(id),
-    dimension_name TEXT,           -- 幻觉控制 | 记忆召回 | 幽默感 | ...
-    score REAL,
-    comment TEXT,
+    case_id INTEGER REFERENCES cases(id), dimension_name TEXT, score REAL, comment TEXT,
     UNIQUE(case_id, dimension_name)
 );
 
-CREATE TABLE IF NOT EXISTS case_llm_messages (
+CREATE TABLE IF NOT EXISTS case_conversations (
+    case_id INTEGER REFERENCES cases(id), turn_order INTEGER,
+    role TEXT, sender TEXT, text TEXT, UNIQUE(case_id, turn_order)
+);
+
+CREATE TABLE IF NOT EXISTS experiments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    case_id INTEGER NOT NULL REFERENCES cases(id),
-    message_order INTEGER,
-    role TEXT,
-    content_preview TEXT            -- 截断到 1000 字
+    name TEXT NOT NULL,
+    description TEXT,
+    created_at TEXT DEFAULT (datetime('now','localtime')),
+    n_samples INTEGER DEFAULT 0,
+    control_badcase_rate REAL, exp_badcase_rate REAL,
+    control_avg_score REAL, exp_avg_score REAL,
+    summary TEXT,
+    dimension_diffs_json TEXT,
+    is_improvement INTEGER DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS experiment_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    experiment_id INTEGER REFERENCES experiments(id),
+    tick_id INTEGER NOT NULL,
+    config_name TEXT NOT NULL,
+    bot_reply TEXT,
+    judge_is_badcase INTEGER DEFAULT 0,
+    judge_score REAL DEFAULT 0,
+    judge_dimensions_json TEXT,
+    judge_reason TEXT,
+    UNIQUE(experiment_id, tick_id, config_name)
+);
+CREATE TABLE IF NOT EXISTS bench_tool_cases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, case_name TEXT UNIQUE NOT NULL,
+    user_message TEXT NOT NULL, should_call_memory INTEGER NOT NULL DEFAULT 0,
+    category TEXT NOT NULL, notes TEXT, enabled INTEGER DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS bench_reply_cases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, case_name TEXT UNIQUE NOT NULL,
+    category TEXT NOT NULL, is_group INTEGER DEFAULT 0,
+    unreplied_json TEXT NOT NULL, all_messages_json TEXT NOT NULL,
+    required_keywords_json TEXT, forbidden_keywords_json TEXT,
+    notes TEXT, enabled INTEGER DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS bench_search_cases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, case_name TEXT UNIQUE NOT NULL,
+    query TEXT NOT NULL, expected_docs_json TEXT NOT NULL,
+    category TEXT NOT NULL, notes TEXT, enabled INTEGER DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS bench_adversarial_cases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, case_id TEXT UNIQUE NOT NULL,
+    query TEXT NOT NULL, sender TEXT, chat_type TEXT DEFAULT 'single',
+    ground_truth TEXT, context_json TEXT, category TEXT, enabled INTEGER DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS daily_metrics (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT NOT NULL,
-    benchmark_name TEXT NOT NULL,   -- tool_decision | reply_quality | judge_quality | ...
-    metric_name TEXT NOT NULL,      -- accuracy | precision | recall | f1 | pass_rate | ...
-    metric_value REAL NOT NULL,
-    git_commit TEXT,
-    created_at TEXT DEFAULT (datetime('now', 'localtime')),
+    date TEXT NOT NULL, benchmark_name TEXT NOT NULL, metric_name TEXT NOT NULL,
+    metric_value REAL NOT NULL, git_commit TEXT,
     UNIQUE(date, benchmark_name, metric_name)
 );
 
-CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status);
+CREATE INDEX IF NOT EXISTS idx_tick_log_created ON tick_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_tick_log_chat ON tick_log(chat_name);
+CREATE INDEX IF NOT EXISTS idx_tick_log_judge ON tick_log(judge_score);
 CREATE INDEX IF NOT EXISTS idx_cases_created ON cases(created_at);
-CREATE INDEX IF NOT EXISTS idx_cases_badcase_type ON cases(badcase_type);
 CREATE INDEX IF NOT EXISTS idx_daily_metrics_date ON daily_metrics(date);
-CREATE INDEX IF NOT EXISTS idx_daily_metrics_benchmark ON daily_metrics(benchmark_name, date);
-
--- ===== Benchmark case tables（P0/P2/P4 测试场景） =====
-
-CREATE TABLE IF NOT EXISTS benchmark_tool_cases (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    case_name TEXT UNIQUE NOT NULL,
-    user_message TEXT NOT NULL,
-    should_call_memory INTEGER NOT NULL DEFAULT 0,  -- 1=应调用, 0=不应调用
-    category TEXT NOT NULL,                          -- person_identity | relationship | adversarial | ...
-    notes TEXT,
-    evaluation_mode TEXT DEFAULT 'binary',           -- binary | rubric
-    enabled INTEGER DEFAULT 1
-);
-
-CREATE TABLE IF NOT EXISTS benchmark_reply_cases (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    case_name TEXT UNIQUE NOT NULL,
-    category TEXT NOT NULL,
-    is_group INTEGER DEFAULT 0,
-    unreplied_json TEXT NOT NULL,        -- JSON array of {sender, text}
-    all_messages_json TEXT NOT NULL,     -- JSON array of {sender, text, sender_type}
-    required_keywords_json TEXT,         -- JSON array of strings
-    required_hits INTEGER DEFAULT 1,
-    forbidden_keywords_json TEXT,        -- JSON array of strings
-    min_replies INTEGER DEFAULT 1,
-    max_replies INTEGER DEFAULT 3,
-    rubric_name TEXT,                    -- reference to rubric definition in code
-    notes TEXT,
-    enabled INTEGER DEFAULT 1
-);
-
-CREATE TABLE IF NOT EXISTS benchmark_search_cases (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    case_name TEXT UNIQUE NOT NULL,
-    query TEXT NOT NULL,
-    expected_docs_json TEXT NOT NULL,         -- JSON array of expected doc names
-    unexpected_docs_json TEXT,                -- JSON array of unexpected doc names
-    required_fragments_json TEXT,             -- JSON array of required keyword fragments
-    category TEXT NOT NULL,                   -- exact_name | alias | relationship | ...
-    notes TEXT,
-    enabled INTEGER DEFAULT 1
-);
 """
 
 
@@ -183,6 +159,43 @@ class CaseDB:
             conn = sqlite3.connect(str(self.db_path))
             conn.executescript(SCHEMA_SQL)
             conn.commit()
+            # 迁移：添加 session_id 列 + 移除 tick_id UNIQUE 约束
+            try:
+                cur = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='tick_log'")
+                ddl = cur.fetchone()[0]
+                needs_migration = ('session_id' not in ddl) or ('UNIQUE' in ddl and 'tick_id' in ddl)
+                if needs_migration:
+                    conn.executescript("""
+                        CREATE TABLE IF NOT EXISTS tick_log_new (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            session_id TEXT NOT NULL DEFAULT '',
+                            tick_id INTEGER NOT NULL,
+                            created_at TEXT DEFAULT (datetime('now','localtime')),
+                            skip_reason TEXT,
+                            chat_name TEXT, is_group INTEGER DEFAULT 0, screenshot_path TEXT,
+                            messages_count INTEGER, new_messages_count INTEGER DEFAULT 0,
+                            system_prompt TEXT, user_prompt TEXT, raw_response TEXT, tool_calls_json TEXT, tool_results_json TEXT DEFAULT '[]',
+                            should_reply INTEGER DEFAULT 0,
+                            replies_sent_json TEXT, send_success INTEGER DEFAULT 0, send_duration_ms INTEGER,
+                            judge_score REAL, judge_is_badcase INTEGER, judge_dimensions_json TEXT,
+                            human_is_badcase INTEGER, human_badcase_type TEXT, human_notes TEXT,
+                            tokens_estimated INTEGER DEFAULT 0, duration_ms INTEGER,
+                            human_labeled_at TEXT, judge_badcase_type TEXT, judge_reason TEXT
+                        );
+                        INSERT INTO tick_log_new SELECT id, '', tick_id, created_at, skip_reason,
+                            chat_name, is_group, screenshot_path, messages_count, new_messages_count,
+                            system_prompt, user_prompt, raw_response, tool_calls_json,
+                            should_reply, replies_sent_json, send_success, send_duration_ms,
+                            judge_score, judge_is_badcase, judge_dimensions_json,
+                            human_is_badcase, human_badcase_type, human_notes,
+                            tokens_estimated, duration_ms, human_labeled_at, judge_badcase_type, judge_reason
+                            FROM tick_log;
+                        DROP TABLE tick_log;
+                        ALTER TABLE tick_log_new RENAME TO tick_log;
+                    """)
+                    conn.commit()
+            except Exception:
+                pass
             conn.close()
 
     # ── INSERT ──
@@ -473,30 +486,30 @@ class CaseDB:
                 except Exception as e:
                     print(f"  ✗ {f.stem}: {e}")
 
-
-# =============================================================================
-# Singleton
-# =============================================================================
-
-_db_instance: Optional[CaseDB] = None
-
-
     def load_benchmark_cases(self, bench_type: str) -> list[dict]:
-        """加载任意 benchmark 的 case。bench_type: 'tool' | 'reply' | 'search' """
+        """从 DB 加载 benchmark case。bench_type: 'tool' | 'reply' | 'search' | 'adversarial'"""
         table_map = {
-            "tool": "benchmark_tool_cases",
-            "reply": "benchmark_reply_cases",
-            "search": "benchmark_search_cases",
+            "tool": "bench_tool_cases",
+            "reply": "bench_reply_cases",
+            "search": "bench_search_cases",
+            "adversarial": "bench_adversarial_cases",
         }
         table = table_map.get(bench_type)
         if not table:
             return []
         conn = self._get_conn()
         try:
-            rows = conn.execute(f"SELECT * FROM {table} WHERE enabled=1").fetchall()
-            return [dict(r) for r in rows]
+            return [dict(r) for r in conn.execute(
+                f"SELECT * FROM {table} WHERE enabled=1").fetchall()]
         finally:
             conn.close()
+
+
+# =============================================================================
+# Singleton
+# =============================================================================
+
+_db_instance: Optional[CaseDB] = None
 
 
 def get_db() -> CaseDB:
