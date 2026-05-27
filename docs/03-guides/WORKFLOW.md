@@ -191,28 +191,63 @@
 
 ---
 
-## 6. 前端开发自测
+## 6. 前端修改后强制验证
 
-**前端页面开发完成后，必须用 Playwright 浏览器自动化点击一遍，验证功能正常。**
+**任何修改前端相关代码（admin.py、HTML 模板、CSS、JS、路径配置）后，必须全量验证所有 admin 页面，禁止只看代码就声称完成。**
 
-- 启动 Playwright：`playwright install chromium`（首次），然后用脚本验证
-- 必须验证的场景：
-  1. 页面是否正常加载（HTTP 200），不是空白页
-  2. **Admin 侧边栏是否保留**（不能把独立 HTML 直接返回，必须嵌入 `_page()` 框架）
-  3. **页面不出现原始 JSON/代码**（检查 `.inner_text()` 不包含 `[{`、`is_badcase` 等字段名）
-  4. 所有链接、按钮是否可点击且有响应
-  5. 数据是否正确展示（不是空白/报错），关键指标数字 > 0
-  6. 分页、筛选、跳转等交互是否生效
-  7. 图片/截图是否能正常加载
-  8. **表格、卡片、指标区布局是否整齐**（`page.locator('.card').count()` > 0）
-- 发现问题立即修复，修复后重新 Playwright 验证
+### 验证范围
+
+必须检查 admin.py 的全部 8 个页面：
+- `/` Dashboard
+- `/ticks` Tick 查看
+- `/gt` GT 标注
+- `/review` 人工审核
+- `/screenshots` 截图 OCR
+- `/benchmark/judge` Judge 质量
+- `/benchmark/reply` 回复质量
+- `/experiments` 实验管理
+
+### 验证清单
+
+1. **所有页面 HTTP 200**，不是空白页/500 错误
+2. **Admin 侧边栏是否保留**（不能把独立 HTML 直接返回，必须嵌入 `_page()` 框架）
+3. **页面不出现原始 JSON/代码**（检查 `.inner_text()` 不包含 `[{`、`is_badcase` 等字段名）
+4. 所有链接、按钮是否可点击且有响应
+5. 数据是否正确展示（不是空白/报错），关键指标数字 > 0
+6. 分页、筛选、跳转等交互是否生效
+7. 图片/截图是否能正常加载
+8. **表格、卡片、指标区布局是否整齐**（`page.locator('.card').count()` > 0）
+
+### Playwright 验证脚本
+
+```python
+import asyncio, time
+from playwright.async_api import async_playwright
+
+async def verify_admin():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        for path in ["/", "/ticks", "/gt", "/review", "/screenshots", "/benchmark/judge", "/benchmark/reply", "/experiments"]:
+            await page.goto(f"http://localhost:8766{path}")
+            assert page.url.endswith(path), f"跳转失败: {path}"
+            text = await page.inner_text("body")
+            assert "[{" not in text and "is_badcase" not in text, f"暴露原始数据: {path}"
+            count = await page.locator(".card").count()
+            assert count > 0 or path in ["/gt", "/review"], f"布局异常: {path}"
+            await page.screenshot(path=f"/tmp/admin_{path.replace('/', '_')}_{int(time.time())}.png", full_page=True)
+        await browser.close()
+        print("✅ 全部 8 个页面验证通过")
+
+asyncio.run(verify_admin())
+```
+
+### 纪律
+
+- 发现问题立即修复，修复后重新**全量验证**（不能只验证改过的页面）
 - **禁止只看代码不实际浏览就声称"完成"**
 - **禁止返回独立 HTML 导致侧边栏消失** — 所有页面必须通过 `_page()` 嵌入 admin 框架
-- **每次前端开发/改动完成后，必须用 Playwright 截图留证：**
-  ```python
-  page.screenshot(path="/tmp/page_name.png", full_page=True)
-  ```
-  截图保存到 `/tmp/` 下，文件名包含页面名和时间戳，方便回溯对比
+- **每次前端修改后必须用 Playwright 截图留证**，保存到 `/tmp/` 下
 
 ---
 

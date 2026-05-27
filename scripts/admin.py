@@ -535,8 +535,8 @@ def screenshot_detail(id: int):
 
 # ── Benchmark Dashboard ──
 
-BENCHMARK_JUDGE = Path(__file__).parent.parent / "benchmark_judge.html"
-BENCHMARK_REPLY = Path(__file__).parent.parent / "benchmark_reply.html"
+BENCHMARK_JUDGE = Path(__file__).parent.parent / "data" / "reports" / "benchmark_judge.html"
+BENCHMARK_REPLY = Path(__file__).parent.parent / "data" / "reports" / "benchmark_reply.html"
 
 def _embed_benchmark(html_path: Path, title: str, active: str) -> str:
     """提取独立 HTML 的 body + style 内容，嵌入 admin 框架。"""

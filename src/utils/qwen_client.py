@@ -18,13 +18,10 @@ class QwenClient:
     """LLM API 客户端（支持 DeepSeek 官方 / DashScope 双平台）"""
 
     def __init__(self, model: str = "deepseek-v4-flash"):
-        # 默认 DashScope（稳定有额度），如需切 DeepSeek 官方平台设 USE_DEEPSEEK_OFFICIAL=true
-        use_official = os.environ.get("USE_DEEPSEEK_OFFICIAL", "").lower() in ("1", "true", "yes")
-        if use_official:
-            api_key = os.environ.get("DEEPSEEK_API_KEY")
-            base_url = "https://api.deepseek.com/v1"
-        else:
-            api_key = os.environ.get("DASHSCOPE_API_KEY") or os.environ.get("DEEPSEEK_API_KEY")
+        api_key = os.environ.get("DEEPSEEK_API_KEY")
+        base_url = "https://api.deepseek.com/v1"
+        if not api_key:
+            api_key = os.environ.get("DASHSCOPE_API_KEY")
             base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
         if not api_key:
             raise RuntimeError("DEEPSEEK_API_KEY 或 DASHSCOPE_API_KEY 至少设置一个")
