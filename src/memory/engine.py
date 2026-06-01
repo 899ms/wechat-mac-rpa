@@ -83,7 +83,7 @@ _UPDATE_PROMPT = """请根据以下对话记录，更新用户 {user_name} 的 w
 7. 冲突处理：新信息覆盖旧信息
 8. 不确定的信息用 [待验证] 标记
 9. 多账号标注：如果对话来源包含不同账号标记，标注所属账号
-10. 共同群聊：记录当前用户和 Bot 共同所在的群聊（放在 wiki 靠前位置）
+10. 共同群聊：记录当前用户和 Bot 共同所在的群聊（放在 wiki 靠前位置）。**只列群聊名称，严禁列出对话时间、历史记录或时间戳**
 11. 关系记录：记录当前用户与 Bot 的社会关系，如家人、大学同学、小公司同事等（需细分，如"大学同学"而非仅"同学"）。不要记录互动频率
 12. 与其他人的关系：记录当前用户与其他人的社会关系，不限于群成员，包括对话中出现的所有人
 13. **区分陈述和疑问（严格）**：以"吗"、"呢"、"?"结尾的句子是疑问，不是事实陈述，严禁当作事实提取。例如"周宇之前在上海吗？"是疑问，不能提取为"周宇之前在上海"。
@@ -418,8 +418,8 @@ class MemoryEngine:
             if ts:
                 try:
                     ts_str = time.strftime("%Y-%m-%d %H:%M", time.localtime(int(ts)))
-                except Exception:
-                    pass
+                except Exception as e:
+                    _logger.warning("[MemoryEngine] 时间戳格式化失败: %s (ts=%r)", e, ts)
             # 组装前缀：[账号][时间]
             prefix = ""
             if account:
@@ -494,18 +494,15 @@ class MemoryEngine:
         raise RuntimeError(f"LLM 生成 wiki 失败（已重试 3 次）: {last_error}")
 
     def _strip_llm_prefix(self, text: str) -> str:
-        """去掉 LLM 常见的开场白、前言等前缀。"""
-        import re
-        # 匹配 "好的，这是..." / "以下是..." / "根据..." 等开场白（直到第一个 # 标题）
-        patterns = [
-            r'^好的[，,].*?(?=#\s)',
-            r'^以下是.*?(?=#\s)',
-            r'^根据.*?(?=#\s)',
-            r'^这是.*?(?=#\s)',
-            r'^我来.*?(?=#\s)',
-        ]
-        for p in patterns:
-            text = re.sub(p, '', text, count=1, flags=re.DOTALL)
+        """去掉 LLM 常见的开场白、前言等前缀（直到第一个 # 标题）。"""
+        prefixes = ("好的，", "好的,", "以下是", "根据", "这是", "我来")
+        text = text.lstrip()
+        for prefix in prefixes:
+            if text.startswith(prefix):
+                hash_idx = text.find("# ")
+                if hash_idx != -1:
+                    text = text[hash_idx:]
+                break
         return text.strip()
 
     def _do_update_user(self, task: dict) -> None:
@@ -580,7 +577,6 @@ class MemoryEngine:
 
     def _extract_aliases_from_user_wiki(self, wiki: str, user_name: str) -> List[str]:
         """从用户 wiki 的 ## 别名 段落提取别名。严格过滤，排除他人名字和无效条目。"""
-        import re
         aliases = []
         marker = "## 别名"
         if marker not in wiki:
@@ -614,7 +610,7 @@ class MemoryEngine:
                     continue  # 过长，不太可能是别名
                 if any(kw in alias_text for kw in invalid_keywords):
                     continue  # 包含描述性关键词，可能是句子而非别名
-                if re.search(r'[。，；！？\.\,;!?]', alias_text):
+                if any(c in alias_text for c in '。，；！？.,;!?'):
                     continue  # 包含标点，说明是句子
                 if alias_text.startswith("wxid_") or alias_text.endswith("@chatroom"):
                     continue  # 微信 ID 模式，不是别名
@@ -630,12 +626,33 @@ class MemoryEngine:
         if "## 群成员画像" not in wiki and "## 活跃成员" not in wiki:
             return result
         # 模式: **成员名（别名1/别名2）**
-        import re
         existing_mains = set(self._aliases.keys())
         invalid_keywords = ["说", "提到", "认为", "和", "与", "让", "叫", "是", "在", "觉得", "告诉", "问", "回答", "表示", "介绍", "@"]
-        for m in re.finditer(r'\*\*([^*（(]+)[（(]([^)）]+)[)）]\*\*', wiki):
-            main = m.group(1).strip()
-            alias_str = m.group(2).strip()
+        # 从 markdown 中提取 **成员名（别名1/别名2）** 格式
+        # 遍历所有 **...** 模式，用字符串操作替代正则
+        i = 0
+        while i < len(wiki):
+            open_idx = wiki.find("**", i)
+            if open_idx == -1:
+                break
+            close_idx = wiki.find("**", open_idx + 2)
+            if close_idx == -1:
+                break
+            content = wiki[open_idx + 2:close_idx]
+            i = close_idx + 2
+            # 查找括号
+            paren_open = content.find("（")
+            if paren_open == -1:
+                paren_open = content.find("(")
+            if paren_open == -1:
+                continue
+            main = content[:paren_open].strip()
+            paren_close = content.find("）", paren_open)
+            if paren_close == -1:
+                paren_close = content.find(")", paren_open)
+            if paren_close == -1:
+                continue
+            alias_str = content[paren_open + 1:paren_close].strip()
             aliases = []
             for a in alias_str.replace("、", "/").split("/"):
                 a = a.strip()
@@ -647,7 +664,7 @@ class MemoryEngine:
                     continue
                 if any(kw in a for kw in invalid_keywords):
                     continue
-                if re.search(r'[。，；！？\.\,;!?]', a):
+                if any(c in a for c in '。，；！？.,;!?'):
                     continue
                 if a.startswith("wxid_") or a.endswith("@chatroom"):
                     continue
@@ -722,11 +739,30 @@ class MemoryEngine:
         return list(keywords)
 
     def _extract_all_snippets(self, content: str, keywords: List[str], max_snippets: int = 2) -> List[str]:
-        """从内容中提取所有包含关键词的片段，去重，限制数量。"""
+        """从内容中提取所有包含关键词的片段，去重，限制数量。
+
+        策略：按关键词命中数量从少到多排序，优先提取稀有命中点，
+        避免通用词（如人名）占满所有 snippet 配额。
+        """
+        # 先统计每个关键词的命中数量
+        kw_hit_counts = []
+        for kw in keywords:
+            start = 0
+            count = 0
+            while True:
+                idx = content.find(kw, start)
+                if idx < 0:
+                    break
+                count += 1
+                start = idx + len(kw)
+            kw_hit_counts.append((kw, count))
+        # 按命中数量排序（少的优先）
+        kw_hit_counts.sort(key=lambda x: x[1])
+
         snippets = []
         seen_ranges = set()  # 避免重叠片段
         hit_keywords = set()
-        for kw in keywords:
+        for kw, _ in kw_hit_counts:
             start = 0
             kw_hits = 0
             while True:
@@ -742,7 +778,7 @@ class MemoryEngine:
                         break
                 if not overlap:
                     snippet_start = max(0, idx - 80)
-                    snippet_end = min(len(content), idx + 150)
+                    snippet_end = min(len(content), idx + 500)
                     snippet = content[snippet_start:snippet_end].strip()
                     if snippet_start > 0:
                         snippet = "…" + snippet
@@ -909,7 +945,18 @@ class MemoryEngine:
             _logger.info(f"[Search] select: {name} score={score:.4f} primary={is_primary} group={is_group}")
             if is_primary:
                 primary_names.add(name)
-                results.append(f"【{name}的记忆】{content}")
+                # 本人 wiki 如果太长，提取包含查询词的 snippet，避免完整 wiki 挤占空间导致截断
+                snippet_keywords = filtered_original if filtered_original else [resolved_keyword]
+                if len(content) > max_chars:
+                    snippets = self._extract_all_snippets(content, snippet_keywords, max_snippets=3)
+                    if snippets:
+                        for snippet in snippets:
+                            results.append(f"【{name}的记忆】{snippet}")
+                    else:
+                        # 提取不到 snippet 时fallback：返回开头+截断提示
+                        results.append(f"【{name}的记忆】{content[:max_chars]}\n（…内容截断）")
+                else:
+                    results.append(f"【{name}的记忆】{content}")
             else:
                 # snippet 提取：先用原始搜索词，提取不到再用别名回退
                 snippet_keywords = filtered_original if filtered_original else [resolved_keyword]

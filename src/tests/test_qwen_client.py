@@ -14,7 +14,7 @@ class TestQwenClientInit:
             client = QwenClient()
             assert client.model == "deepseek-v4-flash"
             assert not client.is_deepseek_official
-            assert "dashscope" in str(client.client.base_url)
+            assert "aliyuncs" in str(client.client.base_url)
 
     def test_deepseek_official(self):
         with patch.dict(os.environ, {

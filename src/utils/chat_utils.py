@@ -4,7 +4,6 @@
 所有涉及 chat_name 的处理逻辑统一放在这里，禁止各模块自己写正则。
 """
 
-import re
 from typing import Optional
 
 
@@ -12,7 +11,14 @@ def _is_group_chat_name(chat_name: str) -> bool:
     """判断聊天名称是否为群聊（以群人数结尾，如 'ai开发小分队（128）' 或 'xxx (5)'）。"""
     if not chat_name:
         return False
-    return bool(re.search(r'[（(]\d+[）)]$', chat_name))
+    # 找到最后一个 '(' 或 '（'，检查后面是否是数字 + 对应闭合括号
+    for open_ch, close_ch in (('(', ')'), ('（', '）')):
+        idx = chat_name.rfind(open_ch)
+        if idx != -1 and chat_name.endswith(close_ch):
+            mid = chat_name[idx + 1:-1]
+            if mid.isdigit():
+                return True
+    return False
 
 
 def _normalize_chat_name(name: str) -> str:
@@ -26,9 +32,15 @@ def _normalize_chat_name(name: str) -> str:
     name = name.replace("(", "（").replace(")", "）")
     name = name.replace("—", "—").replace("–", "—")
     name = name.replace(" ", "").replace("\u00a0", "").replace("\t", "")
-    name = re.sub(r'^\d+[\.\、\s]*', '', name)
+    # 去掉开头的序号前缀（如 "1. 群名"、"1、群名"、"1 群名"）
+    i = 0
+    while i < len(name) and (name[i].isdigit() or name[i] in '.、 \t'):
+        i += 1
+    name = name[i:]
     # 去掉群人数后缀（如 'ai开发小分队（128）' → 'ai开发小分队'）
-    name = re.sub(r'（\d+）$', '', name)
+    idx = name.rfind('（')
+    if idx != -1 and name.endswith('）') and name[idx + 1:-1].isdigit():
+        name = name[:idx]
     return name.strip()
 
 

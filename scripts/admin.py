@@ -4,10 +4,15 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import asyncio
 import json as _json
+import subprocess
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from src.badcase.case_db import get_db
+
+WORK_DIR = str(Path(__file__).parent.parent)
+KIMI_BIN = "/Users/yihanwang/.local/bin/kimi"
 
 app = FastAPI(title="wechat-twin Admin")
 
@@ -28,11 +33,26 @@ th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)}th{
 #lightbox{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.9);z-index:9999;cursor:zoom-out;align-items:center;justify-content:center}
 #lightbox img{max-width:95vw;max-height:95vh;object-fit:contain}
 #lightbox.show{display:flex}
-/* diff styles */
-.ln{color:var(--muted);text-align:right;padding:0 4px;width:30px;font-size:9px;user-select:none}
-.eq{color:var(--text);padding:0 4px}.del{background:rgba(248,81,73,.2);color:#ff9999;padding:0 4px}
-.add{background:rgba(63,185,80,.2);color:#99ff99;padding:0 4px}
-.empty{background:rgba(255,255,255,.02)}.skip{color:var(--muted);text-align:center;padding:4px}
+/* diff styles - full scrollable side-by-side */
+.diff-container{display:flex;gap:0;margin-top:4px;max-height:65vh;overflow:auto;font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;border:1px solid var(--border);border-radius:6px;background:var(--card)}
+.diff-container::-webkit-scrollbar{width:8px;height:8px}
+.diff-container::-webkit-scrollbar-track{background:transparent}
+.diff-container::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:4px}
+.diff-container::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.25)}
+.diff-col{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.diff-col+.diff-col{border-left:1px solid var(--border)}
+.diff-header{position:sticky;top:0;z-index:10;display:flex;align-items:center;padding:6px 10px;font-size:12px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,sans-serif;border-bottom:1px solid var(--border);background:var(--card)}
+.diff-header.control{color:var(--red);border-left:3px solid var(--red)}
+.diff-header.exp{color:var(--green);border-left:3px solid var(--green)}
+.diff-body{overflow-y:auto;max-height:calc(65vh - 32px)}
+.diff-body::-webkit-scrollbar{width:6px}
+.diff-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
+.ln{color:var(--muted);text-align:right;padding:4px 6px;width:44px;font-size:10px;user-select:none;background:#1c2128;border-right:1px solid var(--border);vertical-align:top;white-space:nowrap}
+.eq{color:#adbac7;padding:4px 6px;background:transparent;vertical-align:top;line-height:1.5}
+.del{background:rgba(248,81,73,.08);color:#ff9d9d;padding:4px 6px;border-left:3px solid #f85149;vertical-align:top;line-height:1.5}
+.add{background:rgba(63,185,80,.08);color:#7ee787;padding:4px 6px;border-left:3px solid #3fb950;vertical-align:top;line-height:1.5}
+.empty{background:rgba(255,255,255,.02);color:var(--muted);padding:4px 6px;vertical-align:top;line-height:1.5}
+.skip{color:var(--muted);text-align:center;padding:8px;background:rgba(255,255,255,.02);font-style:italic;font-size:10px}
 </style></head><body>
 <div id="lightbox" onclick="this.classList.remove('show')"><img id="lightbox-img" src=""></div>
 <nav>
@@ -45,6 +65,7 @@ th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)}th{
 <a href="/benchmark/judge">📊 Judge质量</a>
 <a href="/benchmark/reply">🤖 回复质量</a>
 <a href="/experiments">🧪 实验</a>
+<a href="/code-audit">🐛 代码审计</a>
 </nav><main>"""
 
 FOOTER = """</main>
@@ -61,7 +82,7 @@ document.addEventListener('dblclick',function(e){
 
 def _page(title: str, content: str, active: str = "") -> str:
     nav = HEADER
-    for href, label in [("/", "📊 Dashboard"), ("/ticks", "🔍 Tick"), ("/gt", "🏷️ GT"), ("/review", "🧑‍⚖️ 审核"), ("/screenshots", "📸 截图OCR"), ("/benchmark/judge", "📊 Judge"), ("/benchmark/reply", "🤖 回复"), ("/experiments", "🧪 实验")]:
+    for href, label in [("/", "📊 Dashboard"), ("/ticks", "🔍 Tick"), ("/gt", "🏷️ GT"), ("/review", "🧑‍⚖️ 审核"), ("/screenshots", "📸 截图OCR"), ("/benchmark/judge", "📊 Judge"), ("/benchmark/reply", "🤖 回复"), ("/experiments", "🧪 实验"), ("/code-audit", "🐛 审计")]:
         cls = ' class="active"' if href == active else ""
         nav += f'<a href="{href}"{cls}>{label}</a>'
     nav += "</nav><main>"
@@ -115,13 +136,13 @@ def tick_list(page: int = Query(1), filter: str = Query("all")):
             try:
                 import json as _j2
                 arr = _j2.loads(rp)
-                reply_preview = " | ".join(str(x)[:20] for x in (arr if isinstance(arr, list) else []))[:60]
+                reply_preview = " | ".join(str(x) for x in (arr if isinstance(arr, list) else []))
             except: pass
         rows_html += f"""<tr>
           <td><a href="/ticks/{r['id']}" style="color:var(--blue)">{r['session_id']}:#{r['tick_id']}</a></td>
           <td>{r['chat_name'] or '-'}</td><td>{r['new_messages_count'] or r['messages_count'] or 0}条</td>
           <td>{status}</td><td style="font-size:11px">{reply_preview}</td><td>{llm_score}</td><td>{human}</td><td>{r['duration_ms'] or 0}ms</td>
-          <td style="font-size:11px;color:var(--muted)">{r['created_at'][:16] if r['created_at'] else ''}</td></tr>"""
+          <td style="font-size:11px;color:var(--muted)">{r['created_at'] if r['created_at'] else ''}</td></tr>"""
 
     conn = db._get_conn()
     total = conn.execute(f"SELECT COUNT(*) FROM tick_log {where}").fetchone()[0]
@@ -164,13 +185,13 @@ def tick_detail(id: int):
     ms = d.get("duration_ms",0) or 0
     status = d.get("skip_reason") or ("已回复" if d.get("should_reply") else "无消息")
     content = f"""
-    <div class="card"><b>{d.get("session_id","")}:#{d["tick_id"]}</b> — {d.get("created_at","")[:16]}</div>
+    <div class="card"><b>{d.get("session_id","")}:#{d["tick_id"]}</b> — {d.get("created_at","")}</div>
     <div class="card"><b>聊天:</b> {d.get("chat_name","?")} {"(群)" if d.get("is_group") else "(私)"} | <b>状态:</b> {status} | <b>耗时:</b> {ms}ms</div>
     <div class="card"><b>消息:</b> 总{d.get("messages_count",0)}条 新{d.get("new_messages_count",0)}条 | <b>发送:</b> {"OK" if d.get("send_success") else "N/A"}</div>
     <div class="card"><b>Bot 回复:</b><br>{replies_display}</div>
-    <details style="margin-bottom:12px"><summary style="cursor:pointer;color:var(--blue)">System Prompt ({len(sp)}字)</summary><div class="card"><pre style="font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap">{sp}</pre></div></details>
-    <details style="margin-bottom:12px"><summary style="cursor:pointer;color:var(--blue)">User Prompt ({len(up)}字)</summary><div class="card"><pre style="font-size:10px;max-height:400px;overflow:auto;white-space:pre-wrap">{up}</pre></div></details>
-    <details style="margin-bottom:12px"><summary style="cursor:pointer;color:var(--muted)">Raw Response</summary><div class="card"><pre style="font-size:10px;max-height:200px;overflow:auto">{raw}</pre></div></details>
+    <div class="card" style="border-left:3px solid var(--blue)"><b>📝 System Prompt ({len(sp)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{sp}</pre></div>
+    <div class="card" style="border-left:3px solid var(--green)"><b>📝 User Prompt ({len(up)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{up}</pre></div>
+    <div class="card" style="border-left:3px solid var(--muted)"><b>📝 Raw Response</b><pre style="font-size:10px;white-space:pre-wrap">{raw}</pre></div>
     """
     # 工具调用 + 结果（合并 tool_calls_json 和 tool_results_json）
     try:
@@ -213,12 +234,15 @@ def tick_detail(id: int):
             dims = _j.loads(d["judge_dimensions_json"])
             for name, dd in dims.items():
                 s = int(dd.get("score", 0))
-                bar = "▮"*s + "▯"*(5-s)
-                judge_dims += f'<div style="margin:2px 0;font-size:11px">{bar} {name}: {dd.get("score","?")}/5 — {dd.get("comment","")[:120]}</div>'
+                filled = min(s // 10, 10)
+                bar = "█"*filled + "░"*(10-filled)
+                judge_dims += f'<div style="margin:2px 0;font-size:11px">{bar} {name}: {dd.get("score","?")}/100 — {dd.get("comment","")}</div>'
         except: pass
+    js = d.get("judge_score")
+    js_str = f"{js:.0f}" if js is not None else "?"
     content += f"""
     <div class="card" style="border-left:3px solid orange">
-      <b>LLM Judge:</b> {d.get("judge_score","?")}/50 | is_badcase: {d.get("judge_is_badcase","?")} | {d.get("judge_badcase_type","?")}<br>{judge_dims}
+      <b>LLM Judge:</b> {js_str}/100 | is_badcase: {'是' if d.get('judge_is_badcase') else '否'} | {d.get("judge_badcase_type") or "?"}<br>{judge_dims}
     </div>
     """
 
@@ -245,6 +269,8 @@ def tick_detail(id: int):
     return HTMLResponse(_page(f"Tick {d.get('session_id','')}:#{d['tick_id']}", content, "/ticks"))
 
 
+@app.get("/gt", response_class=HTMLResponse)
+def gt_list():
     db = get_db()
     conn = db._get_conn()
     # Show ticks where Judge might be wrong: high score but human disagrees, or low score but human says OK
@@ -257,9 +283,9 @@ def tick_detail(id: int):
         j = "✅正常" if r["judge_is_badcase"] == 0 else "❌badcase"
         h = "—" if r["human_is_badcase"] is None else ("✅正常" if r["human_is_badcase"] == 0 else f"❌{r['human_badcase_type']}")
         cls = "" if r["human_is_badcase"] is None else ("style='color:var(--yellow)'" if r["human_is_badcase"] != r["judge_is_badcase"] else "")
-        rows_html += f"""<tr {cls}><td><a href="/ticks/{r['id']}" style="color:var(--blue)">{r.get('session_id','')}:#{r['tick_id']}</a></td>
+        rows_html += f"""<tr {cls}><td><a href="/ticks/{r['id']}" style="color:var(--blue)">{r['session_id'] or ''}:#{r['tick_id']}</a></td>
           <td>{r['chat_name']}</td><td>{r['judge_score']:.0f}</td><td>{j}</td><td>{h}</td>
-          <td style="font-size:11px;color:var(--muted)">{(r['raw_response'] or '')[:60]}</td></tr>"""
+          <td style="font-size:11px;color:var(--muted)">{(r['raw_response'] or '')}</td></tr>"""
 
     content = f"""<p style="color:var(--muted);font-size:13px;margin-bottom:12px">标注 Judge 判定可能错误的 tick。点击 tick 进入详情页，底部可设置 GT。</p>
     <table><tr><th>Tick</th><th>聊天</th><th>Judge分</th><th>Judge判</th><th>人工判</th><th>回复</th></tr>{rows_html}</table>"""
@@ -274,7 +300,7 @@ def review_list():
     conn.close()
     rows_html = ""
     for r in rows:
-        rows_html += f"""<tr><td><a href="/review/{r['draft_id']}" style="color:var(--blue)">{r['draft_id'][:40]}</a></td>
+        rows_html += f"""<tr><td><a href="/review/{r['draft_id']}" style="color:var(--blue)">{r['draft_id']}</a></td>
           <td>{r['chat_name']}</td><td>{r['status']}</td><td>{r['badcase_type']}</td>
           <td>{r['confidence']:.0%}</td><td>{r['overall_score']:.0f}</td></tr>"""
 
@@ -398,7 +424,7 @@ def screenshots_list(page: int = Query(1, ge=1), limit: int = Query(20, ge=5, le
         <tr>
           <td><a href="/screenshots/{db_id}" style="color:var(--blue)">{name_link}</a></td>
           <td>{ts}</td>
-          <td>{chat_name[:12]}</td>
+          <td>{chat_name}</td>
           <td>{img_tag}</td>
           <td style="font-size:12px">{ocr_summary}</td>
           <td>{api_info}</td>
@@ -455,7 +481,7 @@ def screenshot_detail(id: int):
             sp = dbg.get("screenshot_path", "") or dbg.get("perception_screenshot_path", "") or ""
         if not db_chat_name:
             raw_chat = dbg.get("perception_chat_name", "") or dbg.get("bot_chat_name", "") or ""
-        ts = dbg.get("timestamp", "")[:16]
+        ts = dbg.get("timestamp", "")
     except Exception:
         pass
 
@@ -470,8 +496,8 @@ def screenshot_detail(id: int):
             ocr_elems = dbg.get("ocr_elements", [])
             if ocr_elems:
                 ocr_rows = ""
-                for e in ocr_elems[:100]:
-                    text = e.get("text", "")[:60]
+                for e in ocr_elems:
+                    text = e.get("text", "")
                     bbox = e.get("bbox", [])
                     conf = e.get("confidence", 0)
                     ocr_rows += f"<tr><td style='font-size:10px;color:var(--muted)'>{bbox}</td><td>{text}</td><td>{conf:.0%}</td></tr>"
@@ -488,10 +514,10 @@ def screenshot_detail(id: int):
                 val = dbg.get(key, [])
                 if val:
                     if isinstance(val, list):
-                        items = "<br>".join(str(v)[:100] for v in val[:20])
+                        items = "<br>".join(str(v) for v in val)
                         layout_parts.append(f"<div class='card'><b>{label}</b> ({len(val)}):<br><span style='font-size:11px'>{items}</span></div>")
                     else:
-                        layout_parts.append(f"<div class='card'><b>{label}</b>: {str(val)[:200]}</div>")
+                        layout_parts.append(f"<div class='card'><b>{label}</b>: {str(val)}</div>")
             if layout_parts:
                 layout_html = "".join(layout_parts)
 
@@ -499,16 +525,16 @@ def screenshot_detail(id: int):
             api_prompt = dbg.get("api_prompt", "")
             api_response = dbg.get("api_response", "")
             if api_prompt:
-                api_prompt_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{api_prompt[:5000]}</pre>"
+                api_prompt_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{api_prompt}</pre>"
             if api_response:
-                api_response_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{api_response[:5000]}</pre>"
+                api_response_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{api_response}</pre>"
 
             # 提取消息
             msgs = dbg.get("extraction_messages", [])
             if msgs:
                 msgs_html = ""
-                for m in msgs[:30]:
-                    msgs_html += f"<tr><td>{m.get('sender','')[:20]}</td><td>{m.get('text','')[:80]}</td><td>{m.get('chat_name','')[:20]}</td></tr>"
+                for m in msgs:
+                    msgs_html += f"<tr><td>{m.get('sender','')}</td><td>{m.get('text','')}</td><td>{m.get('chat_name','')}</td></tr>"
                 layout_parts.append(f"<div class='card'><b>提取的消息</b> ({len(msgs)}):<table><tr><th>发送者</th><th>文本</th><th>聊天</th></tr>{msgs_html}</table></div>")
         except Exception:
             pass
@@ -608,7 +634,7 @@ def experiments_list():
           <td>{(e['control_badcase_rate'] or 0)*100:.0f}% → {(e['exp_badcase_rate'] or 0)*100:.0f}%</td>
           <td>{e['control_avg_score']:.1f} → {e['exp_avg_score']:.1f}</td>
           <td>{icon} {e['summary'] or ''}</td>
-          <td style="font-size:11px;color:var(--muted)">{(e['created_at'] or '')[:16]}</td>
+          <td style="font-size:11px;color:var(--muted)">{(e['created_at'] or '')}</td>
         </tr>"""
 
     content = f"""<table>
@@ -630,29 +656,54 @@ def experiment_detail(exp_id: int):
 
     dims = json.loads(exp["dimension_diffs_json"] or "{}")
 
-    # Config params diff
+    # Config params diff — 从 run_experiment.py 动态导入，计算与 CONTROL 的差异
     exp_name = exp['name'] or ''
-    config_params = {
-        "enable_time": {"时间感知": "✅", "时间戳注入": "✅", "回复克制": "❌", "未读去重": "❌", "search_in_page": "❌"},
-        "enable_restraint": {"时间感知": "❌", "时间戳注入": "❌", "回复克制": "✅", "未读去重": "✅", "search_in_page": "❌"},
-        "enable_search": {"时间感知": "❌", "时间戳注入": "❌", "回复克制": "❌", "未读去重": "❌", "search_in_page": "✅"},
-        "enable_all_p0": {"时间感知": "✅", "时间戳注入": "✅", "回复克制": "✅", "未读去重": "✅", "search_in_page": "✅"},
-        "all_off": {"时间感知": "❌", "时间戳注入": "❌", "回复克制": "❌", "未读去重": "❌", "search_in_page": "❌"},
-    }
-    params = config_params.get(exp_name, {})
     param_html = ""
-    if params:
-        param_html = '<div class="card"><b>⚙️ 实验参数（基线=全❌ → 实验组）：</b><br>'
-        for k, v in params.items():
-            param_html += f'<span style="margin:4px 8px;font-size:12px">{k}: <b>{v}</b></span>'
-        param_html += '</div>'
+    try:
+        import sys
+        from pathlib import Path
+        exp_script = Path(__file__).parent / "run_experiment.py"
+        if str(exp_script.parent.parent) not in sys.path:
+            sys.path.insert(0, str(exp_script.parent.parent))
+        from scripts.run_experiment import BOT_EXPERIMENTS, CONTROL
+
+        exp_cfg = BOT_EXPERIMENTS.get(exp_name)
+        if exp_cfg:
+            # 功能开关对比
+            features = [
+                ("时间感知", "enable_time_awareness"),
+                ("时间戳注入", "enable_timestamps"),
+                ("回复克制", "enable_reply_restraint"),
+                ("未读去重", "enable_unread_dedup"),
+                ("search_in_page", "enable_search_in_page"),
+            ]
+            diffs = []
+            for label, attr in features:
+                c_val = getattr(CONTROL, attr, True)
+                e_val = getattr(exp_cfg, attr, c_val)
+                if c_val != e_val:
+                    diffs.append(f'{label}: {"✅→❌ 关闭" if e_val else "❌→✅ 开启"}')
+            # 截断长度对比
+            if CONTROL.browse_truncate != exp_cfg.browse_truncate:
+                diffs.append(f'浏览截断: {CONTROL.browse_truncate}→{exp_cfg.browse_truncate}')
+            if CONTROL.tool_result_truncate != exp_cfg.tool_result_truncate:
+                diffs.append(f'工具截断: {CONTROL.tool_result_truncate}→{exp_cfg.tool_result_truncate}')
+
+            param_html = '<div class="card"><b>⚙️ 实验参数（CONTROL 线上配置 → 实验组差异）：</b><br>'
+            if diffs:
+                param_html += '<div style="margin-top:4px">' + ' · '.join(f'<span style="margin:4px 8px;font-size:12px">{d}</span>' for d in diffs) + '</div>'
+            else:
+                param_html += '<span style="font-size:12px;color:var(--muted)">无差异（与 CONTROL 配置相同）</span>'
+            param_html += '</div>'
+    except Exception as e:
+        param_html = f'<!-- config diff error: {e} -->'
 
     # 实验策略详细说明
     exp_desc = exp['description'] or ''
     content = f"""<div class="card" style="border-left:3px solid var(--blue);margin-bottom:16px">
   <h2>🧪 实验: {exp['name']}</h2>
   <div style="font-size:13px;line-height:1.7;color:var(--text);margin:8px 0">{exp_desc}</div>
-  <div style="font-size:11px;color:var(--muted);margin-top:8px">N={exp['n_samples']} · 对照组=all_off(基线) · 固定Judge=v4-pro</div>
+  <div style="font-size:11px;color:var(--muted);margin-top:8px">N={exp['n_samples']} · 对照组=CONTROL(线上当前配置) · 实验组={exp_name} · 固定Judge=v4-pro</div>
 </div>""" + param_html
 
     # Summary
@@ -734,7 +785,7 @@ def experiment_detail(exp_id: int):
         try: e_dims = json.loads(e_dims_json)
         except: e_dims = {}
         dim_comparison = ""
-        for dim_name in ["幻觉控制", "时间推理", "回复必要性", "信息准确性", "上下文理解"]:
+        for dim_name in ["幻觉控制", "上下文理解", "回复必要性", "简洁度", "个性一致性", "时间推理", "信息准确性", "亮点加分项"]:
             cv = c_dims.get(dim_name, {}).get("score", 0)
             ev = e_dims.get(dim_name, {}).get("score", 0)
             d = ev - cv
@@ -746,7 +797,7 @@ def experiment_detail(exp_id: int):
         c_full = (rd.get('c_sp') or '') + '\n---\n' + (rd.get('c_up') or '')
         e_full = (rd.get('e_sp') or '') + '\n---\n' + (rd.get('e_up') or '')
         prompt_diff = ""
-        if c_full.strip() and e_full.strip() and c_full != e_full:
+        if c_full.strip() and e_full.strip():
             import difflib
             cl = c_full.splitlines(); el = e_full.splitlines()
             sm = difflib.SequenceMatcher(None, cl, el)
@@ -757,46 +808,66 @@ def experiment_detail(exp_id: int):
                     lines = cl[i1:i2]
                     if len(lines) <= 5:
                         for ln in lines:
-                            left_rows.append(f'<tr><td class="ln">{i1+1}</td><td class="eq">{ln[:150]}</td></tr>')
-                            right_rows.append(f'<tr><td class="ln">{j1+1}</td><td class="eq">{ln[:150]}</td></tr>')
+                            left_rows.append(f'<tr><td class="ln">{i1+1}</td><td class="eq">{ln}</td></tr>')
+                            right_rows.append(f'<tr><td class="ln">{j1+1}</td><td class="eq">{ln}</td></tr>')
                             i1+=1; j1+=1
                     else:
-                        for ln in lines[:2]:
-                            left_rows.append(f'<tr><td class="ln">{i1+1}</td><td class="eq">{ln[:150]}</td></tr>')
-                            right_rows.append(f'<tr><td class="ln">{j1+1}</td><td class="eq">{ln[:150]}</td></tr>')
+                        skip_n = len(lines) - 4
+                        for ln in lines:
+                            left_rows.append(f'<tr><td class="ln">{i1+1}</td><td class="eq">{ln}</td></tr>')
+                            right_rows.append(f'<tr><td class="ln">{j1+1}</td><td class="eq">{ln}</td></tr>')
                             i1+=1; j1+=1
-                        left_rows.append('<tr><td colspan="2" class="skip">···</td></tr>')
-                        right_rows.append('<tr><td colspan="2" class="skip">···</td></tr>')
+                        left_rows.append(f'<tr><td colspan="2" class="skip">··· {skip_n} 行相同 ···</td></tr>')
+                        right_rows.append(f'<tr><td colspan="2" class="skip">··· {skip_n} 行相同 ···</td></tr>')
                         for ln in lines[-2:]:
-                            left_rows.append(f'<tr><td class="ln">{i1+len(lines)-2}</td><td class="eq">{ln[:150]}</td></tr>')
-                            right_rows.append(f'<tr><td class="ln">{j1+len(lines)-2}</td><td class="eq">{ln[:150]}</td></tr>')
+                            left_rows.append(f'<tr><td class="ln">{i1+len(lines)-2}</td><td class="eq">{ln}</td></tr>')
+                            right_rows.append(f'<tr><td class="ln">{j1+len(lines)-2}</td><td class="eq">{ln}</td></tr>')
                             i1+=1; j1+=1
                 elif tag == 'delete':
                     for ln in cl[i1:i2]:
-                        left_rows.append(f'<tr><td class="ln">{i1+1}</td><td class="del">{ln[:150]}</td></tr>')
+                        left_rows.append(f'<tr><td class="ln">{i1+1}</td><td class="del">{ln}</td></tr>')
                         right_rows.append(f'<tr><td class="ln"></td><td class="empty"></td></tr>')
                         i1+=1
                 elif tag == 'insert':
                     for ln in el[j1:j2]:
                         left_rows.append(f'<tr><td class="ln"></td><td class="empty"></td></tr>')
-                        right_rows.append(f'<tr><td class="ln">{j1+1}</td><td class="add">{ln[:150]}</td></tr>')
+                        right_rows.append(f'<tr><td class="ln">{j1+1}</td><td class="add">{ln}</td></tr>')
                         j1+=1
                 elif tag == 'replace':
                     for ln in cl[i1:i2]:
-                        left_rows.append(f'<tr><td class="ln">{i1+1}</td><td class="del">{ln[:150]}</td></tr>')
+                        left_rows.append(f'<tr><td class="ln">{i1+1}</td><td class="del">{ln}</td></tr>')
                         right_rows.append(f'<tr><td class="ln"></td><td class="empty"></td></tr>')
                         i1+=1
                     for ln in el[j1:j2]:
                         left_rows.append(f'<tr><td class="ln"></td><td class="empty"></td></tr>')
-                        right_rows.append(f'<tr><td class="ln">{j1+1}</td><td class="add">{ln[:150]}</td></tr>')
+                        right_rows.append(f'<tr><td class="ln">{j1+1}</td><td class="add">{ln}</td></tr>')
                         j1+=1
 
-            change_count = sum(1 for row in left_rows if 'class="del"' in row or 'class="add"' in row)
-            prompt_diff = '<details style="margin-top:4px"><summary style="cursor:pointer;font-size:11px;color:var(--blue)">\U0001f4dd 提示词 Diff (' + str(change_count) + ' 行变化)</summary>'
-            prompt_diff += '<div style="display:flex;gap:0;margin-top:4px;max-height:400px;overflow:auto;font-size:10px;font-family:monospace;border:1px solid var(--border);border-radius:4px">'
-            prompt_diff += '<div style="flex:1;min-width:0;overflow:hidden"><table style="width:100%;border-collapse:collapse"><tr><th style="width:30px;color:var(--muted)">#</th><th style="color:var(--red)">基线(all_off)</th></tr>' + ''.join(left_rows) + '</table></div>'
-            prompt_diff += '<div style="flex:1;min-width:0;overflow:hidden;border-left:2px solid var(--border)"><table style="width:100%;border-collapse:collapse"><tr><th style="width:30px;color:var(--muted)">#</th><th style="color:var(--green)">' + exp_name + '</th></tr>' + ''.join(right_rows) + '</table></div>'
-            prompt_diff += '</div></details>'
+            # 统计删除/新增/修改行数
+            del_count = sum(i2-i1 for tag,i1,i2,j1,j2 in sm.get_opcodes() if tag=='delete')
+            add_count = sum(j2-j1 for tag,i1,i2,j1,j2 in sm.get_opcodes() if tag=='insert')
+            mod_count = sum(i2-i1 for tag,i1,i2,j1,j2 in sm.get_opcodes() if tag=='replace')
+            change_count = del_count + add_count + mod_count
+            if change_count > 0:
+                diff_title = f'提示词 Diff — 删除 {del_count} 行 / 新增 {add_count} 行 / 修改 {mod_count} 行'
+            else:
+                diff_title = '提示词 Diff — 无变化'
+
+            # diff summary bar
+            summary_bar = ""
+            if change_count > 0:
+                total_lines = max(len(cl), len(el))
+                del_w = max(1, int(del_count/total_lines*200)) if total_lines else 0
+                add_w = max(1, int(add_count/total_lines*200)) if total_lines else 0
+                mod_w = max(1, int(mod_count/total_lines*200)) if total_lines else 0
+                summary_bar = f'<div style="display:flex;height:4px;border-radius:2px;margin:4px 0;overflow:hidden;max-width:200px"><div style="width:{del_w}px;height:4px;background:#f85149"></div><div style="width:{mod_w}px;height:4px;background:#d29922"></div><div style="width:{add_w}px;height:4px;background:#3fb950"></div></div>'
+
+            prompt_diff = '<div style="margin:8px 0 4px;font-size:11px;color:var(--muted)">📝 ' + diff_title + '</div>'
+            prompt_diff += '<div style="margin:4px 0">' + summary_bar + '</div>'
+            prompt_diff += '<div class="diff-container">'
+            prompt_diff += '<div class="diff-col"><div class="diff-header control">线上配置 (CONTROL)</div><div class="diff-body"><table style="width:100%;border-collapse:collapse">' + ''.join(left_rows) + '</table></div></div>'
+            prompt_diff += '<div class="diff-col"><div class="diff-header exp">' + exp_name + ' (实验组)</div><div class="diff-body"><table style="width:100%;border-collapse:collapse">' + ''.join(right_rows) + '</table></div></div>'
+            prompt_diff += '</div>'
 
         content += f"""<div class="card {cls}">
   <h3><a href="/ticks/{r['tick_id']}" style="color:var(--blue)">#{r['tick_id']}</a> {arrow} {diff:+.0f}分</h3>
@@ -817,6 +888,678 @@ def experiment_detail(exp_id: int):
 </div>"""
 
     return HTMLResponse(_page(f"实验: {exp['name']}", content, "/experiments"))
+
+
+# ── 代码审计 ──
+
+def _ensure_code_audit_migration():
+    """迁移旧版 code_audit 表：checked INTEGER -> status TEXT"""
+    try:
+        db = get_db()
+        conn = db._get_conn()
+        cols = [c[1] for c in conn.execute("PRAGMA table_info(code_audit)").fetchall()]
+        if "checked" in cols and "status" not in cols:
+            conn.execute("ALTER TABLE code_audit ADD COLUMN status TEXT DEFAULT 'pending'")
+            conn.execute("UPDATE code_audit SET status = CASE WHEN checked = 1 THEN 'fixed' ELSE 'pending' END")
+            conn.commit()
+            print("[CodeAudit] migrated checked -> status")
+        conn.close()
+    except Exception as e:
+        print(f"[CodeAudit] migration check: {e}")
+
+
+CODE_AUDIT_ISSUES = [
+    {
+        "key": "api-timestamp-missing",
+        "severity": "P0",
+        "title": "API 路径时间戳系统性缺失",
+        "file": "src/perception/smart_pipeline.py",
+        "lines": "48-142, 893-904",
+        "github_url": "https://github.com/wq19901103wq/wechat-mac-rpa/blob/main/src/perception/smart_pipeline.py#L893",
+        "problem": "System Prompt 的 messages 格式只有 sender/text/type，未要求 API 返回时间戳；解析代码固定用 strptime('%Y-%m-%d %H:%M:%S')，但截图中的时间格式是'昨天 21:58'、'11:34'等，完全不匹配。",
+        "impact": "所有 API 路径消息 create_time 100% fallback 到 int(time.time())。同 tick 内多条消息时间戳完全相同，导致历史窗口'最近10分钟'cutoff失效、already_handled去重误判、LLM时间推理维度失效。Tick 409已证实此症状。",
+        "fix": "1) System Prompt 增加 timestamp 字段要求；2) 解析逻辑支持'昨天 HH:MM'、'HH:MM'、'YYYY-MM-DD HH:MM'多种格式；3) 使用相对时间转换（昨天=今天日期-1天+HH:MM）。"
+    },
+    {
+        "key": "layout-timestamp-bug",
+        "severity": "P0",
+        "title": "layout_parser 聊天列表时间戳检测逻辑完全错误",
+        "file": "src/layout/layout_parser.py",
+        "lines": "354",
+        "github_url": "https://github.com/wq19901103wq/wechat-mac-rpa/blob/main/src/layout/layout_parser.py#L354",
+        "problem": "e.text in TIMESTAMP_PATTERNS 永远为False（列表元素是正则串）；e.text[1]==':' 对'11:34'判断第二个字符'1'；e.text[2:].isdigit() 对'11:34'得到':34'.isdigit()。三个条件全部永远为False。",
+        "impact": "ChatListItem.timestamp 永远为空。当前无下游直接消费此字段，但这是一个彻底失效的功能——未来任何人基于时间戳做排序/判断都会失败。",
+        "fix": "改为正则匹配：any(re.match(p, e.text) for p in TIMESTAMP_PATTERNS)"
+    },
+    {
+        "key": "judge-weight-mismatch",
+        "severity": "P0",
+        "title": "judge_worker 维度权重表与 Prompt 模板不一致",
+        "file": "src/badcase/judge_worker.py",
+        "lines": "602-611, 215",
+        "github_url": "https://github.com/wq19901103wq/wechat-mac-rpa/blob/main/src/badcase/judge_worker.py#L602",
+        "problem": "Prompt中回复必要性20%/简洁度15%，代码中15%/10%；代码多出一个'工具调用正确性'10%维度，Prompt中完全没有。",
+        "impact": "Judge LLM按Prompt打分，代码用另一套权重算总分。'工具调用正确性'缺失时fallback到50分，每个case被系统性扣5分，borderline case可能错误判为badcase。",
+        "fix": "统一权重表：代码DIM_WEIGHTS与Prompt模板完全一致，或将'工具调用正确性'合并到'信息准确性'中。"
+    },
+    {
+        "key": "weflow-mode-check",
+        "severity": "P1",
+        "title": "WeFlow 模式判断 hasattr 永远为 True",
+        "file": "src/session/global_store.py",
+        "lines": "390",
+        "github_url": "https://github.com/wq19901103wq/wechat-mac-rpa/blob/main/src/session/global_store.py#L390",
+        "problem": "hasattr(messages[0], 'local_id') 对任何 ChatMessage 永远为True（dataclass定义了该字段）。",
+        "impact": "当前_weflow_mode='ocr'，不会触发此分支。但如果未来启用WeFlow持续模式，OCR消息会错误进入_merge_tick_weflow。",
+        "fix": "messages[0].local_id is not None"
+    },
+    {
+        "key": "timestamp-extract-inconsistent",
+        "severity": "P1",
+        "title": "_format_message_line 与 _msg_ts 时间戳提取逻辑不一致",
+        "file": "src/reply/generator.py",
+        "lines": "772-784, 916-921",
+        "github_url": "https://github.com/wq19901103wq/wechat-mac-rpa/blob/main/src/reply/generator.py#L772",
+        "problem": "_format_message_line对SELF消息不优先用reply_time；_msg_ts对SELF消息优先reply_time。两者fallback路径也不同（timestamp解析 vs time.time()）。",
+        "impact": "Bot自己发的消息在prompt中不显示时间标签（因为create_time为空），但会被正确纳入历史窗口。显示与选择逻辑不一致，未来维护者容易困惑。",
+        "fix": "统一两个函数的时间戳提取优先级：SELF→reply_time→create_time→timestamp解析→time.time()；OTHER→create_time→timestamp解析→time.time()"
+    },
+    {
+        "key": "bot-self-msg-no-create-time",
+        "severity": "P1",
+        "title": "Bot 自身消息不设置 create_time",
+        "file": "src/bot/wechat_bot.py",
+        "lines": "416-420",
+        "github_url": "https://github.com/wq19901103wq/wechat-mac-rpa/blob/main/src/bot/wechat_bot.py#L416",
+        "problem": "发送成功后创建ChatMessage时只设置了reply_time，没有设置create_time。",
+        "impact": "结合P1-2，Bot消息在prompt中永远不显示时间标签。LLM无法判断Bot消息的发送时间，只能依赖消息顺序推断。",
+        "fix": "ChatMessage(..., create_time=int(time.time()), reply_time=time.time())"
+    },
+    {
+        "key": "already-handled-mislabel",
+        "severity": "P2",
+        "title": "already_handled 可能错误标记连续消息",
+        "file": "src/reply/generator.py",
+        "lines": "962-975",
+        "github_url": "https://github.com/wq19901103wq/wechat-mac-rpa/blob/main/src/reply/generator.py#L962",
+        "problem": "如果用户连续发3条消息，Bot只回复了第3条，第1/2条也会因为'reply_time > ts'被标记为'⚠️(可跳过)'。",
+        "impact": "这是提示性标记不强制跳过，但可能误导LLM跳过需要单独回复的消息。属于设计缺陷。",
+        "fix": "更精确匹配：检查Bot回复的上一条消息是否与当前未读消息内容对应，而非仅比较时间。"
+    },
+]
+
+
+@app.post("/api/code-audit/{key}")
+async def save_code_audit(key: str, request: Request):
+    body = await request.json()
+    db = get_db()
+    conn = db._get_conn()
+    status = body.get("status", "pending")
+    if status not in ("pending", "todo", "rethink", "fixed", "wontfix", "deferred"):
+        status = "pending"
+    conn.execute("""INSERT INTO code_audit (issue_key, status, notes, updated_at)
+        VALUES (?, ?, ?, datetime('now','localtime'))
+        ON CONFLICT(issue_key) DO UPDATE SET
+        status=excluded.status, notes=excluded.notes, updated_at=excluded.updated_at""",
+        (key, status, body.get("notes", "")))
+    conn.commit()
+    conn.close()
+    return JSONResponse({"success": True})
+
+
+@app.get("/code-audit", response_class=HTMLResponse)
+def code_audit_page():
+    db = get_db()
+    conn = db._get_conn()
+    _ensure_code_audit_migration()
+    rows = conn.execute("SELECT issue_key, status, notes, ai_proposal FROM code_audit").fetchall()
+    conn.close()
+    state_map = {r["issue_key"]: {"status": r["status"] or "pending", "notes": r["notes"] or "", "ai_proposal": r["ai_proposal"] or ""} for r in rows}
+
+    severity_color = {"P0": "#f85149", "P1": "#d29922", "P2": "#58a6ff"}
+    status_label = {"pending": "⏳ 待处理", "todo": "🔧 需要修复", "rethink": "💡 需AI重新思考", "fixed": "✅ 已修复", "wontfix": "🚫 不需要修复", "deferred": "⏸️ 搁置"}
+    status_color = {"pending": "var(--muted)", "todo": "var(--blue)", "rethink": "var(--yellow)", "fixed": "var(--green)", "wontfix": "var(--muted)", "deferred": "var(--muted)"}
+
+    issues_json = _json.dumps(CODE_AUDIT_ISSUES, ensure_ascii=False)
+    state_json = _json.dumps({r["issue_key"]: {"status": r["status"] or "pending", "notes": r["notes"] or "", "ai_proposal": r["ai_proposal"] or ""} for r in rows}, ensure_ascii=False)
+
+    content = f"""
+    <div class="audit-layout">
+      <div class="audit-sidebar">
+        <div class="audit-sidebar-header">🐛 代码审计 ({len(CODE_AUDIT_ISSUES)}条)</div>
+        <div id="issue-list"></div>
+      </div>
+      <div class="audit-main">
+        <div id="issue-detail">
+          <div style="color:var(--muted);text-align:center;padding:60px 20px">👈 点击左侧 issue 开始审计</div>
+        </div>
+      </div>
+    </div>
+    <script>
+    const issues = {issues_json};
+    const stateMap = {state_json};
+    const statusLabel = {{
+      pending: "⏳ 待处理", ai_analyzing: "🤖 AI 分析中", rethink: "✅ AI 分析完成", failed: "❌ 分析失败",
+      todo: "🔧 需要修复", fixed: "✅ 已修复", wontfix: "🚫 不需要修复", deferred: "⏸️ 搁置"
+    }};
+    const statusColor = {{
+      pending: "var(--muted)", ai_analyzing: "var(--yellow)", rethink: "var(--green)", failed: "var(--red)",
+      todo: "var(--blue)", fixed: "var(--green)", wontfix: "var(--muted)", deferred: "var(--muted)"
+    }};
+    const severityColor = {{P0: "#f85149", P1: "#d29922", P2: "#58a6ff"}};
+    let currentKey = null;
+    let currentRounds = [];
+
+    function renderIssueList() {{
+      const list = document.getElementById('issue-list');
+      list.innerHTML = issues.map((issue, idx) => {{
+        const st = stateMap[issue.key] || {{}};
+        const status = st.status || 'pending';
+        const active = issue.key === currentKey ? 'active' : '';
+        return `<div class="issue-item ${{active}}" data-key="${{issue.key}}" onclick="selectIssue('${{issue.key}}')">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span class="issue-sev" style="background:${{severityColor[issue.severity]}}">${{issue.severity}}</span>
+            <span class="issue-status" style="color:${{statusColor[status]}}">${{statusLabel[status]}}</span>
+          </div>
+          <div class="issue-title">${{issue.title}}</div>
+        </div>`;
+      }}).join('');
+    }}
+
+    async function selectIssue(key) {{
+      currentKey = key;
+      renderIssueList();
+      const issue = issues.find(i => i.key === key);
+      const resp = await fetch('/api/code-audit/' + key);
+      const data = await resp.json();
+      currentRounds = data.rounds || [];
+      stateMap[key] = {{status: data.status, notes: data.notes, ai_proposal: data.ai_proposal}};
+      renderIssueList(); // 数据已更新，刷新左侧列表状态
+
+      const detail = document.getElementById('issue-detail');
+      detail.innerHTML = `
+        <div class="issue-header">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <span class="issue-sev" style="background:${{severityColor[issue.severity]}};font-size:13px;padding:3px 10px">${{issue.severity}}</span>
+            <h2 style="margin:0;font-size:18px">${{issue.title}}</h2>
+          </div>
+          <div style="font-size:12px;color:var(--muted)">
+            📍 <a href="${{issue.github_url}}" target="_blank" style="color:var(--blue)">${{issue.file}}:${{issue.lines}}</a>
+          </div>
+        </div>
+        <div class="issue-info">
+          <div class="info-section">
+            <div class="info-label" style="color:var(--red)">❌ 问题</div>
+            <div class="info-text">${{issue.problem}}</div>
+          </div>
+          <div class="info-section">
+            <div class="info-label" style="color:var(--yellow)">⚠️ 影响</div>
+            <div class="info-text">${{issue.impact}}</div>
+          </div>
+          <div class="info-section">
+            <div class="info-label" style="color:var(--green)">💡 修复建议</div>
+            <div class="info-text">${{issue.fix}}</div>
+          </div>
+        </div>
+        <div id="rounds-area" class="rounds-area">
+          ${{renderRounds()}}
+        </div>
+        <div class="input-area">
+          <div class="status-bar">
+            <span>当前状态: <strong style="color:${{statusColor[data.status]}}">${{statusLabel[data.status]}}</strong></span>
+            <span id="save-status"></span>
+          </div>
+          <textarea id="notes-input" rows="3" placeholder="写出你的要求/点评给 AI...">${{data.notes || ''}}</textarea>
+          <div class="input-actions">
+            <button class="btn-analyze" id="btn-analyze" onclick="analyzeIssue()">🤖 请求 AI 分析</button>
+
+            <button class="btn-save" onclick="saveStatus()">💾 保存状态</button>
+          </div>
+          <div id="analyze-status" class="status-msg"></div>
+        </div>
+      `;
+    }}
+
+    function renderRounds() {{
+      if (!currentRounds.length) {{
+        return '<div style="color:var(--muted);text-align:center;padding:40px 20px;font-size:13px">💬 还没有分析记录。在下方输入要求，点击"请求 AI 分析"开始第一轮。</div>';
+      }}
+      const st = stateMap[currentKey] || {{}};
+      const currentStatus = st.status || 'pending';
+      return currentRounds.map((r, idx) => {{
+        const isLatest = idx === 0;
+        const isAnalyzing = !r.proposal || r.proposal === '';
+        const isFailed = r.proposal && r.proposal.indexOf('分析失败:') === 0;
+        let aiLabel, aiContent;
+        if (isAnalyzing) {{
+          aiLabel = '🤖 AI 正在分析...';
+          aiContent = '<span style="color:var(--yellow)">⏳ 分析中，请稍候（约1-3分钟）...</span>';
+        }} else if (isFailed) {{
+          aiLabel = '❌ 分析失败';
+          aiContent = '<span style="color:var(--red)">' + escapeHtml(r.proposal) + '</span>';
+        }} else {{
+          aiLabel = '🤖 AI 方案';
+          aiContent = markdownToHtml(r.proposal);
+        }}
+        const canAct = isLatest && currentStatus !== 'todo' && currentStatus !== 'fixed';
+        const actions = canAct ? `
+          <div style="margin-top:10px;display:flex;gap:8px;">
+            <button class="btn-execute" onclick="executeRound(${{r.round}})">✅ 执行此方案</button>
+            <button class="btn-reject" onclick="rejectRound(${{r.round}})">❌ 驳回</button>
+          </div>
+        ` : '';
+        return `
+        <div class="round-block">
+          <div class="round-header">Round ${{r.round}} · ${{r.created_at || ''}}</div>
+          <div class="user-bubble">
+            <div class="bubble-label">👤 用户要求</div>
+            <div class="bubble-content">${{escapeHtml(r.notes || '(无点评)')}}</div>
+          </div>
+          <div class="ai-bubble">
+            <div class="bubble-label">${{aiLabel}}</div>
+            <div class="bubble-content markdown-body">${{aiContent}}</div>
+          </div>
+          ${{actions}}
+        </div>
+        `;
+      }}).join('');
+    }}
+
+    async function analyzeIssue() {{
+      if (!currentKey) return;
+      const notes = document.getElementById('notes-input').value.trim();
+      if (!notes) {{
+        alert('请先输入具体要求');
+        return;
+      }}
+      const btn = document.getElementById('btn-analyze');
+      const status = document.getElementById('analyze-status');
+      btn.disabled = true;
+      status.textContent = '⏳ AI 分析中（约 1-3 分钟）...';
+      status.className = 'status-msg loading';
+
+      // 1. 立即清空输入框，让用户要求显示在对话区
+      document.getElementById('notes-input').value = '';
+
+      // 2. 立即在本地添加一个"分析中"的 round，给用户即时反馈
+      const nextRound = currentRounds.length > 0
+        ? Math.max(...currentRounds.map(r => r.round)) + 1
+        : 1;
+      const nowStr = new Date().toLocaleString('zh-CN');
+      const tempRound = {{
+        round: nextRound,
+        notes: notes,
+        proposal: '',
+        created_at: nowStr
+      }};
+      currentRounds.unshift(tempRound);
+      renderRounds();
+
+      try {{
+        const resp = await fetch('/api/code-audit/' + currentKey + '/analyze', {{
+          method: 'POST', headers: {{'Content-Type': 'application/json'}},
+          body: JSON.stringify({{issue: issues.find(i => i.key === currentKey), notes: notes}})
+        }});
+        const data = await resp.json();
+        if (data.success) {{
+          status.textContent = '✓ 分析完成 (' + data.reply.length + ' 字符)';
+          status.className = 'status-msg success';
+          // 刷新 rounds 和左侧列表（会从 DB 加载完整数据）
+          await selectIssue(currentKey);
+          renderIssueList();
+          // 显示确认按钮
+          const confirmBtn = document.getElementById('btn-confirm');
+          if (confirmBtn) confirmBtn.style.display = 'inline-block';
+        }} else {{
+          status.textContent = '✗ ' + (data.error || '失败');
+          status.className = 'status-msg error';
+          // 从后端重新加载状态（后端已设为 failed），刷新左侧列表
+          await selectIssue(currentKey);
+          renderIssueList();
+          // 恢复 notes 到输入框让用户重试
+          document.getElementById('notes-input').value = notes;
+        }}
+      }} catch(err) {{
+        status.textContent = '✗ 网络错误: ' + err.message;
+        status.className = 'status-msg error';
+        // 从后端重新加载状态，刷新左侧列表
+        await selectIssue(currentKey);
+        renderIssueList();
+        document.getElementById('notes-input').value = notes;
+      }} finally {{
+        btn.disabled = false;
+      }}
+    }}
+
+    async function executeRound(roundNum) {{
+      if (!currentKey) return;
+      if (!confirm('确认执行 Round ' + roundNum + ' 的方案？状态将变为「需要修复」。')) return;
+      const resp = await fetch('/api/code-audit/' + currentKey + '/execute', {{
+        method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{round: roundNum}})
+      }});
+      const data = await resp.json();
+      if (data.success) {{
+        await selectIssue(currentKey);
+        renderIssueList();
+      }}
+    }}
+
+    async function rejectRound(roundNum) {{
+      if (!currentKey) return;
+      if (!confirm('驳回 Round ' + roundNum + ' 的方案？状态将回到「待处理」，你可以写新要求重新分析。')) return;
+      const resp = await fetch('/api/code-audit/' + currentKey + '/reject', {{
+        method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{round: roundNum}})
+      }});
+      const data = await resp.json();
+      if (data.success) {{
+        await selectIssue(currentKey);
+        renderIssueList();
+      }}
+    }}
+
+    async function saveStatus() {{
+      if (!currentKey) return;
+      const notes = document.getElementById('notes-input').value;
+      const resp = await fetch('/api/code-audit/' + currentKey, {{
+        method: 'POST', headers: {{'Content-Type': 'application/json'}},
+        body: JSON.stringify({{status: 'pending', notes: notes}})
+      }});
+      const data = await resp.json();
+      const statusEl = document.getElementById('save-status');
+      if (data.success) {{
+        statusEl.textContent = '✓ 已保存';
+        statusEl.style.color = 'var(--green)';
+        setTimeout(() => statusEl.textContent = '', 2000);
+      }}
+    }}
+
+    function escapeHtml(text) {{
+      if (!text) return '';
+      return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }}
+
+    function markdownToHtml(text) {{
+      if (!text) return '';
+      // 保护代码块
+      let html = text;
+      const codeBlocks = [];
+      html = html.replace(/```([\\s\\S]*?)```/g, function(match, code) {{
+        codeBlocks.push(escapeHtml(code));
+        return '\\x00CODE' + (codeBlocks.length - 1) + '\\x00';
+      }});
+      // 行内代码
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+      // 标题
+      html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
+      html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+      html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+      html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+      // 粗体
+      html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      // 表格
+      html = html.replace(/((?:^\|.*\|[\\s\\n]*)+)/gm, function(match) {{
+        const rows = match.trim().split('\\n').filter(function(r) {{ return r.trim(); }});
+        if (rows.length < 2) return match;
+        let tbl = '<table style="border-collapse:collapse;margin:8px 0;font-size:12px">';
+        rows.forEach(function(row) {{
+          if (row.replace(/[\|\-\\s]/g, '') === '') return;
+          const cells = row.split('|').filter(function(c) {{ return c !== ''; }}).map(function(c) {{
+            return '<td style="border:1px solid var(--border);padding:4px 8px">' + c.trim() + '</td>';
+          }});
+          tbl += '<tr>' + cells.join('') + '</tr>';
+        }});
+        tbl += '</table>';
+        return tbl;
+      }});
+      // 分隔线
+      html = html.replace(/^---+$/gim, '<hr style="border:0;border-top:1px solid var(--border);margin:12px 0">');
+      // 列表
+      html = html.replace(/^- (.*$)/gim, '<li>$1</li>');
+      html = html.replace(/(<li>.*<\/li>\\s*)+/g, function(match) {{
+        return '<ul style="margin-left:16px;margin-bottom:8px">' + match + '</ul>';
+      }});
+      // 段落处理（代码块还是占位符，不会被破坏）
+      html = html.split('\\n').map(function(line) {{
+        line = line.trim();
+        if (!line) return '';
+        if (line.match(/^<[h|p|u|o|t|d|l]/)) return line;
+        if (line.indexOf('\\x00CODE') !== -1) return line;
+        return '<p style="margin:4px 0">' + line + '</p>';
+      }}).join('');
+      // 恢复代码块（diff 类型做红绿高亮）
+      html = html.replace(/\\x00CODE(\d+)\\x00/g, function(match, idx) {{
+        let code = codeBlocks[idx];
+        // 去掉末尾多余的换行，避免 <pre> 最后一行是空行
+        code = code.replace(/\\n$/, '');
+        if (code.indexOf('diff\\n') === 0) {{
+          const lines = code.split('\\n').map(function(line) {{
+            if (line.indexOf('- ') === 0) {{
+              return '<span style="color:#f85149;background:rgba(248,81,73,0.08);padding:1px 4px;border-radius:2px">' + line + '</span>';
+            }} else if (line.indexOf('+ ') === 0) {{
+              return '<span style="color:#3fb950;background:rgba(63,185,80,0.08);padding:1px 4px;border-radius:2px">' + line + '</span>';
+            }}
+            return line;
+          }});
+          code = lines.join('\\n');
+        }}
+        return '<pre style="background:#0d1117;padding:10px;border-radius:6px;overflow-x:auto;border:1px solid var(--border);margin:8px 0"><code>' + code + '</code></pre>';
+      }});
+      return html;
+    }}
+
+    renderIssueList();
+    if (issues.length) selectIssue(issues[0].key);
+
+    // 切回 tab 时自动刷新当前 issue（防止后台分析完成后状态未更新）
+    document.addEventListener('visibilitychange', function() {{
+      if (!document.hidden && currentKey) {{
+        selectIssue(currentKey);
+      }}
+    }});
+    </script>
+    <style>
+    .audit-layout {{display:flex;height:calc(100vh - 48px);gap:0}}
+    .audit-sidebar {{width:280px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;background:var(--card)}}
+    .audit-sidebar-header {{padding:12px 16px;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);z-index:10}}
+    .issue-item {{padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}}
+    .issue-item:hover {{background:rgba(255,255,255,.03)}}
+    .issue-item.active {{background:rgba(88,166,255,.08);border-left:3px solid var(--blue)}}
+    .issue-sev {{padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;color:#fff}}
+    .issue-status {{font-size:11px}}
+    .issue-title {{font-size:12px;margin-top:4px;line-height:1.4}}
+    .audit-main {{flex:1;overflow-y:auto;padding:20px}}
+    .issue-header {{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}}
+    .issue-info {{display:grid;gap:12px;margin-bottom:20px}}
+    .info-section {{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px}}
+    .info-label {{font-size:12px;font-weight:600;margin-bottom:6px}}
+    .info-text {{font-size:12px;color:var(--muted);line-height:1.6}}
+    .rounds-area {{margin-bottom:20px}}
+    .round-block {{margin-bottom:16px}}
+    .round-header {{font-size:11px;color:var(--muted);margin-bottom:8px;padding-left:8px}}
+    .user-bubble {{background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.15);border-radius:8px;padding:12px;margin-bottom:8px}}
+    .ai-bubble {{background:rgba(63,185,80,.06);border:1px solid rgba(63,185,80,.15);border-radius:8px;padding:12px}}
+    .bubble-label {{font-size:11px;font-weight:600;margin-bottom:6px}}
+    .user-bubble .bubble-label {{color:var(--blue)}}
+    .ai-bubble .bubble-label {{color:var(--green)}}
+    .bubble-content {{font-size:13px;line-height:1.7;white-space:pre-wrap}}
+    .bubble-content h1,.bubble-content h2,.bubble-content h3 {{margin:8px 0 4px;font-size:14px}}
+    .bubble-content pre {{background:#0d1117;padding:10px;border-radius:6px;overflow-x:auto;border:1px solid var(--border);margin:8px 0}}
+    .bubble-content code {{background:#21262d;padding:1px 4px;border-radius:3px;font-family:monospace;font-size:12px}}
+    .bubble-content pre code {{background:transparent;padding:0}}
+    .bubble-content li {{margin-left:16px;margin-bottom:2px}}
+    .input-area {{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;position:sticky;bottom:0}}
+    .status-bar {{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12px;color:var(--muted)}}
+    .input-area textarea {{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-size:13px;resize:vertical;margin-bottom:8px}}
+    .input-actions {{display:flex;gap:8px;align-items:center}}
+    .btn-analyze {{background:var(--blue);color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px}}
+    .btn-analyze:disabled {{opacity:.5;cursor:not-allowed}}
+    .btn-confirm {{background:var(--green);color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px}}
+    .btn-save {{background:#30363d;color:var(--text);border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px}}
+    .status-msg {{font-size:12px;margin-top:6px}}
+    .status-msg.loading {{color:var(--yellow)}}
+    .status-msg.success {{color:var(--green)}}
+    .status-msg.error {{color:var(--red)}}
+    </style>
+    """
+    return HTMLResponse(_page("代码审计", content, "/code-audit"))
+
+
+# ============ 对话式代码审计 API ============
+
+async def _analyze_with_kimi(issue: dict, notes: str, timeout: int = 300) -> dict:
+    prompt = f"""你是一个代码审计专家。请分析以下代码问题并给出修复方案。
+
+## 问题信息
+- 标题: {issue['title']}
+- 文件: {issue['file']}
+- 行号: {issue['lines']}
+- 级别: {issue['severity']}
+
+## 问题描述
+{issue['problem']}
+
+## 影响
+{issue['impact']}
+
+## 用户反馈/要求
+{notes if notes else '请分析问题根因并给出具体修复方案。'}
+
+## 要求
+1. 请先读取相关源码文件进行分析
+2. 给出具体的修复方案（包含代码 diff）
+3. 不要直接修改任何文件，只给出方案
+4. 用中文回复
+"""
+    cmd = [KIMI_BIN, "--quiet", "--yolo", "-p", prompt, "-w", WORK_DIR]
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=WORK_DIR,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        reply = stdout.decode('utf-8', errors='replace')
+        if proc.returncode != 0:
+            err = stderr.decode('utf-8', errors='replace').strip() or f"Kimi 退出码 {proc.returncode}"
+            return {"success": False, "error": err}
+        return {"success": True, "reply": reply}
+    except asyncio.TimeoutError:
+        try: proc.kill()
+        except: pass
+        return {"success": False, "error": f"分析超时（>{timeout}秒）"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/code-audit/{key}")
+def api_get_code_audit(key: str):
+    db = get_db()
+    conn = db._get_conn()
+    _ensure_code_audit_migration()
+    row = conn.execute("SELECT issue_key, status, notes, ai_proposal FROM code_audit WHERE issue_key=?", (key,)).fetchone()
+    rounds = conn.execute(
+        "SELECT round_num, user_notes, ai_proposal, created_at FROM code_audit_round WHERE issue_key=? ORDER BY round_num DESC",
+        (key,)
+    ).fetchall()
+    conn.close()
+    return JSONResponse({
+        "issue_key": key,
+        "status": row["status"] if row else "pending",
+        "notes": row["notes"] if row else "",
+        "ai_proposal": row["ai_proposal"] if row else "",
+        "rounds": [{"round": r["round_num"], "notes": r["user_notes"], "proposal": r["ai_proposal"], "created_at": r["created_at"]} for r in rounds],
+    })
+
+
+@app.post("/api/code-audit/{key}/analyze")
+async def api_analyze_code_audit(key: str, request: Request):
+    body = await request.json()
+    notes = body.get("notes", "")
+    issue = next((i for i in CODE_AUDIT_ISSUES if i["key"] == key), None)
+    if not issue:
+        return JSONResponse({"success": False, "error": "Issue not found"})
+
+    db = get_db()
+    conn = db._get_conn()
+
+    # 1. 先保存 notes，状态设为 ai_analyzing
+    conn.execute("""
+        INSERT INTO code_audit (issue_key, severity, status, notes, updated_at)
+        VALUES (?, ?, 'ai_analyzing', ?, datetime('now','localtime'))
+        ON CONFLICT(issue_key) DO UPDATE SET
+        status='ai_analyzing', notes=excluded.notes, updated_at=excluded.updated_at
+    """, (key, issue["severity"], notes))
+
+    # 2. 立即创建 round 记录（ai_proposal 先为空），让用户切回 tab 能看到自己的要求
+    max_round = conn.execute("SELECT MAX(round_num) FROM code_audit_round WHERE issue_key=?", (key,)).fetchone()[0] or 0
+    new_round = max_round + 1
+    conn.execute(
+        "INSERT INTO code_audit_round (issue_key, round_num, user_notes, ai_proposal) VALUES (?, ?, ?, ?)",
+        (key, new_round, notes, ""),
+    )
+    # 3. 清空 code_audit.notes，因为要求已经归档到 round 中，输入框应该空着准备下一轮
+    conn.execute(
+        "UPDATE code_audit SET notes='' WHERE issue_key=?",
+        (key,)
+    )
+    conn.commit()
+    conn.close()
+
+    # 3. 开始分析
+    result = await _analyze_with_kimi(issue, notes, timeout=60000)
+
+    # 4. 分析完成，更新 round 记录
+    db = get_db()
+    conn = db._get_conn()
+    if result["success"]:
+        conn.execute(
+            "UPDATE code_audit_round SET ai_proposal=? WHERE issue_key=? AND round_num=?",
+            (result["reply"], key, new_round),
+        )
+        conn.execute("""
+            INSERT INTO code_audit (issue_key, severity, status, notes, ai_proposal, updated_at)
+            VALUES (?, ?, 'rethink', ?, ?, datetime('now','localtime'))
+            ON CONFLICT(issue_key) DO UPDATE SET
+            status='rethink', notes=excluded.notes, ai_proposal=excluded.ai_proposal, updated_at=excluded.updated_at
+        """, (key, issue["severity"], notes, result["reply"]))
+    else:
+        # 分析失败，round 记录错误信息，状态改为 failed
+        err_msg = "分析失败: " + result.get("error", "未知错误")
+        conn.execute(
+            "UPDATE code_audit_round SET ai_proposal=? WHERE issue_key=? AND round_num=?",
+            (err_msg, key, new_round),
+        )
+        conn.execute(
+            "UPDATE code_audit SET status='failed', ai_proposal=? WHERE issue_key=?",
+            (err_msg, key),
+        )
+    conn.commit()
+    conn.close()
+    return JSONResponse({"success": result["success"], "reply": result.get("reply", ""), "error": result.get("error", ""), "round": new_round})
+
+
+@app.post("/api/code-audit/{key}/execute")
+async def api_execute_code_audit(key: str, request: Request):
+    db = get_db()
+    conn = db._get_conn()
+    conn.execute(
+        "UPDATE code_audit SET status='todo', updated_at=datetime('now','localtime') WHERE issue_key=?",
+        (key,),
+    )
+    conn.commit()
+    conn.close()
+    return JSONResponse({"success": True})
+
+
+@app.post("/api/code-audit/{key}/reject")
+async def api_reject_code_audit(key: str, request: Request):
+    db = get_db()
+    conn = db._get_conn()
+    conn.execute(
+        "UPDATE code_audit SET status='pending', updated_at=datetime('now','localtime') WHERE issue_key=?",
+        (key,),
+    )
+    conn.commit()
+    conn.close()
+    return JSONResponse({"success": True})
 
 
 if __name__ == "__main__":

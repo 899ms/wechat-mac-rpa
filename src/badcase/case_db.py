@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS tick_log (
     chat_name TEXT, is_group INTEGER DEFAULT 0, screenshot_path TEXT,
     messages_count INTEGER, new_messages_count INTEGER DEFAULT 0,
     system_prompt TEXT, user_prompt TEXT, raw_response TEXT, tool_calls_json TEXT, tool_results_json TEXT DEFAULT '[]',
+    session_input_messages_json TEXT, session_output_unreplied_json TEXT,
+    judge_raw_response TEXT,
     should_reply INTEGER DEFAULT 0,
     replies_sent_json TEXT, send_success INTEGER DEFAULT 0, send_duration_ms INTEGER,
     judge_score REAL, judge_is_badcase INTEGER, judge_dimensions_json TEXT,
@@ -132,6 +134,26 @@ CREATE INDEX IF NOT EXISTS idx_tick_log_chat ON tick_log(chat_name);
 CREATE INDEX IF NOT EXISTS idx_tick_log_judge ON tick_log(judge_score);
 CREATE INDEX IF NOT EXISTS idx_cases_created ON cases(created_at);
 CREATE INDEX IF NOT EXISTS idx_daily_metrics_date ON daily_metrics(date);
+
+CREATE TABLE IF NOT EXISTS code_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    issue_key TEXT UNIQUE NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'P2',
+    status TEXT DEFAULT 'pending',
+    notes TEXT,
+    ai_proposal TEXT,
+    updated_at TEXT DEFAULT (datetime('now','localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS code_audit_round (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    issue_key TEXT NOT NULL,
+    round_num INTEGER NOT NULL,
+    user_notes TEXT,
+    ai_proposal TEXT,
+    created_at TEXT DEFAULT (datetime('now','localtime')),
+    UNIQUE(issue_key, round_num)
+);
 """
 
 
@@ -175,6 +197,8 @@ class CaseDB:
                             chat_name TEXT, is_group INTEGER DEFAULT 0, screenshot_path TEXT,
                             messages_count INTEGER, new_messages_count INTEGER DEFAULT 0,
                             system_prompt TEXT, user_prompt TEXT, raw_response TEXT, tool_calls_json TEXT, tool_results_json TEXT DEFAULT '[]',
+                            session_input_messages_json TEXT, session_output_unreplied_json TEXT,
+                            judge_raw_response TEXT,
                             should_reply INTEGER DEFAULT 0,
                             replies_sent_json TEXT, send_success INTEGER DEFAULT 0, send_duration_ms INTEGER,
                             judge_score REAL, judge_is_badcase INTEGER, judge_dimensions_json TEXT,
@@ -194,8 +218,23 @@ class CaseDB:
                         ALTER TABLE tick_log_new RENAME TO tick_log;
                     """)
                     conn.commit()
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.warning("[CaseDB] schema 迁移失败: %s", e)
+
+            # 迁移：添加 session_input_messages_json 和 session_output_unreplied_json 列
+            try:
+                cur = conn.execute("PRAGMA table_info(tick_log)")
+                columns = {row[1] for row in cur.fetchall()}
+                if "session_input_messages_json" not in columns:
+                    conn.execute("ALTER TABLE tick_log ADD COLUMN session_input_messages_json TEXT")
+                if "session_output_unreplied_json" not in columns:
+                    conn.execute("ALTER TABLE tick_log ADD COLUMN session_output_unreplied_json TEXT")
+                if "judge_raw_response" not in columns:
+                    conn.execute("ALTER TABLE tick_log ADD COLUMN judge_raw_response TEXT")
+                conn.commit()
+            except Exception as e:
+                _logger.warning("[CaseDB] 添加 messages_json 列失败: %s", e)
+
             conn.close()
 
     # ── INSERT ──
@@ -508,12 +547,16 @@ class CaseDB:
 # =============================================================================
 # Singleton
 # =============================================================================
+import threading
 
 _db_instance: Optional[CaseDB] = None
+_db_lock = threading.Lock()
 
 
 def get_db() -> CaseDB:
     global _db_instance
     if _db_instance is None:
-        _db_instance = CaseDB()
+        with _db_lock:
+            if _db_instance is None:
+                _db_instance = CaseDB()
     return _db_instance

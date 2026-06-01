@@ -1,14 +1,5 @@
 {
-  "tool_calls": [
-    {
-      "id": "call_aaa2d901afcb454fa7ad2756",
-      "type": "function",
-      "function": {
-        "name": "search_memory",
-        "arguments": "{\"query\": \"王芊\"}"
-      }
-    }
-  ],
-  "content": "",
-  "timestamp": 1779235118.025137
+  "tool_calls": [],
+  "content": "？？我不就是吗哈哈哈 | 咋了这是突然问这个",
+  "timestamp": 1780189285.917372
 }

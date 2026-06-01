@@ -60,7 +60,7 @@ BOT_EXPERIMENTS = {
     # ====== 消融实验：逐个关闭功能，衡量损失 ======
     "no_time": BotConfig(
         name="no_time",
-        description="【消融】关闭时间感知：去掉每条消息的时间标签（如'3分钟前''昨晚23:15'），去掉会话头部的当前时间+星期+时段说明，去掉时间戳说明。预期：时间推理维度退化，把昨晚消息当现在发的。",
+        description="【消融】关闭时间感知：去掉每条消息的绝对时间标签（YYYY-MM-DD HH:MM），去掉会话头部的当前时间+星期+时段说明，去掉时间戳说明。预期：时间推理维度退化，把历史消息当现在发的。",
         enable_time_awareness=False, enable_timestamps=False,
     ),
     "no_restraint": BotConfig(
@@ -93,7 +93,7 @@ BOT_EXPERIMENTS = {
     # ====== 增量实验：从基线逐步开启，量化每项收益 ======
     "enable_time": BotConfig(
         name="enable_time",
-        description="【增量】仅开启时间感知（其余保持基线关闭状态）：给每条聊天消息注入相对时间标签（如'3分钟前''昨晚23:15'），在会话头注入'当前时间+星期+时段'，告诉Bot消息时间戳的含义。预期：减少时间误判（把昨晚的'好困'当通宵），幻觉控制改善。",
+        description="【增量】仅开启时间感知（其余保持基线关闭状态）：给每条聊天消息注入绝对时间标签（YYYY-MM-DD HH:MM），在会话头注入'当前时间+星期+时段'，告诉Bot消息时间戳的含义。预期：减少时间误判（把历史消息当现在发的），幻觉控制改善。",
         enable_time_awareness=True, enable_timestamps=True,
         enable_reply_restraint=False, enable_unread_dedup=False, enable_search_in_page=False,
     ),
@@ -124,49 +124,84 @@ BOT_EXPERIMENTS = {
 # Bot 回复生成（用相同 prompt 调 LLM 重新生成）
 # =============================================================================
 
-def generate_reply(system_prompt: str, user_prompt: str, config: BotConfig):
-    """根据 Bot 配置，用原始 prompt 调 LLM 生成回复。返回 (reply, modified_sp, modified_up)。"""
-    from src.utils.qwen_client import QwenClient
-    import re
+# 实验禁止调用的写操作工具（会改变现实世界）
+_EXPERIMENT_WRITE_TOOL_BLACKLIST = {"tuya_control_device", "tuya_set_temperature"}
 
-    sp = system_prompt
-    up = user_prompt
 
-    if not config.enable_time_awareness:
-        up = re.sub(r'当前时间：[^\n]+\n', '', up)
-        up = re.sub(r'⚠️ 消息时间戳说明[^\n]*\n', '', up)
-        up = re.sub(r'（[^）]*(?:分钟前|昨晚|今早|\d{2}:\d{2})[^）]*）', '', up)
+# =============================================================================
+# ChatMessage 反序列化（从 tick_log JSON 还原）
+# =============================================================================
 
-    if not config.enable_reply_restraint:
-        sp = sp.replace("### 7. 回复克制原则", "### 7. 回复克制原则（实验关闭）")
-        sp = sp.replace("以下情况**不回复**", "以下情况可以回复")
-
-    if not config.enable_unread_dedup:
-        up = up.replace("⚠️(历史中已有回复，可跳过)", "")
-        up = up.replace("提示：第", "提示（关闭）：第")
-
-    if not config.enable_timestamps:
-        up = re.sub(r'（[^）]*(?:分钟前|昨晚|今早|\d{2}:\d{2})[^）]*）', '', up)
-
-    # 构建 messages
-    messages = [{"role": "system", "content": sp[:8000]}]
-    messages.append({"role": "user", "content": up[:12000]})
-
-    reply = ""
-    try:
-        client = QwenClient(model=config.model)
-        raw = client.chat(messages=messages, temperature=config.temperature, max_tokens=500, timeout=30)
-        text = raw if isinstance(raw, str) else getattr(raw, "content", str(raw))
+def _deserialize_messages(json_str: str) -> List[ChatMessage]:
+    """从 JSON 字符串反序列化 ChatMessage 列表。"""
+    from src.models.base import ChatMessage, SenderType
+    data = json.loads(json_str) if json_str else []
+    messages = []
+    for item in data:
+        sender_type_str = item.get("sender_type", "other")
         try:
-            data = json.loads(text.strip().lstrip("```json").rstrip("```"))
-            rlist = data.get("replies", [])
-            reply = " | ".join(rlist) if rlist else text[:200]
-        except:
-            reply = text[:200]
-    except Exception as e:
-        reply = f"[生成失败: {e}]"
+            sender_type = SenderType(sender_type_str)
+        except ValueError:
+            sender_type = SenderType.OTHER
+        msg = ChatMessage(
+            text=item.get("text", ""),
+            sender=item.get("sender", ""),
+            sender_type=sender_type,
+            chat_name=item.get("chat_name", ""),
+            is_at_me=item.get("is_at_me", False),
+            timestamp=item.get("timestamp"),
+            replied=item.get("replied", False),
+            reply_text=item.get("reply_text", ""),
+            reply_time=item.get("reply_time"),
+            message_type=item.get("message_type", "text"),
+            image_description=item.get("image_description", ""),
+            image_text=item.get("image_text", ""),
+            is_image_duplicate=item.get("is_image_duplicate", False),
+            account=item.get("account", ""),
+            local_id=item.get("local_id"),
+            server_id=item.get("server_id"),
+            create_time=item.get("create_time"),
+            raw_type=item.get("raw_type"),
+            sender_wxid=item.get("sender_wxid"),
+        )
+        messages.append(msg)
+    return messages
 
-    return reply, sp[:8000], up[:12000]
+
+def _generate_with_config(all_messages: List[ChatMessage], unreplied: List[ChatMessage],
+                          is_group: bool, config: BotConfig) -> tuple[str, str, str]:
+    """使用 ReplyGenerator 生成回复，返回 (reply_text, system_prompt, user_prompt)。"""
+    from src.reply.generator import ReplyGenerator
+    from src.tools import ToolRegistry, register_builtin_tools
+    from src.utils.qwen_client import QwenClient
+
+    # 创建独立的工具注册表（实验和生产隔离）
+    registry = ToolRegistry()
+    register_builtin_tools(registry)
+    # 移除会改变现实世界的写操作工具
+    for name in _EXPERIMENT_WRITE_TOOL_BLACKLIST:
+        if registry.has(name):
+            registry._tools.pop(name, None)
+
+    llm_client = QwenClient(model=config.model)
+    reply_generator = ReplyGenerator(
+        llm_client=llm_client,
+        tool_registry=registry,
+        judge_worker=None,
+        enable_time_awareness=config.enable_time_awareness,
+        enable_reply_restraint=config.enable_reply_restraint,
+        enable_unread_dedup=config.enable_unread_dedup,
+        enable_timestamps=config.enable_timestamps,
+    )
+
+    replies = reply_generator.generate(
+        unreplied=unreplied,
+        all_messages=all_messages,
+        is_group=is_group,
+    )
+
+    reply_text = " | ".join(replies) if replies else ""
+    return reply_text, reply_generator.last_system_prompt, reply_generator.last_user_prompt
 
 
 # =============================================================================
@@ -205,6 +240,7 @@ def judge_reply(tick_data: dict, bot_reply: str) -> dict:
 def run_experiment(exp_config: BotConfig, tick_ids: list):
     """跑实验：对每个 tick，基线 vs 实验组都生成回复，Judge 打分，对比。"""
     from src.badcase.case_db import get_db
+    from src.models.base import ChatMessage
 
     control_results = []
     exp_results = []
@@ -212,20 +248,44 @@ def run_experiment(exp_config: BotConfig, tick_ids: list):
     for tid in tick_ids:
         conn = sqlite3.connect(str(DB_PATH))
         conn.row_factory = sqlite3.Row
-        r = conn.execute("SELECT * FROM tick_log WHERE tick_id=? ORDER BY id DESC LIMIT 1", (tid,)).fetchone()
+        r = conn.execute(
+            "SELECT * FROM tick_log WHERE tick_id=? ORDER BY id DESC LIMIT 1", (tid,)
+        ).fetchone()
         conn.close()
         if not r:
             continue
         d = dict(r)
-        sp = d.get("system_prompt", "") or ""
-        up = d.get("user_prompt", "") or ""
 
-        # 对照组：统一用 all_off 基线（全关）
-        control_reply, control_sp, control_up = generate_reply(sp, up, BOT_EXPERIMENTS["all_off"])
+        # 反序列化消息（优先使用 session_input_messages_json）
+        session_input_json = d.get("session_input_messages_json", "") or ""
+        session_unreplied_json = d.get("session_output_unreplied_json", "") or ""
+        if not session_input_json or not session_unreplied_json:
+            print(f"  #{tid}: 跳过（无 session_input_messages_json 或 session_output_unreplied_json）")
+            continue
+
+        try:
+            all_messages = _deserialize_messages(session_input_json)
+            unreplied = _deserialize_messages(session_unreplied_json)
+        except Exception as e:
+            print(f"  #{tid}: 跳过（反序列化失败: {e}）")
+            continue
+
+        if not all_messages or not unreplied:
+            print(f"  #{tid}: 跳过（空消息列表）")
+            continue
+
+        is_group = bool(d.get("is_group", 0))
+
+        # 对照组：用当前生产配置（CONTROL）重新生成
+        control_reply, control_sp, control_up = _generate_with_config(
+            all_messages, unreplied, is_group, CONTROL
+        )
         control_judge = judge_reply(d, control_reply)
 
         # 实验组：用实验配置重新生成
-        exp_reply, exp_sp, exp_up = generate_reply(sp, up, exp_config)
+        exp_reply, exp_sp, exp_up = _generate_with_config(
+            all_messages, unreplied, is_group, exp_config
+        )
         exp_judge = judge_reply(d, exp_reply)
 
         control_results.append({"tick_id": tid, "reply": control_reply, "sp": control_sp, "up": control_up, "judge": control_judge})
@@ -237,22 +297,29 @@ def run_experiment(exp_config: BotConfig, tick_ids: list):
         e_s = exp_judge.get("overall_score", 0)
         print(f"  #{tid}: baseline={c_bc}({c_s:.0f}) exp={e_bc}({e_s:.0f}) diff={e_s-c_s:+.0f}")
 
-    n = len(control_results)
-    c_bad = sum(1 for r in control_results if r["judge"].get("is_badcase"))
-    e_bad = sum(1 for r in exp_results if r["judge"].get("is_badcase"))
-    c_avg = sum(r["judge"].get("overall_score", 0) for r in control_results) / n if n else 0
-    e_avg = sum(r["judge"].get("overall_score", 0) for r in exp_results) / n if n else 0
+    # 过滤无效评分（Judge 空返回/解析失败）
+    invalid_reasons = ("空返回", "JSON 解析失败")
+    valid_pairs = [(c, e) for c, e in zip(control_results, exp_results)
+                   if c["judge"].get("reason") not in invalid_reasons and e["judge"].get("reason") not in invalid_reasons]
+    n_total = len(control_results)
+    n_valid = len(valid_pairs)
+    c_bad = sum(1 for c, e in valid_pairs if c["judge"].get("is_badcase"))
+    e_bad = sum(1 for c, e in valid_pairs if e["judge"].get("is_badcase"))
+    c_avg = sum(c["judge"].get("overall_score", 0) for c, e in valid_pairs) / n_valid if n_valid else 0
+    e_avg = sum(e["judge"].get("overall_score", 0) for c, e in valid_pairs) / n_valid if n_valid else 0
 
-    print(f"\n基线: badcase={c_bad}/{n} ({c_bad/n*100:.0f}%) 均分={c_avg:.1f}")
-    print(f"实验: badcase={e_bad}/{n} ({e_bad/n*100:.0f}%) 均分={e_avg:.1f}")
+    invalid_n = n_total - n_valid
+    print(f"\n有效样本: {n_valid}/{n_total} ({invalid_n} 个无效已排除)")
+    print(f"基线: badcase={c_bad}/{n_valid} ({c_bad/n_valid*100:.0f}%) 均分={c_avg:.1f}")
+    print(f"实验: badcase={e_bad}/{n_valid} ({e_bad/n_valid*100:.0f}%) 均分={e_avg:.1f}")
     print(f"差异: badcase {c_bad-e_bad:+d} 均分 {e_avg-c_avg:+.1f}")
 
-    # 维度对比
+    # 维度对比（仅有效样本）
     dims = ["幻觉控制", "时间推理", "回复必要性", "信息准确性", "上下文理解"]
     print("维度差异（实验-基线）:")
     for dim in dims:
-        c_dim = sum(r["judge"].get("dimensions", {}).get(dim, {}).get("score", 0) for r in control_results) / n
-        e_dim = sum(r["judge"].get("dimensions", {}).get(dim, {}).get("score", 0) for r in exp_results) / n
+        c_dim = sum(c["judge"].get("dimensions", {}).get(dim, {}).get("score", 0) for c, e in valid_pairs) / n_valid if n_valid else 0
+        e_dim = sum(e["judge"].get("dimensions", {}).get(dim, {}).get("score", 0) for c, e in valid_pairs) / n_valid if n_valid else 0
         diff = e_dim - c_dim
         bar = "█" * max(0, int(diff * 5)) if diff > 0 else "░" * max(0, int(abs(diff) * 5))
         print(f"  {dim}: {c_dim:.1f} → {e_dim:.1f} ({diff:+.1f}) {bar}")
@@ -264,12 +331,12 @@ def run_experiment(exp_config: BotConfig, tick_ids: list):
         control_badcase_rate, exp_badcase_rate, control_avg_score, exp_avg_score,
         summary, dimension_diffs_json, is_improvement)
         VALUES (?,?,?,?,?,?,?,?,?,?)""", (
-        exp_config.name, exp_config.description, n,
-        c_bad/n, e_bad/n, c_avg, e_avg,
-        f"badcase {c_bad-e_bad:+d} 均分 {e_avg-c_avg:+.1f}",
+        exp_config.name, exp_config.description, n_valid,
+        c_bad/n_valid if n_valid else 0, e_bad/n_valid if n_valid else 0, c_avg, e_avg,
+        f"badcase {c_bad-e_bad:+d} 均分 {e_avg-c_avg:+.1f} (有效{n_valid}/{n_total})",
         json.dumps({dim: round(
-            sum(r["judge"].get("dimensions", {}).get(dim, {}).get("score", 0) for r in exp_results) / n -
-            sum(r["judge"].get("dimensions", {}).get(dim, {}).get("score", 0) for r in control_results) / n, 1
+            sum(e["judge"].get("dimensions", {}).get(dim, {}).get("score", 0) for c, e in valid_pairs) / n_valid -
+            sum(c["judge"].get("dimensions", {}).get(dim, {}).get("score", 0) for c, e in valid_pairs) / n_valid, 1
         ) for dim in dims}, ensure_ascii=False),
         1 if e_avg > c_avg + 1 else 0,
     ))

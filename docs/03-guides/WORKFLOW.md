@@ -135,38 +135,59 @@
 1. 实验设计
     - 确定变量（prompt / 模型 / 路由策略）
     - 确定指标（badcase_rate / avg_score / 特定维度）
-    - 确定样本量（建议 ≥ 20 条 tick）
+    - 确定样本量（建议 ≥ 10 条 tick，Judge 调用慢，样本量过大实验时间过长）
     │
     ▼
-2. 基线采集
-    - python3 scripts/run_experiment.py --exp <name> --config baseline
-    - 记录对照组结果
+2. 样本选择
+    - **不过滤空回复 tick**：空回复本身就是 badcase，保留以暴露配置问题
+    - 排除明显系统错误的 tick（如 raw_response 为 `[空回复，attempt=3]` 且非模型正常输出）
+    - 等距采样或随机采样，确保覆盖不同聊天场景
     │
     ▼
-3. 实验组运行
-    - python3 scripts/run_experiment.py --exp <name> --config experiment
-    - 记录实验组结果
+3. 小样本验证（强制步骤，禁止跳过）
+    - python3 scripts/run_experiment.py --exp <name> --n-samples 1
+    - 检查 Judge 是否成功：查看输出是否正常评分（非"空返回"/"JSON 解析失败"）
+    - 结果异常（如 0 分、空返回、或明显不合理评分）→ 先排查 Judge 稳定性，**严禁直接全量**
+    - 失败原因排查：检查 prompt 长度、API 端点、模型选择
     │
     ▼
-4. Judge 评估
+4. 全量运行
+    - 基线采集：python3 scripts/run_experiment.py --exp <name> --n-samples <N>
+      - 对照组 = CONTROL（当前生产配置），重新生成回复
+    - 实验组运行：同上脚本同时完成实验组
+    - Judge 失败时自动重试 3 次（judge_worker.py 内置）
+    │
+    ▼
+5. Judge 评估与无效排除
     - 两组结果统一过 JudgeWorker
-    - 对比 badcase_rate、avg_score、各维度评分
+    - **排除无效评分**：Judge reason 为"空返回"或"JSON 解析失败"的 tick 不计入统计
+    - 对比 badcase_rate、avg_score、各维度评分（仅有效样本）
+    - 输出"有效 X/Y 个"，确保样本量足够
     │
     ▼
-5. 结果入库
+6. 结果入库
     - 实验结果自动写入 experiments 表
     - 维度差异写入 dimension_diffs_json
+    - summary 中标注有效样本数（如"badcase +1 均分 +2.3 (有效 8/10)"）
     │
     ▼
-6. Dashboard 查看
+7. Dashboard 查看
     - 打开 admin.py 的实验管理页
     - 可视化对比两组结果
+    - 检查 diff 表头是否正确（"线上配置(CONTROL)" vs "实验组"）
     │
     ▼
-7. 决策
+8. 决策
     ├── 显著改善 → 合并上生产 → 跑全量 benchmark 回归 → 提交
     └── 无显著差异 / 恶化 → 废弃实验 → 记录结论
 ```
+
+### 实验注意事项
+
+- **Judge 稳定性**：deepseek-v4-pro 处理长 prompt 时偶发空返回，已通过去掉 `response_format` + 重试 3 次缓解，但仍可能失败
+- **对照组设计**：CONTROL（生产配置）重新生成，不是直接使用历史回复，引入少量随机性
+- **无效样本处理**：实验脚本已自动排除 Judge 失败的 tick，若有效样本 < 50% 则实验结果不可信
+- **后台运行**：实验耗时较长（10 tick ≈ 15-20 分钟），建议用 nohup 后台运行
 
 ---
 

@@ -187,7 +187,7 @@ class QwenVLOCRClient:
             )
         self.client = OpenAI(
             api_key=self.api_key,
-            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            base_url=os.environ.get("DASHSCOPE_BASE_URL", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"),
         )
         self.model = model
         self.extra_body = {}

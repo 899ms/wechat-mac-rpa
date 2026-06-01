@@ -12,7 +12,8 @@ from src.layout.profile import LayoutProfile
 from src.session.global_store import GlobalStore
 from src.reply.policy import ReplyPolicy
 from src.utils.chat_utils import _is_group_chat_name, _normalize_chat_name
-from src.reply.generator import ReplyGenerator
+from src.reply.generator import ReplyGenerator, _get_judge_worker
+from src.tools import get_registry, register_builtin_tools
 from src.action.message_sender import WeChatMessageSender
 from src.action.chat_list_clicker import ChatListClicker
 import logging as _logging
@@ -61,9 +62,19 @@ class WeChatBot:
 
         # 先创建记忆引擎（ReplyGenerator 初始化时需要）
         self.memory_engine: MemoryEngine = MemoryEngine(llm_client=actual_llm)
-        # 再创建 Generator，把 memory_engine 直接传入（这样 search_memory 工具才能注册）
-        self.generator = ReplyGenerator(llm_client=actual_llm, complex_llm_client=complex_llm_client, memory_engine=self.memory_engine)
-        self.sender = WeChatMessageSender()
+        # 注册工具到全局注册表
+        registry = get_registry()
+        register_builtin_tools(registry)
+        # 再创建 Generator，把 memory_engine 和 tool_registry 直接传入
+        self.generator = ReplyGenerator(
+            llm_client=actual_llm,
+            complex_llm_client=complex_llm_client,
+            memory_engine=self.memory_engine,
+            tool_registry=registry,
+            judge_worker=_get_judge_worker(),
+            enable_timestamps=True,
+        )
+        self.sender = WeChatMessageSender(silent_mode=os.environ.get("WECHAT_SILENT_MODE") == "1")
         self.on_message = on_message
         self.logger: BotLogger = get_logger()
         self.running = False
@@ -321,12 +332,24 @@ class WeChatBot:
                     for t in trace if t.get("type") == "tool_execution"
                 ]
 
+                # 序列化原始消息数据供实验复跑使用
+                def _serialize_msgs(msgs):
+                    from dataclasses import asdict
+                    data = []
+                    for m in msgs:
+                        d = asdict(m)
+                        d['sender_type'] = m.sender_type.value
+                        d.pop('source_elements', None)
+                        data.append(d)
+                    return _json.dumps(data, ensure_ascii=False, default=str)
+
                 conn.execute("""INSERT INTO tick_log
                     (session_id, tick_id, chat_name, is_group,
                      messages_count, new_messages_count,
                      system_prompt, user_prompt, raw_response, tool_calls_json, tool_results_json,
+                     session_input_messages_json, session_output_unreplied_json,
                      should_reply, replies_sent_json, screenshot_path)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?,?)""", (
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
                     self.session_id,
                     tick_id, chat_name, 1 if is_group else 0,
                     len(all_messages) if all_messages else 0,
@@ -336,6 +359,9 @@ class WeChatBot:
                     getattr(self.generator, 'last_raw_response', '') or '',
                     _json.dumps(getattr(self.generator, 'last_tool_calls', []) or [], ensure_ascii=False),
                     _json.dumps(tool_results, ensure_ascii=False),
+                    _serialize_msgs(all_messages) if all_messages else '[]',
+                    _serialize_msgs(unreplied) if unreplied else '[]',
+                    1,
                     _json.dumps(replies, ensure_ascii=False),
                     result.screenshot_path or '',
                 ))

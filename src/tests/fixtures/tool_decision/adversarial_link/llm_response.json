@@ -1,14 +1,5 @@
 {
-  "tool_calls": [
-    {
-      "id": "call_87591601effd4f4e9f4dd9ef",
-      "type": "function",
-      "function": {
-        "name": "search_memory",
-        "arguments": "{\"query\": \"王芊\"}"
-      }
-    }
-  ],
-  "content": "",
-  "timestamp": 1779235103.978562
+  "tool_calls": [],
+  "content": "啥链接啊？ | 我刚才发的吗？🙃",
+  "timestamp": 1780189262.035234
 }

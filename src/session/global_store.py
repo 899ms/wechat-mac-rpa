@@ -401,13 +401,6 @@ class GlobalStore:
             state.messages.append(new_msg)
             state._msg_ids.add(_msg_id(chat_name, new_msg, is_group))
 
-        # 裁剪旧消息
-        if len(state.messages) > self.max_messages:
-            removed = state.messages[:-self.max_messages]
-            state.messages = state.messages[-self.max_messages:]
-            for msg in removed:
-                state._msg_ids.discard(_msg_id(chat_name, msg, is_group))
-
         # 收集所有未回复的消息（按时间顺序）
         unreplied = [
             msg for msg in state.messages

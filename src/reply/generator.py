@@ -13,25 +13,41 @@ from src.reply.session_memory import SessionMemory, _extract_query_key
 _logger = logging.getLogger("src.reply.generator")
 
 # Badcase JudgeWorker（可选，默认不启用）
+import threading
 _judge_worker = None
+_judge_worker_lock = threading.Lock()
 
 def _get_judge_worker():
     global _judge_worker
     if _judge_worker is None:
-        try:
-            from src.badcase.judge_worker import JudgeWorker
-            _judge_worker = JudgeWorker()
-            _logger.info("JudgeWorker initialized")
-        except Exception as e:
-            _logger.warning("JudgeWorker init failed: %s", e)
+        with _judge_worker_lock:
+            if _judge_worker is None:
+                try:
+                    from src.badcase.judge_worker import JudgeWorker
+                    _judge_worker = JudgeWorker()
+                    _logger.info("JudgeWorker initialized")
+                except Exception as e:
+                    _logger.warning("JudgeWorker init failed: %s", e)
     return _judge_worker
 
 
 class ReplyGenerator:
-    def __init__(self, llm_client=None, complex_llm_client=None, memory_engine=None):
+    def __init__(self, llm_client=None, complex_llm_client=None, memory_engine=None,
+                 tool_registry=None,
+                 judge_worker=None,
+                 enable_time_awareness: bool = True,
+                 enable_reply_restraint: bool = True,
+                 enable_unread_dedup: bool = True,
+                 enable_timestamps: bool = True):
         self.llm_client = llm_client
         self.complex_llm_client = complex_llm_client
         self.memory_engine = memory_engine
+        self.tool_registry = tool_registry or get_registry()
+        self.judge_worker = judge_worker
+        self.enable_time_awareness = enable_time_awareness
+        self.enable_reply_restraint = enable_reply_restraint
+        self.enable_unread_dedup = enable_unread_dedup
+        self.enable_timestamps = enable_timestamps
         print(f"[Hermes] ReplyGenerator init: llm_client={type(llm_client).__name__ if llm_client else None}, complex_llm_client={type(complex_llm_client).__name__ if complex_llm_client else None}")
         # 最后一次调用的 prompt/response（供 debug 使用）
         self.last_system_prompt: str = ""
@@ -52,9 +68,6 @@ class ReplyGenerator:
         self.last_hermes_response: str = ""
         # 传给 Judge 的完整 LLM 上下文
         self.last_llm_messages: List[Dict] = []
-        # 注册内置工具
-        self.tool_registry = get_registry()
-        register_builtin_tools()
         # 短期记忆（跨 tick 缓存工具结果）
         self.session_memory = SessionMemory()
         # 动态注册记忆搜索工具（如果 memory_engine 可用）
@@ -83,7 +96,7 @@ class ReplyGenerator:
         """把当前 tick 的数据提交给 JudgeWorker 异步判定"""
         import json
         try:
-            worker = _get_judge_worker()
+            worker = self.judge_worker
             if worker is None:
                 return
             tick_data = {
@@ -118,7 +131,12 @@ class ReplyGenerator:
         except Exception as e:
             _logger.debug("JudgeWorker submit failed: %s", e)
 
-    def generate(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage], is_group: bool = False, tick_id: int = 0) -> List[str]:
+    def generate(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage],
+                 is_group: bool = False, tick_id: int = 0,
+                 enable_time_awareness: bool = None,
+                 enable_reply_restraint: bool = None,
+                 enable_unread_dedup: bool = None,
+                 enable_timestamps: bool = None) -> List[str]:
         """
         生成回复内容，返回多条回复列表（最多3条）。
         支持多轮工具调用，但总工具时间不超过 max_tool_seconds，超时后强制生成文本回复。
@@ -152,7 +170,7 @@ class ReplyGenerator:
         chat_name = unreplied[-1].chat_name if unreplied else ""
 
         t_sp_start = time.time()
-        system_prompt = self._system_prompt()
+        system_prompt = self._system_prompt(enable_reply_restraint=enable_reply_restraint)
         t_sp_ms = (time.time() - t_sp_start) * 1000
 
         t_tc_start = time.time()
@@ -160,7 +178,13 @@ class ReplyGenerator:
         t_tc_ms = (time.time() - t_tc_start) * 1000
 
         t_up_start = time.time()
-        user_prompt = self._build_user_prompt(unreplied, all_messages, is_group)
+        user_prompt = self._build_user_prompt(
+            unreplied, all_messages, is_group,
+            enable_time_awareness=enable_time_awareness,
+            enable_unread_dedup=enable_unread_dedup,
+            enable_timestamps=enable_timestamps,
+            tools_context=tools_context,
+        )
         t_up_ms = (time.time() - t_up_start) * 1000
 
         # 模型辅助路由：按需加载匹配的 skill 正文到 user prompt
@@ -211,10 +235,8 @@ class ReplyGenerator:
         max_total_seconds = 600.0 if is_hermes else 60.0  # deepseek 给 60 秒，给工具调用留余量
         overall_start_time = time.time()
 
-        # 构建 messages：system（人设）+ system（工具缓存）+ user（上下文）
+        # 构建 messages：system（人设）+ user（上下文含缓存）
         messages = [{"role": "system", "content": system_prompt}]
-        if tools_context:
-            messages.append({"role": "system", "content": tools_context})
         messages.append({"role": "user", "content": user_prompt})
 
         # Hermes 走精简 system prompt，不传 tools
@@ -496,37 +518,55 @@ class ReplyGenerator:
             truncated.append(cm)
         return truncated
 
-    def _parse_replies(self, text: str) -> List[str]:
-        """解析 LLM 回复：{"replies": ["msg1", "msg2"]}。prompt 已要求此格式。"""
-        import json, re
+    @staticmethod
+    def _extract_json(text: str) -> Optional[Dict]:
+        """从 LLM 回复中提取 JSON 对象。支持 markdown 代码块和裸 JSON。
+        使用括号深度计数找 JSON 边界，避免正则贪婪匹配截断问题。
+        """
+        import json
         text = text.strip()
         if not text:
-            return []
+            return None
         # 去掉 markdown 代码块
-        m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-        if m:
-            text = m.group(1)
-        # 找 JSON 边界
+        if "```" in text:
+            parts = text.split("```", 2)
+            if len(parts) >= 3:
+                code_content = parts[1]
+                # 去掉可能的 "json" 语言标记
+                if code_content.lstrip().startswith("json"):
+                    code_content = code_content.lstrip()[4:].lstrip()
+                text = code_content
+        # 找 JSON 边界（括号深度计数）
         start = text.find("{")
-        if start >= 0:
-            depth = 0
-            for i in range(start, len(text)):
-                ch = text[i]
-                if ch == "{": depth += 1
-                elif ch == "}":
-                    depth -= 1
-                    if depth == 0: text = text[start:i+1]; break
-        try:
-            data = json.loads(text)
+        if start < 0:
+            return None
+        depth = 0
+        for i in range(start, len(text)):
+            ch = text[i]
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(text[start:i + 1])
+                    except json.JSONDecodeError:
+                        return None
+        return None
+
+    def _parse_replies(self, text: str) -> List[str]:
+        """解析 LLM 回复：{"replies": ["msg1", "msg2"]}。prompt 已要求此格式。"""
+        data = self._extract_json(text)
+        if data is not None:
             replies = data.get("replies", [])
             return [str(r).strip() for r in replies if str(r).strip() not in ("收到", "好的", "嗯", "OK", "1")][:3]
-        except Exception:
-            # fallback: 按段落拆分，不再整段当一条发
-            for sep in ("\n\n", "\n"):
-                parts = [p.strip() for p in text.split(sep) if p.strip()]
-                if len(parts) > 1:
-                    return [p for p in parts if p not in ("收到", "好的", "嗯", "OK", "1")]
-            return [text] if text not in ("收到", "好的", "嗯", "OK", "1") else []
+        # fallback: 按段落拆分，不再整段当一条发
+        text = text.strip()
+        for sep in ("\n\n", "\n"):
+            parts = [p.strip().replace("\n", " ") for p in text.split(sep) if p.strip()]
+            if len(parts) > 1:
+                return [p for p in parts if p not in ("收到", "好的", "嗯", "OK", "1")][:3]
+        return [text.replace("\n", " ")] if text not in ("收到", "好的", "嗯", "OK", "1") else []
 
     def _load_skill_manifest(self) -> List[Dict[str, str]]:
         """扫描 skills/ 目录，返回技能清单（name + trigger 描述），不含正文。"""
@@ -608,15 +648,8 @@ class ReplyGenerator:
                 })
             # 尝试解析 JSON
             if raw_str:
-                import json, re
-                # 先尝试从 markdown 代码块中提取
-                m = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw_str, re.DOTALL)
-                if not m:
-                    # 再找最外层的大括号（贪婪匹配，确保取完整 JSON）
-                    m = re.search(r'\{.*\}', raw_str, re.DOTALL)
-                if m:
-                    json_text = m.group(1) if m.lastindex else m.group()
-                    data = json.loads(json_text)
+                data = self._extract_json(raw_str)
+                if data is not None:
                     matched = data.get("skills", [])
                     # 过滤有效 skill
                     valid = {s["name"] for s in manifest}
@@ -673,13 +706,27 @@ class ReplyGenerator:
             return "\n可用技能（系统会根据对话内容自动下发详细框架）：\n" + "\n".join(parts) + "\n"
         return ""
 
-    def _system_prompt(self) -> str:
+    def _system_prompt(self, enable_reply_restraint: bool = None) -> str:
         """核心 system prompt：读 prompts/persona.md（DT 风格），注入工具描述 + 检索案例。"""
+        if enable_reply_restraint is None:
+            enable_reply_restraint = self.enable_reply_restraint
+
         prompt_path = Path(__file__).parent.parent.parent / "prompts" / "persona.md"
         if prompt_path.exists():
             prompt = prompt_path.read_text(encoding="utf-8")
         else:
             prompt = "你是王芊本人。用户不是在跟AI聊天，是在微信上给王芊发消息。"
+
+        # 根据开关删除回复克制原则 section
+        if not enable_reply_restraint:
+            marker = "### 7. 回复克制原则"
+            idx = prompt.find(marker)
+            if idx != -1:
+                next_section = prompt.find("### ", idx + 1)
+                if next_section != -1:
+                    prompt = prompt[:idx] + prompt[next_section:]
+                else:
+                    prompt = prompt[:idx]
 
         # 注入工具描述
         tools_desc = "\n".join(
@@ -709,47 +756,32 @@ class ReplyGenerator:
 
     @staticmethod
     def _format_time_tag(ts: Optional[int], now_ts: float) -> str:
-        """根据时间戳生成可读的时间标签。"""
+        """根据时间戳生成绝对时间标签 YYYY-MM-DD HH:MM。"""
         if not ts:
             return ""
-        delta_sec = now_ts - ts
-        if delta_sec < 60:
-            return "刚刚"
-        elif delta_sec < 3600:
-            return f"{int(delta_sec/60)}分钟前"
-        elif delta_sec < 7200:
-            return "1小时前"
-        elif delta_sec < 86400:
-            # 同一天内
-            tm = time.localtime(ts)
-            return f"{tm.tm_hour:02d}:{tm.tm_min:02d}"
-        elif delta_sec < 172800:
-            tm = time.localtime(ts)
-            return f"昨晚 {tm.tm_hour:02d}:{tm.tm_min:02d}"
-        elif delta_sec < 604800:
-            tm = time.localtime(ts)
-            return f"{tm.tm_mon}月{tm.tm_mday}日 {tm.tm_hour:02d}:{tm.tm_min:02d}"
-        else:
-            tm = time.localtime(ts)
-            return f"{tm.tm_year}年{tm.tm_mon}月{tm.tm_mday}日"
+        tm = time.localtime(int(ts))
+        return f"{tm.tm_year:04d}-{tm.tm_mon:02d}-{tm.tm_mday:02d} {tm.tm_hour:02d}:{tm.tm_min:02d}"
 
     @staticmethod
-    def _format_message_line(m: ChatMessage) -> str:
+    def _format_message_line(m: ChatMessage, enable_timestamps: bool = True) -> str:
         """将单条消息渲染为 prompt 中的一行文本，含时间戳。"""
         sender_name = "我" if m.sender_type == SenderType.SELF else m.sender
         msg_type = m.message_type or "text"
         now_ts = time.time()
 
         # 时间标签（优先 create_time int，fallback timestamp str）
-        ts = getattr(m, 'create_time', None)
-        if not ts:
-            ts_str = getattr(m, 'timestamp', None)
-            if ts_str:
-                try:
-                    from datetime import datetime
-                    ts = int(datetime.strptime(ts_str.replace('  ', ' '), "%Y-%m-%d %H:%M:%S").timestamp())
-                except: pass
-        time_tag = ReplyGenerator._format_time_tag(ts, now_ts) if ts else ""
+        time_tag = ""
+        if enable_timestamps:
+            ts = getattr(m, 'create_time', None)
+            if not ts:
+                ts_str = getattr(m, 'timestamp', None)
+                if ts_str:
+                    try:
+                        from datetime import datetime
+                        ts = int(datetime.strptime(ts_str.replace('  ', ' '), "%Y-%m-%d %H:%M:%S").timestamp())
+                    except Exception as e:
+                        _logger.warning("[Generator] 时间戳解析失败: %s (raw=%r)", e, ts_str)
+            time_tag = ReplyGenerator._format_time_tag(ts, now_ts) if ts else ""
 
         def _line(body: str) -> str:
             if time_tag:
@@ -791,8 +823,20 @@ class ReplyGenerator:
         else:
             return _line(m.text)
 
-    def _build_user_prompt(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage], is_group: bool = False) -> str:
-        """构建结构化 user prompt：会话信息 + 记忆 + 历史 + 未读。"""
+    def _build_user_prompt(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage],
+                           is_group: bool = False,
+                           enable_time_awareness: bool = None,
+                           enable_unread_dedup: bool = None,
+                           enable_timestamps: bool = None,
+                           tools_context: str = "") -> str:
+        """构建结构化 user prompt：会话信息 + 记忆 + 缓存 + 历史 + 未读。"""
+        if enable_time_awareness is None:
+            enable_time_awareness = self.enable_time_awareness
+        if enable_unread_dedup is None:
+            enable_unread_dedup = self.enable_unread_dedup
+        if enable_timestamps is None:
+            enable_timestamps = self.enable_timestamps
+
         from datetime import datetime
         chat_name = unreplied[-1].chat_name if unreplied else ""
         now = datetime.now().strftime("%Y年%m月%d日 %H:%M")
@@ -807,13 +851,15 @@ class ReplyGenerator:
         hour = now_dt.hour
         time_period = "凌晨" if hour < 6 else ("早上" if hour < 9 else ("上午" if hour < 12 else ("下午" if hour < 18 else ("晚上" if hour < 22 else "深夜"))))
         lines_local.append("[会话]")
-        lines_local.append(f"当前时间：{now} {weekday} {time_period}")
+        if enable_time_awareness:
+            lines_local.append(f"当前时间：{now} {weekday} {time_period}")
         lines_local.append(f"聊天：{chat_name}")
         lines_local.append(f"类型：{chat_type}")
         lines_local.append(f"被@：{'是' if is_at else '否'}")
         lines_local.append("")
-        lines_local.append("⚠️ 消息时间戳说明：每条消息后面标注的时间是消息发出的时间。如果消息是'昨晚'或几小时前发的，说明用户当时的状态（如'好困'）不代表现在。请根据消息时间戳推断语境，不要假设消息是刚刚发的。")
-        lines_local.append("")
+        if enable_time_awareness:
+            lines_local.append("⚠️ 消息时间戳说明：每条消息后面标注的时间是消息发出的绝对时间（格式：YYYY-MM-DD HH:MM）。请根据时间戳推断语境，不要假设消息是刚刚发的。")
+            lines_local.append("")
 
         # wiki 记忆
         t_mem_ms = {}
@@ -864,7 +910,12 @@ class ReplyGenerator:
             mem_summary = " ".join(f"{k}={v:.0f}ms" for k, v in t_mem_ms.items())
             print(f"[Perf][Memory] {mem_summary}")
 
-        # 历史消息：最近20条 或 最近10分钟内，取并集
+        # 已缓存数据（session_memory 中的工具结果）
+        if tools_context:
+            lines_local.append(tools_context)
+            lines_local.append("")
+
+        # 历史消息：最近50条 或 最近30分钟内，取并集
         if all_messages:
             lines_local.append("[历史消息]（仅背景参考，按时间倒序）")
 
@@ -876,12 +927,12 @@ class ReplyGenerator:
                 return time.time()
 
             now_ts = time.time()
-            cutoff_ts = now_ts - 600  # 10分钟
+            cutoff_ts = now_ts - 1800  # 30分钟
 
-            recent_20 = list(all_messages[-20:]) if len(all_messages) > 20 else list(all_messages)
-            recent_10min = [m for m in all_messages if _msg_ts(m) >= cutoff_ts]
+            recent_50 = list(all_messages[-50:]) if len(all_messages) > 50 else list(all_messages)
+            recent_30min = [m for m in all_messages if _msg_ts(m) >= cutoff_ts]
 
-            union_ids = {id(m) for m in recent_20} | {id(m) for m in recent_10min}
+            union_ids = {id(m) for m in recent_50} | {id(m) for m in recent_30min}
             candidate = [m for m in all_messages if id(m) in union_ids]
 
             # 兜底：强制保留最近 5 条 bot 自己发的消息，防止被对方密集消息淹没
@@ -895,10 +946,10 @@ class ReplyGenerator:
             # 保持正序：旧的消息在前，新的消息在后，符合阅读习惯
 
             for m in recent:
-                lines_local.append(self._format_message_line(m))
+                lines_local.append(self._format_message_line(m, enable_timestamps))
 
             if len(all_messages) > len(recent):
-                lines_local.append(f"（共 {len(all_messages)} 条历史，显示 {len(recent)} 条：最近20条 + 10分钟内）")
+                lines_local.append(f"（共 {len(all_messages)} 条历史，显示 {len(recent)} 条：最近50条 + 30分钟内）")
             lines_local.append("")
 
         # 未读消息（带去重检查：如果历史中已有相似消息且 Bot 已回复，标记为'可能已处理'）
@@ -924,13 +975,13 @@ class ReplyGenerator:
                         # Bot 在未读消息之后回复了，说明这条可能已经处理过
                         already_handled = True
                         break
-            tag = " ⚠️(历史中已有回复，可跳过)" if already_handled else ""
-            lines_local.append(f"{i}. {self._format_message_line(m)}{tag}")
-            if already_handled:
+            tag = " ⚠️(历史中已有回复，可跳过)" if (enable_unread_dedup and already_handled) else ""
+            lines_local.append(f"{i}. {self._format_message_line(m, enable_timestamps)}{tag}")
+            if enable_unread_dedup and already_handled:
                 skipped_hint.append(str(i))
         lines_local.append("")
 
-        if skipped_hint:
+        if enable_unread_dedup and skipped_hint:
             lines_local.append(f"提示：第{','.join(skipped_hint)}条未读消息在历史中已有回复，可能不需要再次回复。仅回复真正未处理的新消息。")
         lines_local.append("回复重点：仅回复真正需要回应的未读消息。纯表情/OK/好的等确认性消息可以不回复。")
 

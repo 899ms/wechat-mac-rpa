@@ -11,7 +11,6 @@ Badcase 审核台 - FastAPI + 原生 HTML/JS
 """
 
 import json
-import re
 import shutil
 from datetime import datetime
 from pathlib import Path

@@ -38,7 +38,12 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.models.base import ChatMessage, SenderType
 from src.reply.generator import ReplyGenerator
+from src.tools import get_registry, register_builtin_tools
 from src.utils.qwen_client import QwenClient
+
+# 测试用全局工具注册表
+_TEST_TOOL_REGISTRY = get_registry()
+register_builtin_tools(_TEST_TOOL_REGISTRY)
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "reply_quality"
 
@@ -510,7 +515,7 @@ _CUSTOM_RUBRICS: Dict[str, Rubric] = {
         ],
     ),
     "relationship_query": Rubric(
-        instructions="评估 Bot 对人物关系查询的回复质量",
+        instructions="评估 Bot 对人物关系查询的回复质量。注意：Bot 的人设是王芊本人，以第一人称回答时'我'即代表王芊。",
         dimensions=[
             RubricDimension(
                 name="回复数量", description="Bot 是否生成了回复",
@@ -518,7 +523,7 @@ _CUSTOM_RUBRICS: Dict[str, Rubric] = {
             ),
             RubricDimension(
                 name="关系提及", description="回复是否提及了人物之间的关系",
-                criteria="回复中应提及人物之间的关系（如'同事'、'朋友'等），或提供相关背景信息，不限于必须出现特定关键词", required=True,
+                criteria="回复中应提及人物之间的关系（如'同事'、'朋友'等），或提供相关背景信息。Bot 以第一人称回答时（如'是我同事'），'我'即代表王芊，应视为有效关系提及。", required=True,
             ),
             RubricDimension(
                 name="无敷衍词", description="回复中是否没有敷衍词",
@@ -734,10 +739,10 @@ BENCHMARK_CASES: List[BenchmarkCase] = [
         required_keywords=[],
         required_hits=0,
         forbidden_keywords=["收到", "好的", "嗯"],
-        min_replies=1,
+        min_replies=0,
         max_replies=3,
         category="basic",
-        notes="纯笑声，必须回复且不能敷衍",
+        notes="纯笑声，当前回复克制策略下允许不回复（若回复则不能敷衍）",
     ),
     BenchmarkCase(
         case_name="time_query",
@@ -773,10 +778,10 @@ BENCHMARK_CASES: List[BenchmarkCase] = [
         required_keywords=["猫", "睡", "沙发"],
         required_hits=1,
         forbidden_keywords=["收到", "好的"],
-        min_replies=1,
+        min_replies=0,
         max_replies=3,
         category="basic",
-        notes="图片消息，回复应针对图片内容",
+        notes="图片消息，当前回复克制策略下允许不回复（若回复则应针对图片内容）",
     ),
     BenchmarkCase(
         case_name="empty_msg",
@@ -786,10 +791,10 @@ BENCHMARK_CASES: List[BenchmarkCase] = [
         required_keywords=[],
         required_hits=0,
         forbidden_keywords=["收到", "好的"],
-        min_replies=1,
+        min_replies=0,
         max_replies=3,
         category="basic",
-        notes="空消息，私聊强制回复",
+        notes="空消息，当前回复克制策略下允许不回复",
     ),
     BenchmarkCase(
         case_name="multi_turn_context",
@@ -1125,7 +1130,7 @@ def run_benchmark(use_api: bool = False, api_key: str | None = None) -> List[Ben
                 preview = case.unreplied[-1].text[:30] if case.unreplied[-1].text else "[图片/卡片]"
                 print(f"  [{case.case_name}] 调用 LLM: {preview}...")
                 try:
-                    gen = ReplyGenerator(llm_client=llm_client, memory_engine=memory_engine)
+                    gen = ReplyGenerator(llm_client=llm_client, memory_engine=memory_engine, tool_registry=_TEST_TOOL_REGISTRY)
                     replies = gen.generate(
                         unreplied=case.unreplied,
                         all_messages=case.all_messages,

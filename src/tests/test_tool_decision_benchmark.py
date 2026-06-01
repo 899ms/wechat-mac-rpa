@@ -43,108 +43,6 @@ from src.tests.test_reply_quality_benchmark import JudgeLLM, Rubric, RubricDimen
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "tool_decision"
 
-SYSTEM_PROMPT = """核心人设与风格
-你叫'不爱说话'，是王芊的小号/分身，可以访问本地 wiki 记忆库...
-
-可用工具（系统会自动执行并返回结果）
-- get_current_time：获取当前日期和时间
-- get_weather(city, date)：查询天气
-- web_search(query)：搜索网页获取实时信息
-- browse_url(url)：打开链接提取网页正文
-- stock_query(stock_code)：查询股票
-- search_memory(query)：搜索本地长期记忆。当你不确定某个人是谁、某件事的背景、或者某个关系时调用。
-
-输出格式
-需要工具时：按 function calling 格式输出 tool_calls。
-不需要工具时：直接输出 JSON {"replies": ["回复1"]}，不要 markdown 代码块。
-绝对不要输出思考过程。"""
-
-TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_current_time",
-            "description": "获取当前日期和时间",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_weather",
-            "description": "查询指定城市的天气",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "city": {"type": "string", "description": "城市名称"},
-                    "date": {"type": "string", "description": "日期，如 '今天'、'明天'"},
-                },
-                "required": ["city"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "web_search",
-            "description": "搜索网页获取实时信息",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "搜索关键词"},
-                },
-                "required": ["query"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "browse_url",
-            "description": "打开链接提取网页正文",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "url": {"type": "string", "description": "网页链接"},
-                },
-                "required": ["url"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "stock_query",
-            "description": "查询股票信息",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "stock_code": {"type": "string", "description": "股票代码或名称"},
-                },
-                "required": ["stock_code"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_memory",
-            "description": "搜索本地长期记忆。当你不确定某个人是谁、某件事的背景、或者某个关系时，调用此工具查询本地 wiki 记忆库。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "搜索关键词。必须是单个具体的人名、昵称或名词，不要组合多个词。",
-                    }
-                },
-                "required": ["query"],
-            },
-        },
-    },
-]
-
-
 @dataclass
 class BenchmarkCase:
     case_name: str
@@ -480,7 +378,10 @@ def _save_judge_cache(case_name: str, tool_calls: List[dict], result: dict) -> N
 
 
 def _call_llm(case: BenchmarkCase, api_key: str | None = None) -> dict:
-    """调用真实 LLM API，返回解析后的响应字典"""
+    """调用 ReplyGenerator 生成回复，从 last_tool_calls 提取 tool calls"""
+    from src.models.base import ChatMessage, SenderType
+    from src.reply.generator import ReplyGenerator
+    from src.tools import ToolRegistry, register_builtin_tools
     from src.utils.qwen_client import QwenClient
 
     # 如果外部传入了 api_key，临时设置到环境变量
@@ -490,17 +391,48 @@ def _call_llm(case: BenchmarkCase, api_key: str | None = None) -> dict:
         os.environ["DASHSCOPE_API_KEY"] = api_key
 
     try:
-        client = QwenClient(model="deepseek-v4-flash")
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": case.user_message},
-        ]
-        response = client.chat(
-            messages=messages,
-            tools=TOOLS,
-            temperature=0,
-            max_tokens=500,
-            timeout=30,
+        # 创建独立工具注册表
+        registry = ToolRegistry()
+        register_builtin_tools(registry)
+
+        # 注册 search_memory（实验必需）
+        def _mock_search_memory(query: str = "") -> str:
+            return f"[记忆搜索结果] {query}"
+        registry.register(
+            name="search_memory",
+            description="搜索本地长期记忆。当你不确定某个人是谁、某件事的背景、或者某个关系时，调用此工具查询本地 wiki 记忆库。",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "搜索关键词。必须是单个具体的人名、昵称或名词，不要组合多个词。",
+                    },
+                },
+                "required": ["query"],
+            },
+            func=_mock_search_memory,
+        )
+
+        # 构造 ChatMessage
+        msg = ChatMessage(
+            text=case.user_message,
+            sender="User",
+            sender_type=SenderType.OTHER,
+            chat_name="Benchmark",
+        )
+
+        llm_client = QwenClient(model="deepseek-v4-flash")
+        reply_generator = ReplyGenerator(
+            llm_client=llm_client,
+            tool_registry=registry,
+            judge_worker=None,
+        )
+
+        replies = reply_generator.generate(
+            unreplied=[msg],
+            all_messages=[msg],
+            is_group=False,
         )
     finally:
         if env_backup is not None:
@@ -508,26 +440,24 @@ def _call_llm(case: BenchmarkCase, api_key: str | None = None) -> dict:
         elif api_key and "DASHSCOPE_API_KEY" in os.environ:
             del os.environ["DASHSCOPE_API_KEY"]
 
-    # response 可能是 message 对象（有 tool_calls）或字符串
+    # 从 last_tool_calls 提取 tool calls
     result: dict[str, Any] = {"tool_calls": [], "content": "", "timestamp": time.time()}
-    if response is None:
-        return result
-    if hasattr(response, "tool_calls") and response.tool_calls:
-        result["tool_calls"] = [
-            {
-                "id": getattr(tc, "id", ""),
-                "type": getattr(tc, "type", "function"),
-                "function": {
-                    "name": getattr(tc.function, "name", ""),
-                    "arguments": getattr(tc.function, "arguments", ""),
-                },
-            }
-            for tc in response.tool_calls
-        ]
-    if hasattr(response, "content") and response.content:
-        result["content"] = response.content
-    elif isinstance(response, str):
-        result["content"] = response
+    tool_calls = reply_generator.last_tool_calls or []
+    for tc in tool_calls:
+        result["tool_calls"].append({
+            "id": tc.get("tool_call_id", ""),
+            "type": "function",
+            "function": {
+                "name": tc.get("tool_name", ""),
+                "arguments": tc.get("arguments", ""),
+            },
+        })
+
+    # 内容：取 replies 的拼接，或 raw_response
+    if replies:
+        result["content"] = " | ".join(replies)
+    else:
+        result["content"] = reply_generator.last_raw_response or ""
 
     return result
 

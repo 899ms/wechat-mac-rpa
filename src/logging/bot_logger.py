@@ -234,11 +234,15 @@ class BotLogger:
 
 
 # 全局单例（方便 import 即用）
+import threading
 _default_logger: Optional[BotLogger] = None
+_default_logger_lock = threading.Lock()
 
 
 def get_logger(logs_dir: Optional[str] = None) -> BotLogger:
     global _default_logger
     if _default_logger is None:
-        _default_logger = BotLogger(logs_dir=logs_dir)
+        with _default_logger_lock:
+            if _default_logger is None:
+                _default_logger = BotLogger(logs_dir=logs_dir)
     return _default_logger

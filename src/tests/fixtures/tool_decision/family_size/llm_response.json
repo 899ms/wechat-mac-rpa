@@ -1,14 +1,14 @@
 {
   "tool_calls": [
     {
-      "id": "call_7100b15baa2a4d2ca2472126",
+      "id": "call_1935ee9309554e648353d2c3",
       "type": "function",
       "function": {
         "name": "search_memory",
-        "arguments": "{\"query\": \"王芊 家庭 几口人\"}"
+        "arguments": "{\"query\": \"王芊家庭\"}"
       }
     }
   ],
-  "content": "",
-  "timestamp": 1779235132.9681668
+  "content": "这问题哈哈哈 | 我家就三口人呀 | 我爸妈和我～",
+  "timestamp": 1780189313.124205
 }

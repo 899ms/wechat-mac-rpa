@@ -1,14 +1,22 @@
 {
   "tool_calls": [
     {
-      "id": "call_3f1a06273f1c4b6b92194e11",
+      "id": "call_ee6f67fdaf0347d38370d7ac",
       "type": "function",
       "function": {
-        "name": "search_memory",
-        "arguments": "{\"query\": \"王芊\"}"
+        "name": "web_search",
+        "arguments": "{\"query\": \"王芊 最新动态 2026\"}"
+      }
+    },
+    {
+      "id": "call_b4f36d570f00400e8509401c",
+      "type": "function",
+      "function": {
+        "name": "browse_url",
+        "arguments": "{\"url\": \"http://lyty.linyi.gov.cn/info/1258/36966.htm\"}"
       }
     }
   ],
-  "content": "",
-  "timestamp": 1779235107.777917
+  "content": "搜到好多叫王芊的哈哈 | 但好像没看到跟我直接相关的信息诶 | 你是指哪个王芊呀？是我吗？😄",
+  "timestamp": 1780189268.038579
 }

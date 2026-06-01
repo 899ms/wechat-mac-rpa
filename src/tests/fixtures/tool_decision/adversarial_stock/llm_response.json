@@ -1,22 +1,22 @@
 {
   "tool_calls": [
     {
-      "id": "call_095f881f392448c7946c6d58",
+      "id": "call_9430fc1fa1904433a705e987",
       "type": "function",
       "function": {
-        "name": "search_memory",
-        "arguments": "{\"query\": \"王芊\"}"
+        "name": "stock_query",
+        "arguments": "{\"stock_code\": \"sh600519\"}"
       }
     },
     {
-      "id": "call_772c9586844244cdb0d5e475",
+      "id": "call_b82291bc14524c4d9d3321d8",
       "type": "function",
       "function": {
-        "name": "search_memory",
-        "arguments": "{\"query\": \"王芊 茅台\"}"
+        "name": "web_search",
+        "arguments": "{\"query\": \"贵州茅台 最新消息 2026年5月\"}"
       }
     }
   ],
-  "content": "",
-  "timestamp": 1779235111.9732769
+  "content": "涨啦涨啦！上周五涨了快4个点呢hhh | 现在1326块～ | PE才20倍出头，不算贵哈，估值还算合理",
+  "timestamp": 1780189277.029196
 }

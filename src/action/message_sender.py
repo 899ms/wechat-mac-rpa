@@ -40,7 +40,14 @@ class WeChatMessageSender(MessageSender):
     1. 每次重试都从头开始（重新激活 + focus + pbcopy），避免窗口焦点丢失后后续重试白给。
     2. 粘贴前验证 WeChat 是 frontmost 进程，防止消息发到其他应用。
     3. 异常内容熔断：verify 读到的内容长度超过预期 3 倍时立即中止，防止误删/误发其他窗口内容。
+
+    静默模式（2026-05-29）：
+    - silent_mode=True 时不实际发送消息，只生成回复并记录日志
+    - 用于数据收集、实验、调试，避免打扰用户
     """
+
+    def __init__(self, silent_mode: bool = False):
+        self.silent_mode = silent_mode
 
     # ------------------------------------------------------------------
     # 原子操作辅助方法
@@ -148,8 +155,8 @@ class WeChatMessageSender(MessageSender):
         """清空剪贴板，防止 verify 读到旧内容。"""
         try:
             subprocess.run(["pbcopy"], input=b"", timeout=2, capture_output=True)
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.debug("[Sender] 清空剪贴板失败: %s", e)
 
     def _verify(self) -> tuple[str, int, int]:
         """验证输入框内容：Command+A + Command+C + pbpaste。
@@ -255,7 +262,14 @@ class WeChatMessageSender(MessageSender):
     # ------------------------------------------------------------------
 
     def send(self, text: str) -> ActionResult:
-        """发送文本消息到当前微信聊天。"""
+        """发送文本消息到当前微信聊天。
+
+        静默模式下不实际发送，只记录日志并返回模拟成功。
+        """
+        if self.silent_mode:
+            _logger.info(f"[Sender] [SILENT] 静默模式跳过发送, 文本长度: {len(text)} 字符, 内容: {text[:80]}...")
+            return ActionResult(success=True, sent_text=text)
+
         t_send_start = time.time()
         perf = {}
 
@@ -387,7 +401,7 @@ class WeChatMessageSender(MessageSender):
             if ok:
                 self._focus_input()
                 self._clear_input()
-                rc, err = self._keystroke(text[:60])
+                rc, err = self._keystroke(text)
                 if rc == 0:
                     self._clear_clipboard()
                     time.sleep(0.15)

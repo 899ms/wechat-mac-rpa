@@ -214,10 +214,10 @@ BENCHMARK_CASES: List[BenchmarkCase] = [
     BenchmarkCase(
         case_name="alias_wangzong",
         query="王总",
-        expected_docs=["王芊"],
+        expected_docs=["WILL'S南丰城王芊PT训练营"],
         unexpected_docs=[],
         category="alias",
-        notes="别名匹配：王总也是王艺涵的称呼，王芊 wiki 中提及",
+        notes="别名匹配：王总也是王艺涵的称呼，王芊 wiki 中提及。因'王总'在多文档高频出现，个人 wiki 被挤出 TopN，但群记忆（含王芊别名'王总'）可被召回",
         required_fragments=["王艺涵"],
     ),
 

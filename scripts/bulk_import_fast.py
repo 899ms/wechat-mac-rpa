@@ -11,8 +11,8 @@ from src.session.global_store import GlobalStore
 from openai import OpenAI
 import chromadb
 
-DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "sk-5486877584c0492abe1fccc5dbc1d7f1")
-client = OpenAI(api_key=DASHSCOPE_API_KEY, base_url="https://dashscope.aliyuncs.com/compatible-mode/v1")
+DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY")
+client = OpenAI(api_key=DASHSCOPE_API_KEY, base_url=os.environ.get("DASHSCOPE_BASE_URL", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"))
 
 store = GlobalStore()
 target_name = next((n for n in store.chats if "共同富裕" in n), None)

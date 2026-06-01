@@ -32,7 +32,6 @@ _logger = logging.getLogger("src.weflow_pipeline")
 # 配置
 # ---------------------------------------------------------------------------
 
-WEFLOW_HISTORY_LIMIT = int(os.getenv("WEFLOW_HISTORY_LIMIT", "100"))
 WEFLOW_TICK_LIMIT = int(os.getenv("WEFLOW_TICK_LIMIT", "20"))
 WEFLOW_MAX_WORKERS = int(os.getenv("WEFLOW_MAX_WORKERS", "5"))
 WEFLOW_FETCH_TIMEOUT = float(os.getenv("WEFLOW_FETCH_TIMEOUT", "30.0"))
@@ -53,7 +52,6 @@ class WeFlowPipeline:
         self,
         profile: LayoutProfile,
         weflow_client: Optional[WeFlowClient] = None,
-        history_limit: int = WEFLOW_HISTORY_LIMIT,
         tick_limit: int = WEFLOW_TICK_LIMIT,
     ):
         self.profile = profile
@@ -62,7 +60,6 @@ class WeFlowPipeline:
         self.layout = LayoutParser(profile)
         self.weflow = weflow_client or WeFlowClient()
 
-        self.history_limit = history_limit
         self.tick_limit = tick_limit
 
         # 联系人缓存
@@ -381,8 +378,8 @@ class WeFlowPipeline:
             return self._chat_name_to_talker[chat_name]
 
         # 尝试去掉群人数后缀再匹配（如 "柚子群2（128）" → "柚子群2"）
-        import re
-        cleaned = re.sub(r'（\d+）$', '', chat_name)
+        from src.utils.chat_utils import _normalize_chat_name
+        cleaned = _normalize_chat_name(chat_name)
         if cleaned != chat_name and cleaned in self._chat_name_to_talker:
             return self._chat_name_to_talker[cleaned]
 

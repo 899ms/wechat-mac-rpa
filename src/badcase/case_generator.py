@@ -9,7 +9,6 @@ CaseGenerator - 根据 draft 生成 benchmark case 代码
 """
 
 import json
-import re
 from pathlib import Path
 from typing import Dict, List
 

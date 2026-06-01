@@ -6,6 +6,11 @@ from src.models.base import ChatMessage, SenderType
 from src.session.global_store import ChatState
 from src.reply.policy import ReplyPolicy
 from src.reply.generator import ReplyGenerator
+from src.tools import get_registry, register_builtin_tools
+
+# 测试用全局工具注册表
+_TEST_TOOL_REGISTRY = get_registry()
+register_builtin_tools(_TEST_TOOL_REGISTRY)
 
 
 class TestReplyPolicy:
@@ -59,7 +64,7 @@ class TestReplyPolicy:
 
 class TestReplyGenerator:
     def test_returns_non_empty_string(self):
-        gen = ReplyGenerator(llm_client=None)
+        gen = ReplyGenerator(llm_client=None, tool_registry=_TEST_TOOL_REGISTRY)
         msg = ChatMessage(
             text="hello",
             sender="Alice",
@@ -71,7 +76,7 @@ class TestReplyGenerator:
         assert len(reply) >= 0
 
     def test_handles_none_llm_client_gracefully(self):
-        gen = ReplyGenerator(llm_client=None)
+        gen = ReplyGenerator(llm_client=None, tool_registry=_TEST_TOOL_REGISTRY)
         msg = ChatMessage(
             text="hello",
             sender="Alice",
@@ -86,7 +91,7 @@ class TestReplyGenerator:
             def chat(self, *args, **kwargs):
                 raise RuntimeError("LLM down")
 
-        gen = ReplyGenerator(llm_client=FailingLLM())
+        gen = ReplyGenerator(llm_client=FailingLLM(), tool_registry=_TEST_TOOL_REGISTRY)
         msg = ChatMessage(
             text="hello",
             sender="Alice",

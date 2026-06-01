@@ -316,7 +316,11 @@ class LayoutParser:
             头像数字/乱码应在 nick_col 阶段通过面积过滤排除，不在此处处理。
             """
             # 去掉开头到第一个中文字符之前的噪声符号（最多10个字符）
-            text = re.sub(r'^[！＠@#\$%^&*\(\)\[\]\{\}<>"\'，。、；：？！\-\~\+\=\|\\\/\s\d]{0,10}?(?=[\u4e00-\u9fa5a-zA-Z])', '', text)
+            noise_chars = set('！＠@#$%^&*()[]{}<>"\'，。、；：？！-~+=|\\/ \t\n\r0123456789')
+            i = 0
+            while i < min(10, len(text)) and text[i] in noise_chars:
+                i += 1
+            text = text[i:]
             # 情况C: '岔站 王芊' → 头像上的中文乱码前缀（2-3个无意义汉字）
             # 如果开头是2-3个中文+空格，且后面更长，去掉前缀
             m = re.match(r'^([\u4e00-\u9fa5]{1,3})\s+(.{4,})$', text)
@@ -347,7 +351,7 @@ class LayoutParser:
                 if not (y_min - 20 <= e.center.y <= y_max + 20):
                     continue
                 if e.bbox.x > chat_list_x_max * 0.70:
-                    if re.match(r"^\d{1,2}:\d{2}$", e.text):
+                    if e.text in TIMESTAMP_PATTERNS or (len(e.text) >= 4 and e.text[1] == ':' and e.text[:1].isdigit() and e.text[2:].isdigit()):
                         timestamp = e.text
 
             # 列表项的 rect

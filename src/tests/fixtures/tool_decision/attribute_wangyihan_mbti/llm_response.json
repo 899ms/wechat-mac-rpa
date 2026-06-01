@@ -1,7 +1,23 @@
 {
   "tool_calls": [
     {
-      "id": "call_422aed73c6b24e24b086d510",
+      "id": "call_3404f9e712e9480bae16450d",
+      "type": "function",
+      "function": {
+        "name": "search_memory",
+        "arguments": "{\"query\": \"王艺涵\"}"
+      }
+    },
+    {
+      "id": "call_c4c215fe15874569aae44a73",
+      "type": "function",
+      "function": {
+        "name": "search_memory",
+        "arguments": "{\"query\": \"王艺涵 MBTI\"}"
+      }
+    },
+    {
+      "id": "call_f018b3a917ab455a8a216fc5",
       "type": "function",
       "function": {
         "name": "search_memory",
@@ -9,6 +25,6 @@
       }
     }
   ],
-  "content": "",
-  "timestamp": 1779235075.829403
+  "content": "emmm不太清楚呢 | 没怎么问过她这个😂",
+  "timestamp": 1780189220.6785762
 }

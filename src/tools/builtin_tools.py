@@ -1,14 +1,16 @@
 """内置工具 - 时间、天气、搜索"""
 
 import json
-import re
 from datetime import datetime
 from typing import Dict, Any
+from urllib.parse import parse_qs, urlparse, unquote
 
 import requests
 
 from .tool_registry import get_registry
 from .stock_tools import stock_query
+from .tuya_tools import register_tuya_tools
+from .print_3d_tools import register_print3d_tools
 
 
 def _get_current_time() -> str:
@@ -70,10 +72,10 @@ def _web_search(query: str = "") -> str:
                     if mdurl and mdurl.startswith(("http://", "https://")):
                         link = mdurl
                     elif link.startswith("https://www.so.com/link?"):
-                        from urllib.parse import unquote
-                        m = re.search(r'[?&]url=([^&]+)', link)
-                        if m:
-                            link = unquote(m.group(1))
+                        parsed = urlparse(link)
+                        qs = parse_qs(parsed.query)
+                        if "url" in qs:
+                            link = unquote(qs["url"][0])
 
             if not title or len(title) <= 3 or "360" in title.lower():
                 continue
@@ -83,7 +85,7 @@ def _web_search(query: str = "") -> str:
             desc = li.find("p", class_="res-desc")
             if desc:
                 snippet = desc.get_text(strip=True)
-                snippet = re.sub(r'\s+', ' ', snippet)
+                snippet = ' '.join(snippet.split())
                 if len(snippet) > 200:
                     snippet = snippet[:200] + "..."
 
@@ -115,6 +117,31 @@ def _add_to_cache(url: str, text: str):
     if len(_PAGE_CACHE) > MAX_CACHE_SIZE:
         oldest = next(iter(_PAGE_CACHE))
         del _PAGE_CACHE[oldest]
+
+
+def _search_keyword_in_text(text: str, keyword: str, results: list, is_fuzzy: bool = False, word: str = "") -> None:
+    """在 text 中查找 keyword（忽略大小写），将前后 200 字上下文加入 results。
+    使用 str.find 替代正则，避免 re 模块依赖。
+    """
+    lower_text = text.lower()
+    lower_kw = keyword.lower()
+    pos = 0
+    while True:
+        idx = lower_text.find(lower_kw, pos)
+        if idx == -1:
+            break
+        start = max(0, idx - 200)
+        end = min(len(text), idx + len(keyword) + 200)
+        ctx = text[start:end]
+        if start > 0:
+            ctx = "..." + ctx
+        if end < len(text):
+            ctx = ctx + "..."
+        label = f"[关键词'{word}' 位置 {idx}]" if is_fuzzy else f"[位置 {idx}]"
+        results.append(f"{label}: {ctx}")
+        if len(results) >= 5:
+            return
+        pos = idx + len(keyword)
 
 
 def _browse_url(url: str = "") -> str:
@@ -164,8 +191,8 @@ def _browse_url(url: str = "") -> str:
         for tag in clean_soup(["script", "style", "nav", "footer", "header"]):
             tag.decompose()
         text = clean_soup.get_text(separator="\n")
-        text = re.sub(r'\n\s*\n', '\n', text)
-        text = re.sub(r' +', ' ', text).strip()
+        text = '\n'.join(line for line in text.splitlines() if line.strip())
+        text = ' '.join(text.split())
 
         # 4. 缓存全文（供 search_in_page 后续搜索），截断返回
         _add_to_cache(url, text)
@@ -191,34 +218,13 @@ def _search_in_page(url: str = "", keyword: str = "") -> str:
         return f"页面未缓存。请先用 browse_url 打开 {url}"
     text = _PAGE_CACHE[url]
     # 查找关键词位置，返回前后各 200 字的上下文
-    import re
     results = []
-    for m in re.finditer(re.escape(keyword), text, re.IGNORECASE):
-        start = max(0, m.start() - 200)
-        end = min(len(text), m.end() + 200)
-        ctx = text[start:end]
-        if start > 0:
-            ctx = "..." + ctx
-        if end < len(text):
-            ctx = ctx + "..."
-        results.append(f"[位置 {m.start()}]: {ctx}")
-        if len(results) >= 5:
-            break
+    _search_keyword_in_text(text, keyword, results, is_fuzzy=False)
     if not results:
         # 模糊搜索：按空格拆词
         words = keyword.split()
         for w in words:
-            for m in re.finditer(re.escape(w), text, re.IGNORECASE):
-                start = max(0, m.start() - 200)
-                end = min(len(text), m.end() + 200)
-                ctx = text[start:end]
-                if start > 0:
-                    ctx = "..." + ctx
-                if end < len(text):
-                    ctx = ctx + "..."
-                results.append(f"[关键词'{w}' 位置 {m.start()}]: {ctx}")
-                if len(results) >= 5:
-                    break
+            _search_keyword_in_text(text, w, results, is_fuzzy=True, word=w)
             if results:
                 break
     if not results:
@@ -226,9 +232,10 @@ def _search_in_page(url: str = "", keyword: str = "") -> str:
     return f"在 {url} 中搜索 '{keyword}'（全文 {len(text)} 字）：\n" + "\n\n".join(results)
 
 
-def register_builtin_tools():
+def register_builtin_tools(registry=None):
     """注册所有内置工具"""
-    registry = get_registry()
+    if registry is None:
+        registry = get_registry()
 
     registry.register(
         name="get_current_time",
@@ -327,3 +334,9 @@ def register_builtin_tools():
         },
         func=stock_query,
     )
+
+    # 注册 Tuya 智能家居工具
+    register_tuya_tools(registry)
+
+    # 注册 3D 打印工具
+    register_print3d_tools(registry)

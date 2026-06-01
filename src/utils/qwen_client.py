@@ -22,7 +22,7 @@ class QwenClient:
         base_url = "https://api.deepseek.com/v1"
         if not api_key:
             api_key = os.environ.get("DASHSCOPE_API_KEY")
-            base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            base_url = os.environ.get("DASHSCOPE_BASE_URL", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1")
         if not api_key:
             raise RuntimeError("DEEPSEEK_API_KEY 或 DASHSCOPE_API_KEY 至少设置一个")
         self.client = OpenAI(
@@ -70,7 +70,11 @@ class QwenClient:
             # 如果模型返回 tool_calls，也返回（让上层处理）
             if getattr(msg, "tool_calls", None):
                 return msg
-            return msg.content or ""
+            # DeepSeek 某些模型（如 v4-pro）在长 prompt 下会把输出放在 reasoning_content 而非 content
+            text = msg.content or ""
+            if not text and hasattr(msg, "reasoning_content"):
+                text = msg.reasoning_content or ""
+            return text
         except Exception as e:
             print(f"Qwen LLM 错误: {e}")
             return ""

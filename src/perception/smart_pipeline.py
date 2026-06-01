@@ -156,7 +156,7 @@ class _QwenAPIClient:
             raise RuntimeError("openai package required: pip install openai")
         self._client = OpenAI(
             api_key=self.api_key,
-            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            base_url=os.environ.get("DASHSCOPE_BASE_URL", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"),
         )
 
     def recognize(self, image_path: str) -> dict:
@@ -897,7 +897,8 @@ class SmartPerceptionPipeline:
                 try:
                     from datetime import datetime
                     create_time = int(datetime.strptime(msg_ts.replace('  ',' '), "%Y-%m-%d %H:%M:%S").timestamp())
-                except: pass
+                except Exception as e:
+                    _logger.warning("[SmartPipeline] 时间戳解析失败: %s (raw=%r)", e, msg_ts)
             if not create_time:
                 import time
                 create_time = int(time.time())

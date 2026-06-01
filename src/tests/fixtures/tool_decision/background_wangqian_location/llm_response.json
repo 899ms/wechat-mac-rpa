@@ -1,14 +1,14 @@
 {
   "tool_calls": [
     {
-      "id": "call_268d508fb5b94289b453710d",
+      "id": "call_97a60d6cc66548f7895e031f",
       "type": "function",
       "function": {
         "name": "search_memory",
-        "arguments": "{\"query\": \"王芊 地址\"}"
+        "arguments": "{\"query\": \"王芊 住址\"}"
       }
     }
   ],
-  "content": "",
-  "timestamp": 1779235073.16303
+  "content": "啥？突然问我住哪里干嘛呀😂 | 这我得想想怎么回答你哈",
+  "timestamp": 1780189214.10211
 }

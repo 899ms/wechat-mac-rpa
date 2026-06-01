@@ -217,8 +217,8 @@ class WindowCapture:
                         os.remove(old)
                 except OSError:
                     pass
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.debug("[WindowCapture] 清理旧截图失败: %s", e)
 
         # 每次调用生成新的输出路径，避免覆盖旧截图
         # 这是 SmartPerceptionPipeline 像素 diff 正确工作的前提

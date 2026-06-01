@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from mem0 import Memory
 
-DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "sk-5486877584c0492abe1fccc5dbc1d7f1")
+DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY")
 
 config = {
     "llm": {
@@ -16,7 +16,7 @@ config = {
         "config": {
             "model": "deepseek-v4-flash",
             "api_key": DASHSCOPE_API_KEY,
-            "openai_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "openai_base_url": os.environ.get("DASHSCOPE_BASE_URL", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"),
         }
     },
     "embedder": {
@@ -24,7 +24,7 @@ config = {
         "config": {
             "model": "text-embedding-v3",
             "api_key": DASHSCOPE_API_KEY,
-            "openai_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "openai_base_url": os.environ.get("DASHSCOPE_BASE_URL", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"),
         }
     },
     "vector_store": {

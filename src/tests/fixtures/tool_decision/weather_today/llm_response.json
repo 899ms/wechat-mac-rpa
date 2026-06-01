@@ -1,14 +1,14 @@
 {
   "tool_calls": [
     {
-      "id": "call_37b3fa89f01d4f8b8bb08fae",
+      "id": "call_5c7594dabd70499692adb163",
       "type": "function",
       "function": {
-        "name": "get_current_time",
-        "arguments": "{}"
+        "name": "search_memory",
+        "arguments": "{\"query\": \"城市\"}"
       }
     }
   ],
-  "content": "",
-  "timestamp": 1779235089.475105
+  "content": "你人在哪呀？不说城市我怎么查天气哈哈 😂",
+  "timestamp": 1780189236.105812
 }

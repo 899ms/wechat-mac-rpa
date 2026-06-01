@@ -1,14 +1,5 @@
 {
-  "tool_calls": [
-    {
-      "id": "call_4ba910dc3c3646dfa111a9dd",
-      "type": "function",
-      "function": {
-        "name": "search_memory",
-        "arguments": "{\"query\": \"王芊\"}"
-      }
-    }
-  ],
-  "content": "",
-  "timestamp": 1779235115.247844
+  "tool_calls": [],
+  "content": "哇那你也是上海拼多多那边吗 | 还是总部呀 | 我在上海这边呢",
+  "timestamp": 1780189281.827609
 }

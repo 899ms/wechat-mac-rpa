@@ -1,0 +1,16 @@
+{
+  "dimensions": [
+    {
+      "name": "未过度调用 search_memory",
+      "score": "PASS",
+      "reason": "Bot 回复仅为闲聊回应，未调用 search_memory 或其他任何工具，没有因出现“拼多多”而条件反射地调用搜索，符合原则。"
+    },
+    {
+      "name": "正确工具选择",
+      "score": "PASS",
+      "reason": "用户消息“我也在拼多多上班”为陈述句，非查询意图，不应调用工具；Bot 未调用任何工具，回复纯文本闲聊，选择正确。"
+    }
+  ],
+  "overall": "PASS",
+  "explanation": "Bot 未进行工具调用，仅以闲聊方式回应，完全符合两个必须通过的维度要求，整体表现合格。"
+}

@@ -44,13 +44,15 @@ class ChatListClicker:
         abs_y = int(self.window_rect.y + click_y / self.scale_factor)
 
         try:
-            # Step 1: 激活微信窗口
+            # Step 1: 强制置顶微信窗口（activate 不够强，可能被 Chrome 等覆盖）
             subprocess.run(
-                ["osascript", "-e", 'tell application "WeChat" to activate'],
+                ["osascript", "-e",
+                 'tell application "System Events" to tell process "WeChat" to set frontmost to true'],
                 timeout=3,
                 capture_output=True,
+                check=True,
             )
-            # Step 2: 等待窗口激活 + 避免快速连续点击
+            # Step 2: 等待窗口置顶 + 避免快速连续点击
             import time
             time.sleep(0.8)
             # Step 3: 点击
