@@ -14,7 +14,7 @@ from src.ocr.vision_ocr import VisionOCREngine
 from src.layout.layout_parser import LayoutParser
 from src.layout.profile import LayoutProfile
 from src.message.extractor import MessageExtractor
-from src.action.login_recovery import WeChatLoginHandler
+
 from src.utils.debug_logger import DebugLogger
 
 _logger = logging.getLogger("src.vision_pipeline")
@@ -22,7 +22,7 @@ _logger = logging.getLogger("src.vision_pipeline")
 
 class VisionPipeline:
     def __init__(self, profile: LayoutProfile):
-        self.capture = WindowCapture(login_handler=WeChatLoginHandler())
+        self.capture = WindowCapture()
         self.ocr = VisionOCREngine()
         self.layout = LayoutParser(profile)
         self.extractor = MessageExtractor(profile)

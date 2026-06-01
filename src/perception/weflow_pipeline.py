@@ -22,7 +22,7 @@ from src.capture.window_capture import WindowCapture, WeChatNotReadyError
 from src.ocr.vision_ocr import VisionOCREngine
 from src.layout.layout_parser import LayoutParser
 from src.layout.profile import LayoutProfile
-from src.action.login_recovery import WeChatLoginHandler
+
 
 from .weflow_client import WeFlowClient, WeFlowMessage
 
@@ -55,7 +55,7 @@ class WeFlowPipeline:
         tick_limit: int = WEFLOW_TICK_LIMIT,
     ):
         self.profile = profile
-        self.capture = WindowCapture(login_handler=WeChatLoginHandler())
+        self.capture = WindowCapture()
         self.ocr = VisionOCREngine()
         self.layout = LayoutParser(profile)
         self.weflow = weflow_client or WeFlowClient()

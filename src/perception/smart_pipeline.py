@@ -28,7 +28,7 @@ from src.capture.window_capture import WindowCapture, WeChatNotReadyError
 from src.ocr.vision_ocr import VisionOCREngine
 from src.layout.layout_parser import TIMESTAMP_PATTERNS, LayoutParser, UILayout
 from src.layout.profile import LayoutProfile
-from src.action.login_recovery import WeChatLoginHandler
+
 from src.utils.chat_utils import _is_group_chat_name
 
 
@@ -244,7 +244,7 @@ class SmartPerceptionPipeline:
         chat_list_region: tuple = DEFAULT_CHAT_LIST_REGION,
         always_use_api: bool = False,
     ):
-        self.capture = WindowCapture(login_handler=WeChatLoginHandler())
+        self.capture = WindowCapture()
         self.ocr = VisionOCREngine()
         self.layout = LayoutParser(profile)
         self.profile = profile

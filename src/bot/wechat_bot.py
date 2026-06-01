@@ -8,7 +8,8 @@ from typing import Callable, Optional
 
 from src.models.base import ActionResult, ChatMessage, PerceptionResult, SenderType
 from src.perception.vision_pipeline import VisionPipeline
-from src.layout.profile import LayoutProfile
+from src.capture.window_capture import WeChatNotReadyError
+from src.action.login_recovery import WeChatLoginHandler, LoginRecoveryStatus
 from src.session.global_store import GlobalStore
 from src.reply.policy import ReplyPolicy
 from src.utils.chat_utils import _is_group_chat_name, _normalize_chat_name
@@ -33,7 +34,7 @@ def _try_create_openclaw_client():
 
 
 class WeChatBot:
-    def __init__(self, profile: LayoutProfile, on_message: Optional[Callable] = None, llm_client=None,
+    def __init__(self, profile=None, on_message: Optional[Callable] = None, llm_client=None,
                  complex_llm_client=None, debug_mode: bool = False, use_openclaw: bool = True, perception=None,
                  enable_chat_switch: bool = True):
         if perception is not None:
@@ -75,6 +76,7 @@ class WeChatBot:
             enable_timestamps=True,
         )
         self.sender = WeChatMessageSender(silent_mode=os.environ.get("WECHAT_SILENT_MODE") == "1")
+        self._login_handler = WeChatLoginHandler()
         self.on_message = on_message
         self.logger: BotLogger = get_logger()
         self.running = False
@@ -156,7 +158,17 @@ class WeChatBot:
         self.debug_logger.start_tick(tick_id, "")
 
         try:
-            result = self.perception.perceive()
+            try:
+                result = self.perception.perceive()
+            except WeChatNotReadyError:
+                recovery = self._login_handler.handle()
+                if recovery.status == LoginRecoveryStatus.SUCCESS:
+                    result = self.perception.perceive()
+                else:
+                    self.logger.log_capture(tick_id, success=False, error=f"微信未就绪且恢复失败: {recovery.message}")
+                    self.debug_logger.log_action("none", action_input="", success=False, error=f"微信未就绪: {recovery.message}")
+                    return
+
             if result is None:
                 self.logger.log_capture(tick_id, success=False, error="未能获取微信窗口画面，可能原因：微信未启动、窗口被最小化、或需要扫码登录")
                 self.logger.warning(

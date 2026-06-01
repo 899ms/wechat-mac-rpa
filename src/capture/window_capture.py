@@ -13,9 +13,6 @@ import AppKit
 _logger = logging.getLogger("src.window_capture")
 
 from src.models.base import Rect
-from src.action.login_recovery import (
-    WeChatLoginHandler, LoginRecoveryStatus
-)
 
 
 class WindowNotFoundError(Exception):
@@ -49,7 +46,6 @@ class WindowCapture:
         output_path: str = None,
         min_effective_width: int = 800,
         min_effective_height: int = 600,
-        login_handler: Optional[WeChatLoginHandler] = None,
     ):
         if output_path is None:
             import os
@@ -63,7 +59,6 @@ class WindowCapture:
         self.min_height = 200
         self.min_effective_width = min_effective_width
         self.min_effective_height = min_effective_height
-        self.login_handler = login_handler
 
     def _find_window(self) -> Optional[tuple]:
         """使用 Quartz 查找微信窗口，返回面积最大的有效窗口 (Rect, window_id) 或 None"""
@@ -248,16 +243,6 @@ class WindowCapture:
             window_rect, window_id = result
 
             if not self._is_effective_window(window_rect):
-                if self.login_handler is not None:
-                    recovery = self.login_handler.handle()
-                    if recovery.status == LoginRecoveryStatus.SUCCESS:
-                        # 恢复成功，重新 capture（递归一次）
-                        return self.capture()
-                    else:
-                        raise WeChatNotReadyError(
-                            f"微信窗口尺寸异常 ({window_rect.width}x{window_rect.height})，"
-                            f"{recovery.message}"
-                        )
                 raise WeChatNotReadyError(
                     f"微信窗口尺寸异常 ({window_rect.width}x{window_rect.height})，"
                     "可能需要扫码登录或主窗口未展开"
