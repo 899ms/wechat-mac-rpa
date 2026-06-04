@@ -23,6 +23,13 @@ from src.utils.debug_logger import DebugLogger
 from src.memory import MemoryEngine
 
 
+def _raw_with_thinking(raw_response: str, thinking: str) -> str:
+    """将思考过程合并到 raw_response 前，前端可以直接展示。"""
+    if not thinking:
+        return raw_response
+    return f"[思考过程]\n{thinking}\n\n[回复]\n{raw_response}"
+
+
 def _try_create_openclaw_client():
     """尝试创建 OpenClaw 客户端，失败时返回 None（退化为单模型模式）"""
     try:
@@ -368,7 +375,7 @@ class WeChatBot:
                     len(unreplied),
                     getattr(self.generator, 'last_system_prompt', '') or '',
                     getattr(self.generator, 'last_user_prompt', '') or '',
-                    getattr(self.generator, 'last_raw_response', '') or '',
+                    _raw_with_thinking(getattr(self.generator, 'last_raw_response', '') or '', getattr(self.generator, 'last_thinking', '')),
                     _json.dumps(getattr(self.generator, 'last_tool_calls', []) or [], ensure_ascii=False),
                     _json.dumps(tool_results, ensure_ascii=False),
                     _serialize_msgs(all_messages) if all_messages else '[]',
@@ -431,7 +438,7 @@ class WeChatBot:
 
             # 逐条发送回复，间隔 1.5 秒
             for i, reply in enumerate(replies):
-                action_result = self.sender.send(reply)
+                action_result = self.sender.send(reply, chat_name=chat_name)
                 if action_result.success:
                     self.logger.log_send(tick_id, success=True, text=reply)
                     self.debug_logger.log_action("send", action_input=reply, success=True)
@@ -560,8 +567,11 @@ class WeChatBot:
         # ===== OCR fallback：截图识别未读角标 =====
         # WeFlow 模式下：API 已经检测过未读，如果 API 返回空（没有未读），
         # 直接信任 API，不 fallback 到 OCR（OCR 在小窗口中误识别率太高，会导致无限切换）
-        if self._weflow_mode in ("weflow", "hybrid") and not target_name:
-            return ""
+        # 但仅在 WeFlow 实际已初始化且执行了检测时才信任结果
+        if self._weflow_mode in ("weflow", "hybrid"):
+            weflow = getattr(self.perception, '_weflow_pipeline', None)
+            if weflow and weflow._initialized and not target_name:
+                return ""
 
         if not target_name:
             chat_list_items = result.chat_list_items
@@ -659,7 +669,7 @@ class WeChatBot:
 
     def send_to_chat(self, chat_name: str, text: str) -> ActionResult:
         """外部系统调用此接口主动发消息到指定聊天。"""
-        result = self.sender.send(text)
+        result = self.sender.send(text, chat_name=chat_name)
         if result.success:
             norm = _normalize_chat_name(chat_name)
             is_group = _is_group_chat_name(chat_name)

@@ -59,7 +59,7 @@ def main():
         print("🤖 wechat-twin Bot")
         print("=" * 60)
         print("配置:")
-        print("  • LLM: deepseek-v4-flash (DashScope)")
+        print("  • LLM: deepseek-v4-flash (DeepSeek 官网)")
         print("  • Prompt: DT style (prompts/persona.md)")
         print("  • 检索: 待启用")
         interval = 5.0

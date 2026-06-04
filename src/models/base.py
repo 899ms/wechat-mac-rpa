@@ -62,6 +62,9 @@ class ChatMessage:
     image_text: str = ""               # 图片上的文字（如有）
     is_image_duplicate: bool = False   # 是否被去重标记（原始描述仍保留在 image_description 中）
 
+    # === 引用/回复 ===
+    quoted_text: str = ""             # 被引用的消息内容（微信"引用"功能提取的文字/[图片]/[表情]等）
+
     # === 多账号标记 ===
     account: str = ""                  # 消息来源账号标识（如 "work"、"personal"），空字符串=主账号
 

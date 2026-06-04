@@ -19,18 +19,16 @@ class QwenClient:
 
     def __init__(self, model: str = "deepseek-v4-flash"):
         api_key = os.environ.get("DEEPSEEK_API_KEY")
+        if not api_key:
+            raise RuntimeError("DEEPSEEK_API_KEY 未设置")
         base_url = "https://api.deepseek.com/v1"
-        if not api_key:
-            api_key = os.environ.get("DASHSCOPE_API_KEY")
-            base_url = os.environ.get("DASHSCOPE_BASE_URL", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1")
-        if not api_key:
-            raise RuntimeError("DEEPSEEK_API_KEY 或 DASHSCOPE_API_KEY 至少设置一个")
         self.client = OpenAI(
             api_key=api_key,
             base_url=base_url,
         )
         self.model = model
-        self.is_deepseek_official = "deepseek.com" in base_url
+        self.is_deepseek_official = True
+        self.last_thinking = ""  # 最近一次 LLM 推理过程
 
     def chat(self, messages=None, user_id=None, message=None, system_prompt=None, tools=None, temperature=None, max_tokens=None, timeout=None, response_format=None) -> str:
         """生成回复，支持 tools（function calling）
@@ -67,13 +65,21 @@ class QwenClient:
             _logger.info("[Qwen] request end: duration=%.0fms model=%s",
                          t_req_ms, kwargs.get("model"))
             msg = response.choices[0].message
+            # 日志记录思考过程（在 tool_calls 判断之前）
+            reasoning = getattr(msg, "reasoning_content", None) or ""
+            if reasoning:
+                self.last_thinking = reasoning
+                _logger.info("[Qwen] thinking: %s", reasoning[:800])
+            # 日志记录内容
+            text = msg.content or ""
+            if text:
+                _logger.info("[Qwen] output: %s", text[:500])
             # 如果模型返回 tool_calls，也返回（让上层处理）
             if getattr(msg, "tool_calls", None):
                 return msg
             # DeepSeek 某些模型（如 v4-pro）在长 prompt 下会把输出放在 reasoning_content 而非 content
-            text = msg.content or ""
-            if not text and hasattr(msg, "reasoning_content"):
-                text = msg.reasoning_content or ""
+            if not text and reasoning:
+                text = reasoning
             return text
         except Exception as e:
             print(f"Qwen LLM 错误: {e}")

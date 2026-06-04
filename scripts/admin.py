@@ -349,97 +349,84 @@ def serve_screenshot(filename: str):
 
 
 @app.get("/screenshots", response_class=HTMLResponse)
-def screenshots_list(page: int = Query(1, ge=1), limit: int = Query(20, ge=5, le=100)):
-    """截图 + OCR 列表页 — 用于评测多模态 API。数据来自 debug JSON，覆盖所有 tick。"""
-    # 收集所有 debug JSON，按 tick_id 降序
+def screenshots_list(page: int = Query(1, ge=1), limit: int = Query(20, ge=5, le=100),
+                     filter: str = Query("all")):
+    """截图 + OCR 列表页 — 从 debug JSON 目录查。首次加载慢(~20s)，后续走浏览器缓存。"""
+    import time as _time
+    _t0 = _time.time()
+    # 用 os.listdir 扫一遍，缓存到模块级变量，重启前不重复扫
+    global _screenshot_cache
+    cache_key = "files"
+    if "_screenshot_cache" not in globals() or _screenshot_cache is None:
+        _screenshot_cache = {}
+    if cache_key not in _screenshot_cache:
+        files = [f for f in os.listdir(str(DEBUG_DIR)) if f.startswith("tick_") and f.endswith(".json")]
+        files.sort(reverse=True)
+        _screenshot_cache[cache_key] = files
+    all_files = _screenshot_cache[cache_key]
+    MAX_SCAN = 500
+    scan_files = all_files[:MAX_SCAN * 2]  # 多扫一些，filter 可能过滤掉很多
+
     all_debug = []
-    for f in DEBUG_DIR.glob("tick_*.json"):
+    for fname in scan_files:
         try:
-            tid_str = f.stem.split("_")[-1]
-            tid = int(tid_str)
-            mtime = f.stat().st_mtime
-            all_debug.append((tid, mtime, f))
-        except (ValueError, IndexError):
+            f = DEBUG_DIR / fname
+            dbg = _json.loads(f.read_text(encoding="utf-8"))
+            has_api = bool(dbg.get("api_prompt"))
+            if filter == "api" and not has_api:
+                continue
+            if filter == "skip" and has_api:
+                continue
+            tid = int(fname.rsplit("_", 1)[-1].split(".")[0])
+            sp = dbg.get("screenshot_path", "") or dbg.get("perception_screenshot_path", "") or ""
+            fpath = Path(sp) if sp and Path(sp).exists() else None
+            chat_name = dbg.get("perception_chat_name", "") or dbg.get("bot_chat_name", "") or "-"
+            ocr_count = len(dbg.get("ocr_elements", []))
+            layout_msgs = len(dbg.get("extraction_messages", []))
+            chat_items = len(dbg.get("layout_chat_list_nicknames", []))
+            msg_new = dbg.get("bot_new_messages_count", 0)
+            ocr_summary = f"OCR:{ocr_count} msg:{layout_msgs} chat:{chat_items}"
+            if msg_new:
+                ocr_summary += f" 新:{msg_new}"
+            all_debug.append((tid, sp, chat_name, ocr_summary, has_api, fpath))
+            if len(all_debug) >= MAX_SCAN:
+                break
+        except Exception:
             continue
-    all_debug.sort(key=lambda x: x[1], reverse=True)
+
     total = len(all_debug)
     offset = (page - 1) * limit
     page_items = all_debug[offset:offset + limit]
 
-    # 批量查询 tick_log 统一 ID 显示
-    tick_map = {}
-    if page_items:
-        db = get_db()
-        conn = db._get_conn()
-        try:
-            placeholders = ",".join("?" for _ in page_items)
-            rows = conn.execute(
-                f"SELECT id, tick_id, session_id, chat_name FROM tick_log WHERE tick_id IN ({placeholders})",
-                [tid for tid, _, _ in page_items]
-            ).fetchall()
-            for r in rows:
-                tick_map[r["tick_id"]] = {"id": r["id"], "session_id": r["session_id"] or "", "chat_name": r["chat_name"] or ""}
-        finally:
-            conn.close()
-
     rows_html = ""
-    for tid, mtime, fpath in page_items:
-        ts = __import__('datetime').datetime.fromtimestamp(mtime).strftime("%m-%d %H:%M")
-        sp = ""
-        ocr_summary = ""
-        api_info = ""
-        chat_name = "-"
-        try:
-            dbg = _json.loads(fpath.read_text(encoding="utf-8"))
-            sp = dbg.get("screenshot_path", "") or dbg.get("perception_screenshot_path", "") or ""
-            ocr_count = len(dbg.get("ocr_elements", []))
-            layout_msgs = len(dbg.get("extraction_messages", []))
-            chat_items = len(dbg.get("layout_chat_list_nicknames", []))
-            chat_name = dbg.get("perception_chat_name", "") or dbg.get("bot_chat_name", "") or "-"
-            msg_new = dbg.get("bot_new_messages_count", 0)
-            ocr_summary = f"OCR:{ocr_count}项 msg:{layout_msgs}条 chat:{chat_items}项"
-            if dbg.get("api_prompt"):
-                api_info = f'<span style="color:var(--green)">API</span>'
-            elif ocr_count > 0 or layout_msgs > 0:
-                api_info = f'<span style="color:var(--muted)">本地</span>'
-            else:
-                api_info = f'<span style="color:var(--yellow)">跳过</span>'
-            if msg_new:
-                ocr_summary += f" 新:{msg_new}"
-        except Exception:
-            pass
-
-        # 统一 ID 显示：session_id:#tick_id，链接到 /screenshots/{id}
-        info = tick_map.get(tid, {})
-        db_id = info.get("id", tid)
-        session_id = info.get("session_id", "")
-        if info.get("chat_name") and chat_name == "-":
-            chat_name = info["chat_name"]
-
-        name_link = f'{session_id}:#{tid}' if session_id else f'#{tid}'
+    for tid, sp, chat_name, ocr_summary, has_api, fpath in page_items:
         fname = Path(sp).name if sp else ""
-        img_tag = f'<img src="/api/screenshot-image/{fname}" style="max-width:240px;max-height:160px;border-radius:4px;border:1px solid var(--border)" loading="lazy" onerror="this.style.display=\'none\'">' if fname else '<span style="color:var(--muted)">—</span>'
+        img_tag = '<img src="/api/screenshot-image/' + fname + '" style="max-width:240px;max-height:160px;border-radius:4px;border:1px solid var(--border)" loading="lazy" onerror="this.style.display=\'none\'">' if fname and Path(sp).exists() else '<span style="color:var(--muted)">—</span>'
+        api_info = '<span style="color:var(--green)">API</span>' if has_api else '<span style="color:var(--yellow)">跳过</span>'
 
-        rows_html += f"""
-        <tr>
-          <td><a href="/screenshots/{db_id}" style="color:var(--blue)">{name_link}</a></td>
-          <td>{ts}</td>
-          <td>{chat_name}</td>
-          <td>{img_tag}</td>
-          <td style="font-size:12px">{ocr_summary}</td>
-          <td>{api_info}</td>
-        </tr>"""
+        rows_html += "<tr>"
+        rows_html += '<td><a href="/screenshots/' + str(tid) + '" style="color:var(--blue)">#' + str(tid) + '</a></td>'
+        rows_html += "<td>-</td>"
+        rows_html += "<td>" + chat_name + "</td>"
+        rows_html += "<td>" + img_tag + "</td>"
+        rows_html += '<td style="font-size:12px">' + ocr_summary + '</td>'
+        rows_html += "<td>" + api_info + "</td>"
+        rows_html += "</tr>"
 
     content = f"""
-    <p style="color:var(--muted);font-size:13px;margin-bottom:12px">截图、OCR 识别结果、多模态 API — 数据来自 {total} 个 debug JSON（覆盖所有 tick）</p>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:12px">截图、OCR 识别结果、多模态 API — {total} 条
+    <a href="?" style="color:var(--blue);margin-left:8px">{'<b>[全部]</b>' if filter=='all' else '[全部]'}</a>
+    <a href="?filter=api" style="color:var(--blue);margin-left:4px">{'<b>[API]</b>' if filter=='api' else '[API]'}</a>
+    <a href="?filter=skip" style="color:var(--blue);margin-left:4px">{'<b>[跳过]</b>' if filter=='skip' else '[跳过]'}</a>
+    </p>
     <table>
       <tr><th>Tick</th><th>时间</th><th>聊天</th><th>截图</th><th>OCR/Layout</th><th>API</th></tr>
       {rows_html}
     </table>
     <div style="margin-top:12px;font-size:13px">
-      <a href="?page={page-1}&limit={limit}" style="color:var(--blue);margin-right:12px" {'hidden' if page<=1 else ''}>上一页</a>
+      <a href="?page={page-1}&limit={limit}&filter={filter}" style="color:var(--blue);margin-right:12px" {'hidden' if page<=1 else ''}>上一页</a>
       第 {page} 页 / 共 {(total+limit-1)//limit} 页
-      <a href="?page={page+1}&limit={limit}" style="color:var(--blue);margin-left:12px">下一页</a>
+      <a href="?page={page+1}&limit={limit}&filter={filter}" style="color:var(--blue);margin-left:12px">下一页</a>
     </div>"""
     return HTMLResponse(_page("截图 & OCR 查看", content, "/screenshots"))
 

@@ -26,7 +26,7 @@ class TestChatListClicker:
             mock_run.return_value = MagicMock()
             clicker.click_item(item)
 
-            # 第二次调用是 cliclick（第一次是 activate）
+            # 第一次调用是 activate，第二次是 cliclick
             cliclick_call = mock_run.call_args_list[1]
             args = cliclick_call[0][0]
             # click_x = 200 + 100//2 = 250, click_y = 300 + 50//2 = 325

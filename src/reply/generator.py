@@ -54,6 +54,7 @@ class ReplyGenerator:
         self.last_tools_context: str = ""
         self.last_user_prompt: str = ""
         self.last_raw_response: str = ""
+        self.last_thinking: str = ""
         # 多轮调用完整链路（供 debug 使用）
         self.last_llm_calls: List[Dict] = []
         self.last_tool_calls: List[Dict] = []
@@ -266,6 +267,7 @@ class ReplyGenerator:
                                  attempt + 1, tool_round_count, force_no_tools, bool(actual_tools), llm_timeout, len(messages))
                     t_llm_start = time.time()
                     raw = active_llm.chat(messages=messages, tools=actual_tools, max_tokens=2000, timeout=llm_timeout)
+                    self.last_thinking = getattr(active_llm, "last_thinking", "") or ""
                     self.last_llm_messages = [dict(m) for m in messages]
                     t_llm_ms = (time.time() - t_llm_start) * 1000
                     raw_content = raw if isinstance(raw, str) else getattr(raw, "content", str(raw))
@@ -821,7 +823,10 @@ class ReplyGenerator:
             return _line(f"[视频] {desc}")
 
         else:
-            return _line(m.text)
+            body = m.text or ""
+            if m.quoted_text:
+                body = f"「引用：{m.quoted_text}」{body}"
+            return _line(body)
 
     def _build_user_prompt(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage],
                            is_group: bool = False,
@@ -868,43 +873,30 @@ class ReplyGenerator:
             t_m1 = time.time()
             self_memory = self.memory_engine.get_user_memory("王芊", max_chars=4000)
             t_mem_ms["self"] = (time.time() - t_m1) * 1000
-            if self_memory and "（暂无）" not in self_memory:
+            if self_memory:
                 lines_local.append("[我的信息]（来自长期记忆，Bot 自己的身份背景）")
                 lines_local.append(self_memory)
                 lines_local.append("")
 
-            last_sender = unreplied[-1].sender
-            # 去除 @群名 后缀，提取纯用户名用于 wiki 查询
-            clean_sender = last_sender.split(" @")[0] if last_sender and " @" in last_sender else last_sender
-            if clean_sender and clean_sender != "我":
-                t_m2 = time.time()
-                memory_text = self.memory_engine.get_user_memory(clean_sender, max_chars=6000)
-                t_mem_ms["other"] = (time.time() - t_m2) * 1000
-                if memory_text and "（暂无）" not in memory_text:
-                    lines_local.append("[对方信息]（来自长期记忆，仅为该用户记忆的部分摘要）")
-                    lines_local.append(memory_text)
-                    lines_local.append("")
+            # 对方信息：仅私聊加载，群聊里最后一条发送者不能代表"对方"
+            if not is_group:
+                last_sender = unreplied[-1].sender
+                clean_sender = last_sender.split(" @")[0] if last_sender and " @" in last_sender else last_sender
+                if clean_sender and clean_sender != "我":
+                    t_m2 = time.time()
+                    memory_text = self.memory_engine.get_user_memory(clean_sender, max_chars=6000)
+                    t_mem_ms["other"] = (time.time() - t_m2) * 1000
+                    if memory_text:
+                        lines_local.append("[对方信息]（来自长期记忆，仅为该用户记忆的部分摘要）")
+                        lines_local.append(memory_text)
+                        lines_local.append("")
             if is_group and chat_name:
                 t_m3 = time.time()
                 group_text = self.memory_engine.get_group_memory(chat_name, max_chars=6000)
                 t_mem_ms["group"] = (time.time() - t_m3) * 1000
-                if group_text and "（暂无）" not in group_text:
+                if group_text:
                     lines_local.append("[本群信息]（来自长期记忆）")
                     lines_local.append(group_text)
-                    lines_local.append("")
-
-            # 跨 wiki 搜索：扫描未读消息中提到的人名/alias，grep 所有 wiki
-            if unreplied:
-                t_m4 = time.time()
-                mention_text = " ".join(m.text or "" for m in unreplied)
-                related = self.memory_engine.search_related_mentions(
-                    mention_text, exclude_user=clean_sender if clean_sender and clean_sender != "我" else None, max_files=10
-                )
-                t_mem_ms["mentions"] = (time.time() - t_m4) * 1000
-                if related:
-                    lines_local.append("[相关背景]（来自其他聊天记录）")
-                    for r in related:
-                        lines_local.append(r)
                     lines_local.append("")
 
             mem_summary = " ".join(f"{k}={v:.0f}ms" for k, v in t_mem_ms.items())

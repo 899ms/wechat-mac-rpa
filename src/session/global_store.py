@@ -180,7 +180,7 @@ def _match_single(a: ChatMessage, b: ChatMessage, chat_name: str, is_group: bool
     if not desc_a or not desc_b:
         return False
     sim = _jaccard_2gram(desc_a, desc_b)
-    return sim >= 0.08
+    return sim >= 0.30
 
 
 def _lcs_match(history: List[ChatMessage], tick: List[ChatMessage], chat_name: str, is_group: bool = False) -> set:
@@ -387,7 +387,7 @@ class GlobalStore:
             self._dirty.add(chat_name)
 
         # 选择去重策略
-        if mode in ("weflow", "hybrid") and messages and hasattr(messages[0], "local_id"):
+        if mode in ("weflow", "hybrid") and messages and getattr(messages[0], "local_id", None) is not None:
             _logger.info("[GlobalStore] %s 使用 WeFlow 精确去重 (%d 条)", chat_name, len(messages))
             new_messages = self._merge_tick_weflow(chat_name, messages)
         else:
@@ -512,7 +512,7 @@ class GlobalStore:
             self._dirty.add(chat_name)
         count = 0
 
-        if mode in ("weflow", "hybrid") and messages and hasattr(messages[0], "local_id"):
+        if mode in ("weflow", "hybrid") and messages and getattr(messages[0], "local_id", None) is not None:
             # WeFlow 模式：基于 localId 去重后注入
             seen_ids = {
                 getattr(m, "local_id", None)
@@ -541,7 +541,7 @@ class GlobalStore:
 
         if count:
             self._dirty.add(chat_name)
-            _logger.info(
+            _logger.debug(
                 "[GlobalStore] 注入历史: %s +%d 条 (总计 %d 条)",
                 chat_name,
                 count,
@@ -602,7 +602,7 @@ class GlobalStore:
                     state.messages.append(msg)
                     state._msg_ids.add(_msg_id(chat_name, msg, state.is_group))
                 self.chats[chat_name] = state
-            _logger.info("[GlobalStore] 加载旧格式: %d 个聊天", len(self.chats))
+            _logger.debug("[GlobalStore] 加载旧格式: %d 个聊天", len(self.chats))
         except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
             _logger.warning(f"加载状态失败: {type(e).__name__}: {e}")
         except Exception as e:
@@ -658,7 +658,7 @@ class GlobalStore:
                     state.messages.append(msg)
                     state._msg_ids.add(_msg_id(chat_name, msg, state.is_group))
                 self.chats[chat_name] = state
-            _logger.info("[GlobalStore] 加载分片格式: %d 个聊天", len(self.chats))
+            _logger.debug("[GlobalStore] 加载分片格式: %d 个聊天", len(self.chats))
         except Exception as e:
             _logger.error(f"加载分片失败: {type(e).__name__}: {e}\n{traceback.format_exc()}")
 
@@ -716,7 +716,7 @@ class GlobalStore:
                             json.dump(data, f, ensure_ascii=False, indent=2)
                         os.replace(tmp, shard_file)
                     self._dirty.clear()
-                    _logger.info(f"💾 增量保存 {len(dirty)} 个聊天状态")
+                    _logger.debug(f"💾 增量保存 {len(dirty)} 个聊天状态")
 
                 # 2. 保存轻量索引（始终保存，保证一致性）
                 index = {

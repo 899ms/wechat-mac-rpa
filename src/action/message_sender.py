@@ -5,6 +5,7 @@
 """
 
 import logging
+import os
 import subprocess
 import time
 from abc import ABC, abstractmethod
@@ -48,6 +49,9 @@ class WeChatMessageSender(MessageSender):
 
     def __init__(self, silent_mode: bool = False):
         self.silent_mode = silent_mode
+        # 白名单：静默模式下仍然实际发送的聊天（逗号分隔的聊天名）
+        raw = os.environ.get("SILENT_WHITELIST", "")
+        self._silent_whitelist = {n.strip() for n in raw.split(",") if n.strip()}
 
     # ------------------------------------------------------------------
     # 原子操作辅助方法
@@ -261,14 +265,18 @@ class WeChatMessageSender(MessageSender):
     # 主发送方法
     # ------------------------------------------------------------------
 
-    def send(self, text: str) -> ActionResult:
+    def send(self, text: str, chat_name: str = "") -> ActionResult:
         """发送文本消息到当前微信聊天。
 
         静默模式下不实际发送，只记录日志并返回模拟成功。
+        白名单内的聊天在静默模式下仍然实际发送。
         """
         if self.silent_mode:
-            _logger.info(f"[Sender] [SILENT] 静默模式跳过发送, 文本长度: {len(text)} 字符, 内容: {text[:80]}...")
-            return ActionResult(success=True, sent_text=text)
+            if chat_name and chat_name in self._silent_whitelist:
+                _logger.info(f"[Sender] 白名单聊天 '{chat_name}' 跳过静默，实际发送")
+            else:
+                _logger.info(f"[Sender] [SILENT] 静默模式跳过发送, 文本长度: {len(text)} 字符, 内容: {text[:80]}...")
+                return ActionResult(success=True, sent_text=text)
 
         t_send_start = time.time()
         perf = {}

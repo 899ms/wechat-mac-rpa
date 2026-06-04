@@ -44,7 +44,7 @@ class ChatListClicker:
         abs_y = int(self.window_rect.y + click_y / self.scale_factor)
 
         try:
-            # Step 1: 强制置顶微信窗口（activate 不够强，可能被 Chrome 等覆盖）
+            # Step 1: 强制置顶微信窗口
             subprocess.run(
                 ["osascript", "-e",
                  'tell application "System Events" to tell process "WeChat" to set frontmost to true'],
@@ -52,17 +52,23 @@ class ChatListClicker:
                 capture_output=True,
                 check=True,
             )
-            # Step 2: 等待窗口置顶 + 避免快速连续点击
             import time
-            time.sleep(0.8)
-            # Step 3: 点击
+            time.sleep(0.5)
+            # Step 2: 点击聊天列表项
             subprocess.run(
                 ["/opt/homebrew/bin/cliclick", f"c:{abs_x},{abs_y}"],
                 check=True,
                 timeout=5,
             )
-            # Step 4: 点击后等待右侧展开稳定
-            time.sleep(0.5)
+            # Step 3: 等待右侧聊天内容加载
+            time.sleep(2.5)
+            import logging
+            _click_logger = logging.getLogger("src.chat_list_clicker")
+            _click_logger.info(
+                f"点击聊天列表: screen=({abs_x},{abs_y}) "
+                f"window=({self.window_rect.x},{self.window_rect.y}) "
+                f"rect_in_screenshot=({click_x},{click_y}) scale={self.scale_factor}"
+            )
             return True
         except Exception:
             return False
