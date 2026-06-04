@@ -174,13 +174,14 @@ def _match_single(a: ChatMessage, b: ChatMessage, chat_name: str, is_group: bool
         if not text_a or not text_b:
             return False
         return difflib.SequenceMatcher(None, text_a, text_b).ratio() >= 0.80
-    # 图片/表情/混合：极低阈值 Jaccard
-    desc_a = a.image_description
-    desc_b = b.image_description
-    if not desc_a or not desc_b:
+    # 图片/表情/混合：合并 image_description + image_text 后做 Jaccard
+    # 应对 API 描述不稳定（有时把图上文字放 image_description，有时放 image_text）
+    combined_a = f"{a.image_description or ''} {a.image_text or ''}".strip()
+    combined_b = f"{b.image_description or ''} {b.image_text or ''}".strip()
+    if not combined_a or not combined_b:
         return False
-    sim = _jaccard_2gram(desc_a, desc_b)
-    return sim >= 0.30
+    sim = _jaccard_2gram(combined_a, combined_b)
+    return sim >= 0.20
 
 
 def _lcs_match(history: List[ChatMessage], tick: List[ChatMessage], chat_name: str, is_group: bool = False) -> set:
@@ -192,6 +193,13 @@ def _lcs_match(history: List[ChatMessage], tick: List[ChatMessage], chat_name: s
     m, n = len(history), len(tick)
     if m == 0 or n == 0:
         return set()
+
+    # 性能保护：限制参与比对的 history 范围，避免大群 O(m*n) 爆炸
+    _MAX_HISTORY_FOR_LCS = 80
+    if m > _MAX_HISTORY_FOR_LCS:
+        _logger.info(f"[LCS] history={m} 超过上限 {_MAX_HISTORY_FOR_LCS}，截取最近部分")
+        history = history[-_MAX_HISTORY_FOR_LCS:]
+        m = _MAX_HISTORY_FOR_LCS
 
     # dp[i][j] = history[0:i] 和 tick[0:j] 的 LCS 长度
     dp = [[0] * (n + 1) for _ in range(m + 1)]

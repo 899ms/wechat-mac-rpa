@@ -1020,7 +1020,10 @@ class MemoryEngine:
                             batch = self._update_queue[:cutoff[-1] + 1]
                             self._update_queue = self._update_queue[len(batch):]
                 for task in batch:
-                    self._do_update(task)
+                    try:
+                        self._do_update(task)
+                    except Exception as e:
+                        _logger.error(f"Worker 处理任务失败: {e}, task_type={task.get('type')}, user={task.get('user_name') or task.get('group_name')}")
                     time.sleep(1)
 
         self._worker_thread = threading.Thread(target=_worker, daemon=True)

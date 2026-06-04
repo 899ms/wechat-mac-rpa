@@ -523,7 +523,8 @@ class ReplyGenerator:
     @staticmethod
     def _extract_json(text: str) -> Optional[Dict]:
         """从 LLM 回复中提取 JSON 对象。支持 markdown 代码块和裸 JSON。
-        使用括号深度计数找 JSON 边界，避免正则贪婪匹配截断问题。
+        使用 json.JSONDecoder.raw_decode() 精确解析，避免手动括号计数
+        在字符串内遇到 } 时误判 JSON 边界的问题。
         """
         import json
         text = text.strip()
@@ -538,23 +539,25 @@ class ReplyGenerator:
                 if code_content.lstrip().startswith("json"):
                     code_content = code_content.lstrip()[4:].lstrip()
                 text = code_content
-        # 找 JSON 边界（括号深度计数）
+        # 找到第一个 { 的位置，尝试 raw_decode
         start = text.find("{")
         if start < 0:
             return None
-        depth = 0
-        for i in range(start, len(text)):
-            ch = text[i]
-            if ch == "{":
-                depth += 1
-            elif ch == "}":
-                depth -= 1
-                if depth == 0:
+        decoder = json.JSONDecoder()
+        try:
+            obj, _ = decoder.raw_decode(text, start)
+            return obj
+        except json.JSONDecodeError:
+            # 如果 raw_decode 失败，尝试清理常见问题后重试
+            # 例如 LLM 在 JSON 前后加了多余文字
+            for idx in range(start, len(text)):
+                if text[idx] == '{':
                     try:
-                        return json.loads(text[start:i + 1])
+                        obj, _ = decoder.raw_decode(text, idx)
+                        return obj
                     except json.JSONDecodeError:
-                        return None
-        return None
+                        continue
+            return None
 
     def _parse_replies(self, text: str) -> List[str]:
         """解析 LLM 回复：{"replies": ["msg1", "msg2"]}。prompt 已要求此格式。"""

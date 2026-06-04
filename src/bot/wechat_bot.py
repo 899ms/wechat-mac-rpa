@@ -340,6 +340,7 @@ class WeChatBot:
             replies = self.generator.generate(to_reply, all_messages, is_group=is_group, tick_id=tick_id)
             reply_text = " | ".join(replies) if replies else ""
             # 写 tick_log
+            conn = None
             try:
                 import json as _json
                 from src.badcase.case_db import get_db
@@ -384,9 +385,15 @@ class WeChatBot:
                     _json.dumps(replies, ensure_ascii=False),
                     result.screenshot_path or '',
                 ))
-                conn.commit(); conn.close()
+                conn.commit()
             except Exception as e:
                 self.logger.warning("tick_log 写入失败: %s", e)
+            finally:
+                if conn:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
             self.logger.log_decision(
                 tick_id, should_reply=True,
                 reason=f"触发回复条件 (未读 {len(unreplied)} 条，需回复 {len(to_reply)} 条，生成 {len(replies)} 条回复)",
