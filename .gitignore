@@ -38,3 +38,12 @@ bot.pid
 
 # 运行时数据目录
 data/
+
+# IDE
+.claude/
+
+# 运行时 PID
+admin.pid
+
+# Judge 缓存（运行时生成）
+src/tests/fixtures/reply_quality/*/judge_*.json

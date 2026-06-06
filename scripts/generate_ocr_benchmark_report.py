@@ -15,7 +15,7 @@ def _esc(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
-def generate_html(output_path: str = "ocr_benchmark_report.html") -> None:
+def generate_html(output_path: str = "data/reports/ocr_benchmark_report.html") -> None:
     results = run_benchmark(use_api=False)
     metrics = compute_metrics(results)
 
