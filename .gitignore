@@ -47,3 +47,7 @@ admin.pid
 
 # Judge 缓存（运行时生成）
 src/tests/fixtures/reply_quality/*/judge_*.json
+
+# 内部提示词与纪律守则
+AGENTS.md
+prompts/
