@@ -26,8 +26,8 @@
     {
       "sender": "对方",
       "text": "",
-      "type": "sticker",
-      "image_description": "一只灰色的小动物（可能是仓鼠或老鼠）戴着蓝色的帽子，只露出了头部和上半身",
+      "type": "image",
+      "image_description": "一个卡通人物的腿和脚，穿着短裤，背景为白色",
       "image_text": ""
     },
     {
@@ -53,8 +53,8 @@
     {
       "sender": "对方",
       "text": "",
-      "type": "sticker",
-      "image_description": "一只黄色的小熊（或小狗）闭着眼睛，表情看起来很享受或困倦，背景是粉色调",
+      "type": "image",
+      "image_description": "一只黄色的小动物（可能是仓鼠或熊）闭着眼睛，表情很享受或困倦，背景是粉色调",
       "image_text": ""
     },
     {

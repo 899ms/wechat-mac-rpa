@@ -34,7 +34,7 @@ import pytest
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-FIXTURE_DIR = PROJECT_ROOT / "tests" / "fixtures"
+FIXTURE_DIR = PROJECT_ROOT / "tests_integration" / "fixtures"
 CACHE_DIR = FIXTURE_DIR / "ocr_cache"
 CACHE_DIR.mkdir(exist_ok=True)
 
@@ -280,17 +280,24 @@ def _save_cache(screenshot_path: Path, result: dict) -> None:
         json.dump(result, f, ensure_ascii=False, indent=2)
 
 
+def _load_env() -> None:
+    """加载 .env 文件中的环境变量"""
+    env_path = PROJECT_ROOT / ".env"
+    if env_path.exists():
+        with open(env_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
+                    key = key.strip()
+                    if key.startswith("DASHSCOPE_") and key not in os.environ:
+                        os.environ[key] = value.strip().strip('"').strip("'")
+
+
 def _get_api_key() -> str:
     """获取 API key"""
+    _load_env()
     api_key = os.environ.get("DASHSCOPE_API_KEY")
-    if not api_key:
-        env_path = PROJECT_ROOT / ".env"
-        if env_path.exists():
-            with open(env_path) as f:
-                for line in f:
-                    if line.startswith("DASHSCOPE_API_KEY="):
-                        api_key = line.strip().split("=", 1)[1].strip().strip('"').strip("'")
-                        break
     if not api_key:
         raise RuntimeError("未设置 DASHSCOPE_API_KEY")
     return api_key

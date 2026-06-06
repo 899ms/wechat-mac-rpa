@@ -28,12 +28,12 @@
   ],
   "messages": [
     {
-      "sender": "对方",
+      "sender": "王芊 @ai开发小分队",
       "text": "测试下",
       "type": "text"
     },
     {
-      "sender": "对方",
+      "sender": "王芊 @ai开发小分队",
       "text": "正常吗",
       "type": "text"
     },
@@ -48,7 +48,7 @@
       "type": "text"
     },
     {
-      "sender": "对方",
+      "sender": "王芊 @ai开发小分队",
       "text": "好了吗",
       "type": "text"
     },
@@ -58,12 +58,12 @@
       "type": "text"
     },
     {
-      "sender": "对方",
+      "sender": "王芊 @ai开发小分队",
       "text": "所有方面",
       "type": "text"
     },
     {
-      "sender": "对方",
+      "sender": "王芊 @ai开发小分队",
       "text": "你帮我看下",
       "type": "text"
     }

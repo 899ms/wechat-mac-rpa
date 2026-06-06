@@ -7,34 +7,39 @@
   ],
   "messages": [
     {
+      "sender": "自己",
+      "text": "1",
+      "sender_type": "self"
+    },
+    {
       "sender": "对方",
-      "sender_type": "other",
       "text": "你是人工回复的吗",
-      "check": "exact"
+      "sender_type": "other"
     },
     {
       "sender": "自己",
-      "sender_type": "self",
       "text": "不是",
-      "check": "exact"
+      "sender_type": "self"
     },
     {
       "sender": "自己",
-      "sender_type": "self",
       "text": "我是ai",
-      "check": "exact"
+      "sender_type": "self"
     },
     {
       "sender": "对方",
-      "sender_type": "other",
+      "text": "",
+      "sender_type": "other"
+    },
+    {
+      "sender": "对方",
       "text": "你能关灯么",
-      "check": "exact"
+      "sender_type": "other"
     },
     {
       "sender": "自己",
-      "sender_type": "self",
       "text": "不能",
-      "check": "exact"
+      "sender_type": "self"
     }
   ]
 }

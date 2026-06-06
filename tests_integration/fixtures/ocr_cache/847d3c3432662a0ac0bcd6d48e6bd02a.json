@@ -24,13 +24,6 @@
   ],
   "messages": [
     {
-      "sender": "对方",
-      "text": "",
-      "type": "sticker",
-      "image_description": "一只卡通仓鼠戴着蓝色耳机",
-      "image_text": ""
-    },
-    {
       "sender": "自己",
       "text": "1",
       "type": "text"
@@ -54,7 +47,7 @@
       "sender": "对方",
       "text": "",
       "type": "sticker",
-      "image_description": "一只黄色卡通仓鼠探出头，表情可爱",
+      "image_description": "一只黄色的卡通小动物（类似仓鼠或熊）探出头，背景粉色",
       "image_text": ""
     },
     {

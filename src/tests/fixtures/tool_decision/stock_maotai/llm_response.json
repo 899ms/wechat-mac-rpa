@@ -1,7 +1,7 @@
 {
   "tool_calls": [
     {
-      "id": "call_052452a7e91e467f8c41499d",
+      "id": "call_00_uWYNPEX3Bwqqq3btr7br5488",
       "type": "function",
       "function": {
         "name": "stock_query",
@@ -9,30 +9,14 @@
       }
     },
     {
-      "id": "call_3354a0a7d88e41c7a0fc47d9",
+      "id": "call_00_ts7FlObqpeUgnNUSBeKL2214",
       "type": "function",
       "function": {
         "name": "web_search",
-        "arguments": "{\"query\": \"贵州茅台 最新消息 2026年5月\"}"
-      }
-    },
-    {
-      "id": "call_517bbec4196e4d15b7b9b058",
-      "type": "function",
-      "function": {
-        "name": "browse_url",
-        "arguments": "{\"url\": \"https://post.smzdm.com/p/a5rem538/\"}"
-      }
-    },
-    {
-      "id": "call_b9714a9d896a4f72bb50d32e",
-      "type": "function",
-      "function": {
-        "name": "browse_url",
-        "arguments": "{\"url\": \"https://www.toutiao.com/article/7596952067298705926/\"}"
+        "arguments": "{\"query\": \"贵州茅台 2026年6月 最新消息\"}"
       }
     }
   ],
-  "content": "1326了哈，涨了快4%呢 | PE20倍出头，算是合理偏低估的位置吧 | 不过今天涨幅不小了，别追高啊，真想买等回调再说～ 免责声明哈，个人瞎看，不构成建议😅",
-  "timestamp": 1780189244.869975
+  "content": "茅台这会儿1309.6，跌了1.24%哈 | PE不到20，估值不算贵，但也没到地板价 | 之前3月份涨价了一波飞天指导价，算是利好落地。这价位偏震荡吧，中长线拿着还行，短线弹不出啥大动静",
+  "timestamp": 1780358676.989603
 }

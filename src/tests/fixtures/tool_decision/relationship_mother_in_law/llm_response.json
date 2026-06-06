@@ -1,22 +1,22 @@
 {
   "tool_calls": [
     {
-      "id": "call_83b0369b746942f388676ed1",
-      "type": "function",
-      "function": {
-        "name": "search_memory",
-        "arguments": "{\"query\": \"王芊 家庭 关系\"}"
-      }
-    },
-    {
-      "id": "call_0de08acb8d9842b5a4e66c54",
+      "id": "call_00_bxB6hn2mNcOKaF7Wca6I3137",
       "type": "function",
       "function": {
         "name": "search_memory",
         "arguments": "{\"query\": \"王芊\"}"
       }
+    },
+    {
+      "id": "call_00_gwlT4DdwZEzdbEAzQ4P17160",
+      "type": "function",
+      "function": {
+        "name": "search_memory",
+        "arguments": "{\"query\": \"王芊 岳母\"}"
+      }
     }
   ],
-  "content": "说实话我也不太清楚诶 | 我记忆库里没存这些信息😂",
-  "timestamp": 1780189297.260649
+  "content": "这问题怎么怪怪的哈哈哈，我是女的啊哪来的岳母😂 | 你是想问婆婆吧？",
+  "timestamp": 1780358726.187844
 }

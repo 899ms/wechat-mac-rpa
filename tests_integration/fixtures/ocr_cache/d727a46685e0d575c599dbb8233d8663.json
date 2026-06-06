@@ -41,9 +41,8 @@
     {
       "sender": "对方",
       "text": "",
-      "type": "image",
-      "image_description": "一只卡通小熊闭着眼睛靠在墙边的插画",
-      "image_text": ""
+      "type": "sticker",
+      "image_description": "一只黄色的卡通小动物（像仓鼠或熊）闭着眼睛，看起来很享受或困倦"
     },
     {
       "sender": "对方",

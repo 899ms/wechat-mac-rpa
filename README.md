@@ -171,6 +171,8 @@ graph LR
 - **启动**：`python3 run_bot.py`
 - **后台**：`python3 scripts/admin.py`
 - **测试**：`python3 -m pytest src/tests/test_*_benchmark.py -v`
+- **OCR Benchmark**：`python3 src/tests/test_ocr_quality_benchmark.py`
+- **生成报告**：`python3 scripts/generate_ocr_benchmark_report.py`
 
 详细安装与配置指南见 `docs/01-quickstart/AI_QUICKSTART.md`。
 
@@ -189,7 +191,7 @@ graph LR
 | **Tool Decision** | 27 | Binary + Judge Rubric（对抗性 case） | 🟡 81.5% |
 | **Memory Search** | 29 | Precision / Recall / F1 | 🟡 96.6% |
 | **Chat List Unread** | 23 | Precision / Recall | ✅ 100% |
-| **OCR Quality** | 33 | Sender / Text / ChatName / Count | 🔴 24.2% |
+| **OCR Quality** | 33 | Sender / Text / ChatName / Count | 🟡 81.8% |
 | **Judge Quality** | 18 | Meta-benchmark：评估 Judge LLM 自身准确率 | — |
 | **Judge Quality v2** | — | 多维度 Rubric 评估 | — |
 | **Reply Quality v2** | — | 回复质量多维度评估 | — |

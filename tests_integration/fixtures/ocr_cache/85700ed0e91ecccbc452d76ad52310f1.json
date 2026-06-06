@@ -28,22 +28,22 @@
   ],
   "messages": [
     {
-      "sender": "自己",
-      "text": "已经修好了，你试试看，还有问题随时说。",
-      "type": "text"
-    },
-    {
-      "sender": "对方",
+      "sender": "王芊",
       "text": "OK",
       "type": "text"
     },
     {
       "sender": "自己",
-      "text": "收到👌 有需要随时喊我",
+      "text": "已经修好了，你试试看，还有问题随时说。",
       "type": "text"
     },
     {
-      "sender": "对方",
+      "sender": "自己",
+      "text": "收到🤙 有需要随时喊我",
+      "type": "text"
+    },
+    {
+      "sender": "王芊",
       "text": "什么需要的时候可以叫你",
       "type": "text"
     },

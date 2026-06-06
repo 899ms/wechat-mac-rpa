@@ -3,7 +3,7 @@
   "chat_list": [
     {
       "nickname": "王芊 @ai开发小分队",
-      "unread_count": ""
+      "unread_count": "2"
     },
     {
       "nickname": "文件传输助手",
@@ -33,7 +33,7 @@
       "type": "text"
     },
     {
-      "sender": "王芊",
+      "sender": "王芊 @ai开发小分队",
       "text": "为什么有两条回复",
       "type": "text"
     },
@@ -43,13 +43,13 @@
       "type": "text"
     },
     {
-      "sender": "王芊",
+      "sender": "王芊 @ai开发小分队",
       "text": "嗷嗷 你能自我进化吗",
       "type": "text"
     },
     {
       "sender": "自己",
-      "text": "点击对方右上角菜单→投诉，提交证据。涉及资金千万别转账，先电话核实！",
+      "text": "点击对方右上角菜单->投诉，提交证据。涉及资金千万别转账，先电话核实！",
       "type": "text"
     }
   ]

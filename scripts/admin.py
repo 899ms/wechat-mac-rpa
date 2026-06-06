@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """wechat-twin Admin — 统一开发者后台"""
+import os
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -350,13 +351,15 @@ def serve_screenshot(filename: str):
 
 @app.get("/screenshots", response_class=HTMLResponse)
 def screenshots_list(page: int = Query(1, ge=1), limit: int = Query(20, ge=5, le=100),
-                     filter: str = Query("all")):
+                     filter: str = Query("all"), refresh: bool = Query(False)):
     """截图 + OCR 列表页 — 从 debug JSON 目录查。首次加载慢(~20s)，后续走浏览器缓存。"""
     import time as _time
     _t0 = _time.time()
     # 用 os.listdir 扫一遍，缓存到模块级变量，重启前不重复扫
     global _screenshot_cache
     cache_key = "files"
+    if refresh:
+        _screenshot_cache = {}
     if "_screenshot_cache" not in globals() or _screenshot_cache is None:
         _screenshot_cache = {}
     if cache_key not in _screenshot_cache:
@@ -418,6 +421,7 @@ def screenshots_list(page: int = Query(1, ge=1), limit: int = Query(20, ge=5, le
     <a href="?" style="color:var(--blue);margin-left:8px">{'<b>[全部]</b>' if filter=='all' else '[全部]'}</a>
     <a href="?filter=api" style="color:var(--blue);margin-left:4px">{'<b>[API]</b>' if filter=='api' else '[API]'}</a>
     <a href="?filter=skip" style="color:var(--blue);margin-left:4px">{'<b>[跳过]</b>' if filter=='skip' else '[跳过]'}</a>
+    <a href="?refresh=1&filter={filter}" style="color:var(--yellow);margin-left:12px;font-size:12px">🔄 刷新缓存</a>
     </p>
     <table>
       <tr><th>Tick</th><th>时间</th><th>聊天</th><th>截图</th><th>OCR/Layout</th><th>API</th></tr>
@@ -439,21 +443,24 @@ def screenshot_detail(id: int):
     conn = db._get_conn()
     try:
         row = conn.execute(
-            "SELECT tick_id, session_id, chat_name, screenshot_path FROM tick_log WHERE id = ?",
+            "SELECT tick_id, session_id, chat_name, screenshot_path FROM tick_log WHERE tick_id = ?",
             (id,)
         ).fetchone()
     finally:
         conn.close()
 
-    if not row:
-        return HTMLResponse("<h1>Tick not found</h1><p>没有找到 id #%d 的 tick 数据</p>" % id)
+    tick_id = id
+    session_id = ""
+    db_chat_name = ""
+    db_screenshot = ""
 
-    tick_id = row["tick_id"]
-    session_id = row["session_id"] or ""
-    db_chat_name = row["chat_name"] or ""
-    db_screenshot = row["screenshot_path"] or ""
+    if row:
+        tick_id = row["tick_id"]
+        session_id = row["session_id"] or ""
+        db_chat_name = row["chat_name"] or ""
+        db_screenshot = row["screenshot_path"] or ""
 
-    # 找 debug JSON
+    # 找 debug JSON（无论数据库有无记录，都尝试从 debug JSON 读取）
     debug_files = sorted(DEBUG_DIR.glob(f"tick_*_{tick_id}.json"))
     if not debug_files:
         return HTMLResponse("<h1>Debug data not found</h1><p>没有找到 tick #%d 的 debug 数据</p>" % tick_id)
@@ -476,6 +483,7 @@ def screenshot_detail(id: int):
     layout_html = "<span style='color:var(--muted)'>无 Layout 数据</span>"
     api_prompt_html = "<span style='color:var(--muted)'>无 API 数据</span>"
     api_response_html = "<span style='color:var(--muted)'>无 API 响应</span>"
+    api_thinking_html = "<span style='color:var(--muted)'>无 Thinking</span>"
 
     if dbg:
         try:
@@ -508,13 +516,16 @@ def screenshot_detail(id: int):
             if layout_parts:
                 layout_html = "".join(layout_parts)
 
-            # API prompt & response
+            # API prompt & response & thinking
             api_prompt = dbg.get("api_prompt", "")
             api_response = dbg.get("api_response", "")
+            api_thinking = dbg.get("api_thinking", "")
             if api_prompt:
                 api_prompt_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{api_prompt}</pre>"
             if api_response:
                 api_response_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{api_response}</pre>"
+            if api_thinking:
+                api_thinking_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{api_thinking}</pre>"
 
             # 提取消息
             msgs = dbg.get("extraction_messages", [])
@@ -541,6 +552,7 @@ def screenshot_detail(id: int):
       <div style="flex:2;min-width:400px">
         <div class="card" style="border-left:3px solid var(--blue)"><b>🤖 多模态 API Prompt</b> ({len(dbg.get('api_prompt',''))} 字)<br>{api_prompt_html}</div>
         <div class="card" style="border-left:3px solid var(--green)"><b>🤖 多模态 API Response</b><br>{api_response_html}</div>
+        <div class="card" style="border-left:3px solid var(--yellow)"><b>💭 Thinking</b> ({len(dbg.get('api_thinking',''))} 字)<br>{api_thinking_html}</div>
       </div>
     </div>
 

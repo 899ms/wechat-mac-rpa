@@ -98,7 +98,7 @@ QWEN_SYSTEM_PROMPT = """你是一位专精 UI 截图文字识别的 OCR 引擎�
    - 【群聊 vs 私聊区分】
      - 群聊：消息上方会显示发送者昵称 → sender 必须填这个实际昵称
      - 私聊：只有两个人，消息上方不显示发送者昵称 → sender 必须填 "对方"
-     - 【重要】群聊中同一人连续发多条消息时，只有第一条上方显示昵称，后续不显示。此时根据对齐方向推断：左侧 → 与上方最近一条左侧消息的 sender 相同
+     - 【重要】群聊里可能存在一些比较长、看起来像普通消息的昵称（如"无论几点，都是饭点"、"人心中的成见是一顿大餐"）。这些文字是发送者身份标识，不是消息内容，不要输出为独立消息
    - 时间戳（如"昨天 21:58"、"11:34"、"00:22"）不是消息，不要输出
 
 4. 消息 type 分类（重要新增，最容易出错）：
@@ -128,7 +128,7 @@ QWEN_SYSTEM_PROMPT = """你是一位专精 UI 截图文字识别的 OCR 引擎�
    - 包含所有消息：文字、图片、表情包、链接卡片
    - 排除所有时间戳
    - 按截图中从上到下顺序排列
-   - 【新增】识别引用格式：微信 Mac 版引用消息时，主气泡上方会有一个小气泡，左侧有竖线标识，里面显示被引用的消息内容
+   - 【新增】识别引用格式：微信 Mac 版引用消息时，主气泡外下方有灰色小字，左侧有竖线标识，显示被引用的消息内容
      - 如果消息包含引用，在 JSON 中加 "quoted_text" 字段，值为被引用区域的文字内容
      - 引用区域是纯文字 → quoted_text 填该文字
      - 引用区域显示 [图片] → quoted_text 填 "[图片]"
@@ -169,11 +169,11 @@ class _QwenAPIClient:
         )
 
     def recognize(self, image_path: str) -> dict:
-        raw, _, _ = self.recognize_with_debug(image_path)
+        raw, _, _, _ = self.recognize_with_debug(image_path)
         return raw
 
     def recognize_with_debug(self, image_path: str) -> tuple:
-        """识别并返回 (parsed_result, prompt, raw_response)。"""
+        """识别并返回 (parsed_result, prompt, raw_response, thinking)。"""
         b64 = self._image_to_base64(image_path)
         prompt = QWEN_SYSTEM_PROMPT
         messages = [
@@ -190,10 +190,12 @@ class _QwenAPIClient:
             messages=messages,
             temperature=0.0,
             max_tokens=4096,
-            extra_body={"enable_thinking": False},
+            extra_body={"enable_thinking": True},
         )
-        raw = response.choices[0].message.content or ""
-        return self._extract_json(raw), prompt, raw
+        msg = response.choices[0].message
+        raw = msg.content or ""
+        thinking = getattr(msg, "reasoning_content", "") or ""
+        return self._extract_json(raw), prompt, raw, thinking
 
     @staticmethod
     def _image_to_base64(path: str) -> str:
@@ -464,10 +466,11 @@ class SmartPerceptionPipeline:
             result["layout_chat_list_groups"] = info["chat_list"].get("groups", [])
         return result
 
-    def _build_debug_info(self, layout, api_prompt: str = "", api_response: str = "", extraction_messages=None) -> dict:
+    def _build_debug_info(self, layout, api_prompt: str = "", api_response: str = "", extraction_messages=None, api_thinking: str = "") -> dict:
         info = self._serialize_layout(layout)
         info["api_prompt"] = api_prompt
         info["api_response"] = api_response
+        info["api_thinking"] = api_thinking
         if extraction_messages is not None:
             info["extraction_messages"] = [
                 {
@@ -636,6 +639,7 @@ class SmartPerceptionPipeline:
         api_chat_list = api_result.get("chat_list", [])
         api_prompt = api_result.get("prompt", "")
         api_response = api_result.get("response", "")
+        api_thinking = api_result.get("thinking", "")
 
         # 过滤误识别的未读角标（时间戳、群人数等）
         for item in api_chat_list:
@@ -676,7 +680,7 @@ class SmartPerceptionPipeline:
                 preview = m.text[:40].replace(chr(10), '\\n')
                 _logger.debug(f"  msg[{i}] sender={m.sender} type={m.sender_type.value} text='{preview}...'")
 
-        debug_info = self._build_debug_info(layout, api_prompt, api_response, messages)
+        debug_info = self._build_debug_info(layout, api_prompt, api_response, messages, api_thinking)
         debug_info["api_chat_list"] = api_chat_list
         result = PerceptionResult(
             chat_name=api_chat_name,
@@ -784,13 +788,14 @@ class SmartPerceptionPipeline:
         t0 = time.time()
         _logger.info(f"[SmartPipeline] API请求开始: model=qwen3.6-flash, image={Path(image_path).name}")
         try:
-            raw, prompt, response_text = client.recognize_with_debug(image_path)
+            raw, prompt, response_text, thinking = client.recognize_with_debug(image_path)
             latency_ms = (time.time() - t0) * 1000
             _logger.info(
                 f"[SmartPipeline] API请求成功: latency={latency_ms:.0f}ms, "
                 f"chat_name='{raw.get('chat_name', '')}', "
                 f"messages={len(raw.get('messages', []))}, "
-                f"chat_list={len(raw.get('chat_list', []))}"
+                f"chat_list={len(raw.get('chat_list', []))}, "
+                f"thinking={len(thinking)}字"
             )
             return {
                 "chat_name": raw.get("chat_name", ""),
@@ -798,6 +803,7 @@ class SmartPerceptionPipeline:
                 "chat_list": raw.get("chat_list", []),
                 "prompt": prompt,
                 "response": response_text,
+                "thinking": thinking,
             }
         except Exception as e:
             latency_ms = (time.time() - t0) * 1000

@@ -2,11 +2,12 @@
 """L4 Reply Generator - 回复内容生成."""
 
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from src.models.base import ChatMessage, SenderType
+from src.models.base import ChatMessage, MEDIA_MESSAGE_TYPES, SenderType
 from src.tools import get_registry, register_builtin_tools
 from src.reply.session_memory import SessionMemory, _extract_query_key
 
@@ -38,7 +39,8 @@ class ReplyGenerator:
                  enable_time_awareness: bool = True,
                  enable_reply_restraint: bool = True,
                  enable_unread_dedup: bool = True,
-                 enable_timestamps: bool = True):
+                 enable_timestamps: bool = True,
+                 enable_mode_detection: bool = None):
         self.llm_client = llm_client
         self.complex_llm_client = complex_llm_client
         self.memory_engine = memory_engine
@@ -48,6 +50,9 @@ class ReplyGenerator:
         self.enable_reply_restraint = enable_reply_restraint
         self.enable_unread_dedup = enable_unread_dedup
         self.enable_timestamps = enable_timestamps
+        if enable_mode_detection is None:
+            enable_mode_detection = os.environ.get("WECHAT_MODE_DETECTION", "0").lower() in ("1", "true", "yes", "on")
+        self.enable_mode_detection = enable_mode_detection
         print(f"[Hermes] ReplyGenerator init: llm_client={type(llm_client).__name__ if llm_client else None}, complex_llm_client={type(complex_llm_client).__name__ if complex_llm_client else None}")
         # 最后一次调用的 prompt/response（供 debug 使用）
         self.last_system_prompt: str = ""
@@ -716,10 +721,16 @@ class ReplyGenerator:
         if enable_reply_restraint is None:
             enable_reply_restraint = self.enable_reply_restraint
 
-        prompt_path = Path(__file__).parent.parent.parent / "prompts" / "persona.md"
+        # 支持通过环境变量/参数切换 system prompt 版本
+        if self.enable_mode_detection:
+            prompt_file = "persona_mode_detection.md"
+        else:
+            prompt_file = "persona.md"
+        prompt_path = Path(__file__).parent.parent.parent / "prompts" / prompt_file
         if prompt_path.exists():
             prompt = prompt_path.read_text(encoding="utf-8")
         else:
+            # fallback 到默认 prompt
             prompt = "你是王芊本人。用户不是在跟AI聊天，是在微信上给王芊发消息。"
 
         # 根据开关删除回复克制原则 section
@@ -831,6 +842,96 @@ class ReplyGenerator:
                 body = f"「引用：{m.quoted_text}」{body}"
             return _line(body)
 
+    @staticmethod
+    def _build_mode_hints(
+        unreplied: List[ChatMessage],
+        all_messages: List[ChatMessage],
+        is_group: bool,
+        hour: int,
+    ) -> str:
+        """基于当前消息和历史上下文，生成帮助 LLM 过五关的语境速查提示。"""
+        hints: List[str] = []
+
+        # 1. 读场子：从当前未读消息提取意图和情绪
+        last_texts = " ".join(
+            (m.text or m.image_text or "") for m in unreplied
+        )
+
+        celebration_signals = [
+            "升职", "晋升", "涨薪", "加薪", "获奖", "通过了", "恭喜", "🎉",
+            "喜提", "买房", "买车", "结婚", "订婚", "生娃", "上岸", "拿到",
+            "offer", "签了", "中奖", "发财", "暴富", "脱单",
+        ]
+        complaint_signals = [
+            "烦", "累", "倒霉", "亏了", "无语", "难受", "裂开", "崩溃",
+            "什么鬼", "服了", "妈的", "烦死", "不想干了",
+        ]
+        question_signals = [
+            "怎么办", "怎么", "吗", "呢", "请问", "谁知道", "推荐",
+            "求", "有没有", "能不能", "为什么", "是啥", "是什么",
+        ]
+        confirmation_signals = [
+            "确认", "收到", "麻烦", "核对", "登记", "预约", "扣款",
+            "到账", "办理", "合同", "发票",
+        ]
+
+        if any(s in last_texts for s in celebration_signals):
+            hints.append("【场子】对方刚分享好消息/喜事，优先考虑祝贺模式")
+        elif any(s in last_texts for s in complaint_signals):
+            hints.append("【场子】对方情绪负面，可能在吐槽/受挫，优先考虑安慰模式")
+        elif any(s in last_texts for s in question_signals):
+            hints.append("【场子】对方在提问/求助，优先考虑解答模式")
+        elif any(s in last_texts for s in confirmation_signals):
+            hints.append("【场子】对方在确认事务，优先考虑事务模式")
+        elif unreplied and all(
+            (m.message_type or "text") in MEDIA_MESSAGE_TYPES
+            for m in unreplied
+        ):
+            hints.append("【场子】对方发了图片/表情包，先看图内容再决定接不接梗")
+
+        # 2. 读气氛：看最近 10 轮非我发的消息
+        recent_others = [
+            m for m in all_messages[-10:]
+            if m.sender_type != SenderType.SELF
+        ]
+        recent_texts = [
+            m.text for m in recent_others
+            if m.text and len(m.text.strip()) > 1
+        ]
+
+        if recent_texts:
+            avg_len = sum(len(t) for t in recent_texts) / len(recent_texts)
+            if avg_len < 8:
+                hints.append("【气氛】近期大家回复很短，适合短句/接梗")
+            elif avg_len > 40:
+                hints.append("【气氛】近期在正经长聊，回复可以适当展开")
+
+            banter_signals = ["哈哈", "笑死", "牛逼", "废物", "妈的", "绝了", "艹"]
+            banter_count = sum(
+                1 for t in recent_texts
+                if any(s in t for s in banter_signals)
+            )
+            if banter_count / len(recent_texts) >= 0.3:
+                hints.append("【气氛】近期基调轻松调侃，大家都在互损接梗")
+
+            late_night_signals = ["睡不着", "emo", "烦", "想", "回忆", "曾经"]
+            if 22 <= hour <= 24 or 0 <= hour <= 3:
+                if any(s in " ".join(recent_texts) for s in late_night_signals):
+                    hints.append("【气氛】深夜感性聊天，避免理性分析和说教")
+
+        # 3. 读场域：时间、群/私
+        if is_group:
+            hints.append("【场域】这是群聊，注意分寸，不要乱接话")
+        else:
+            hints.append("【场域】这是私聊，可以更个人化")
+
+        if 22 <= hour or hour <= 6:
+            hints.append("【时间】深夜时段，避免事务性回复和长文分析")
+        elif 9 <= hour <= 18:
+            hints.append("【时间】工作时间，回复可以简洁直接")
+
+        return "\n".join(f"- {h}" for h in hints)
+
     def _build_user_prompt(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage],
                            is_group: bool = False,
                            enable_time_awareness: bool = None,
@@ -868,6 +969,14 @@ class ReplyGenerator:
         if enable_time_awareness:
             lines_local.append("⚠️ 消息时间戳说明：每条消息后面标注的时间是消息发出的绝对时间（格式：YYYY-MM-DD HH:MM）。请根据时间戳推断语境，不要假设消息是刚刚发的。")
             lines_local.append("")
+
+        # 语境速查（仅开启模式检测时注入，帮助 LLM 过五关）
+        if self.enable_mode_detection and unreplied:
+            mode_hints = self._build_mode_hints(unreplied, all_messages, is_group, hour)
+            if mode_hints:
+                lines_local.append("[语境速查]（帮你过五关，参考即可，不要原样复述）")
+                lines_local.append(mode_hints)
+                lines_local.append("")
 
         # wiki 记忆
         t_mem_ms = {}

@@ -24,13 +24,6 @@
   ],
   "messages": [
     {
-      "sender": "对方",
-      "text": "",
-      "type": "image",
-      "image_description": "一张人物照片，显示穿着浅色衣服的人",
-      "image_text": ""
-    },
-    {
       "sender": "自己",
       "text": "不能",
       "type": "text"

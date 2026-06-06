@@ -1,14 +1,22 @@
 {
   "tool_calls": [
     {
-      "id": "call_14e9839186504230a3bada23",
+      "id": "call_00_mvpO9JfQSktRFcK0E4YV0409",
       "type": "function",
       "function": {
         "name": "search_memory",
         "arguments": "{\"query\": \"程立\"}"
       }
+    },
+    {
+      "id": "call_00_rzZbZgr7TyPZpHsh9bAX7866",
+      "type": "function",
+      "function": {
+        "name": "search_memory",
+        "arguments": "{\"query\": \"王芊\"}"
+      }
     }
   ],
-  "content": "程立是谁啊？ | 我不认识这个人呢",
-  "timestamp": 1780189208.318879
+  "content": "程立？谁啊，不认识哈",
+  "timestamp": 1780358643.521572
 }

@@ -1,14 +1,38 @@
 {
   "tool_calls": [
     {
-      "id": "call_e0f137c65048464cbaa0e947",
+      "id": "call_00_eQyWrFC4W6qLItp3vCrJ6804",
       "type": "function",
       "function": {
         "name": "web_search",
-        "arguments": "{\"query\": \"2026年5月31日 新闻\"}"
+        "arguments": "{\"query\": \"2026年6月2日 新闻 今日要闻\"}"
+      }
+    },
+    {
+      "id": "call_00_IIIdAOMkWWk2ocfwVbvq3706",
+      "type": "function",
+      "function": {
+        "name": "browse_url",
+        "arguments": "{\"url\": \"https://news.so.com/ns?q=2026%E5%B9%B46%E6%9C%882%E6%97%A5%20%E6%96%B0%E9%97%BB%20%E4%BB%8A%E6%97%A5%E8%A6%81%E9%97%BB&src=obx-news_ai\"}"
+      }
+    },
+    {
+      "id": "call_00_yaz00FWUs0r6v8EOicn81005",
+      "type": "function",
+      "function": {
+        "name": "web_search",
+        "arguments": "{\"query\": \"今日新闻 2026年6月2日 头条新闻\"}"
+      }
+    },
+    {
+      "id": "call_00_2R3uTU0ERjOAnfrJtX9K5065",
+      "type": "function",
+      "function": {
+        "name": "browse_url",
+        "arguments": "{\"url\": \"http://www.cctime.com/scroll/\"}"
       }
     }
   ],
-  "content": "好嘞，今天新闻不少呢！ | 欧冠决赛今天凌晨刚踢完，巴黎圣日耳曼vs阿森纳，在布达佩斯打的！ | 美联储那边又有动静，新任主席沃什放鹰派信号，可能要加息",
-  "timestamp": 1780189255.816138
+  "content": "今天新闻还挺多哈，拣几条有意思的：\n1. 商业航天首飞成功，多地抢滩太空算力\n2. 英伟达要出PC芯片挑战Intel和AMD\n3. 宇树科技科创板IPO今天上会，募资42亿\n4. 牧原跟阿里云搞养猪大模型\n5. 问界辅助驾驶累计跑了78亿公里",
+  "timestamp": 1780358694.003509
 }
