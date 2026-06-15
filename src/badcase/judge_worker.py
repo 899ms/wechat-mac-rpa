@@ -271,7 +271,7 @@ def _empty_judge_result(reason: str = "") -> dict:
 
 def _get_qwen_client():
     from src.utils.qwen_client import QwenClient
-    return QwenClient(model="deepseek-v4-pro")
+    return QwenClient(model="deepseek-v4-flash")
 
 
 class JudgeWorker:
@@ -279,7 +279,7 @@ class JudgeWorker:
     JUDGE_MAX_TOOL_RESULT = 99999 # 不截断工具结果
     JUDGE_MAX_MESSAGES = 99       # 全量消息
 
-    def __init__(self, model: str = "deepseek-v4-pro", use_fewshot: bool = True):
+    def __init__(self, model: str = "deepseek-v4-flash", use_fewshot: bool = True):
         self.client = _get_qwen_client()
         self.queue: queue.Queue = queue.Queue()
         self._running = False
