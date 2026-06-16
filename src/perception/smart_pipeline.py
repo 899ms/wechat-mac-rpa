@@ -190,7 +190,7 @@ class _QwenAPIClient:
             messages=messages,
             temperature=0.0,
             max_tokens=4096,
-            extra_body={"enable_thinking": True},
+            extra_body={"enable_thinking": False},
         )
         msg = response.choices[0].message
         raw = msg.content or ""

@@ -305,7 +305,7 @@ def register_builtin_tools(registry=None):
 
     registry.register(
         name="web_search",
-        description="在网页上搜索信息，获取实时新闻、知识、数据等",
+        description="在网页上搜索实时信息。遇到任何你不完全了解的产品、车型、技术、新闻、八卦、陌生名词时，必须调用此工具搜索后再评论，禁止基于已有知识猜测具体配置/价格/细节/事实。用于查询公众人物、公司、产品、技术、新闻八卦、陌生名词等本地记忆里没有的内容。不要用于查询身边的亲友同事同学。",
         parameters={
             "type": "object",
             "properties": {
