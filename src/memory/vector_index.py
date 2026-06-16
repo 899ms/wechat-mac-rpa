@@ -6,7 +6,6 @@
 2. MessageVectorIndex: 消息级检索，检索最相似的消息并返回前后多轮完整上下文
 """
 
-import json
 import pickle
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
