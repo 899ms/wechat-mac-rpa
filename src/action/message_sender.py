@@ -30,7 +30,7 @@ class MessageSender(ABC):
         pass
 
     @abstractmethod
-    def send_file(self, file_path: str) -> ActionResult:
+    def send_file(self, file_path: str, chat_name: str = "") -> ActionResult:
         """发送文件"""
         pass
 
@@ -471,9 +471,89 @@ class WeChatMessageSender(MessageSender):
             error="send_image is not implemented yet",
         )
 
-    def send_file(self, file_path: str) -> ActionResult:
-        """预留：拖拽文件到输入框或复制到剪贴板后粘贴发送。"""
-        return ActionResult(
-            success=False,
-            error="send_file is not implemented yet",
+    def send_file(self, file_path: str, chat_name: str = "") -> ActionResult:
+        """发送文件到当前微信聊天。
+
+        实现方式：通过 AppleScript 将文件设置到剪贴板（`set the clipboard to POSIX file ...`），
+        然后在微信输入框粘贴并发送。
+
+        静默模式下不实际发送，只记录日志并返回模拟成功。
+        白名单内的聊天在静默模式下仍然实际发送。
+        整个流程加锁，防止并发 send 导致剪贴板内容互相覆盖。
+
+        注意：文件类剪贴板无法通过 pbpaste/pbcopy 完整保存/恢复，发送文件会覆盖当前剪贴板。
+        """
+        with self._send_lock:
+            return self._send_file_impl(file_path, chat_name)
+
+    def _send_file_impl(self, file_path: str, chat_name: str = "") -> ActionResult:
+        """send_file 的实际实现，由 send_file() 持锁后调用。"""
+        from pathlib import Path
+
+        if not file_path:
+            return ActionResult(success=False, error="文件路径为空")
+
+        file_name = Path(os.path.basename(file_path)).name
+
+        if self.silent_mode:
+            if chat_name and chat_name in self._silent_whitelist:
+                _logger.info(f"[Sender] 白名单聊天 '{chat_name}' 跳过静默，实际发送文件")
+            else:
+                _logger.info(f"[Sender] [SILENT] 静默模式跳过发送文件: {file_path}")
+                return ActionResult(success=True, sent_text=f"[文件] {file_name}")
+
+        abs_path = os.path.abspath(file_path)
+        if not os.path.exists(abs_path):
+            return ActionResult(success=False, error=f"文件不存在: {file_path}")
+
+        _logger.info(
+            f"[Sender] 开始发送文件, 路径: {abs_path}, 大小: {os.path.getsize(abs_path)} bytes"
         )
+
+        try:
+            # 1. 确保 frontmost
+            ok, err = self._ensure_wechat_frontmost()
+            if not ok:
+                return ActionResult(success=False, error=f"无法激活微信: {err}")
+
+            # 2. focus 输入框
+            rc, err = self._focus_input()
+            if rc != 0:
+                return ActionResult(success=False, error=f"focus 失败: {err}")
+
+            # 3. 清空输入框，避免旧内容干扰
+            self._clear_input()
+
+            # 4. 用 AppleScript 把文件复制到剪贴板
+            safe_path = abs_path.replace('"', '\\"')
+            copy_script = f'''
+                set the clipboard to (POSIX file "{safe_path}")
+            '''
+            r = subprocess.run(
+                ["osascript", "-e", copy_script],
+                timeout=5,
+                capture_output=True,
+            )
+            if r.returncode != 0:
+                err = r.stderr.decode("utf-8", errors="replace")[:200]
+                return ActionResult(success=False, error=f"复制文件到剪贴板失败: {err}")
+
+            # 5. 粘贴（文件粘贴需要比文本更长的延迟）
+            rc, err = self._paste(delay=0.8)
+            if rc != 0:
+                return ActionResult(success=False, error=f"粘贴文件失败: {err}")
+
+            # 6. 等待文件卡片渲染
+            time.sleep(0.5)
+
+            # 7. 发送
+            rc, err = self._send_return()
+            if rc != 0:
+                return ActionResult(success=False, error=f"回车发送失败: {err}")
+
+            _logger.info(f"[Sender] 文件发送成功: {file_name}")
+            return ActionResult(success=True, sent_text=f"[文件] {file_name}")
+
+        except Exception as e:
+            _logger.error(f"[Sender] 发送文件异常: {e}")
+            return ActionResult(success=False, error=str(e))
