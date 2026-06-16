@@ -1,214 +1,55 @@
-# 3D打印一键自动化技能
+# 3D打印自动化 Skill
 
-## 概述
+## 触发条件
 
-此技能用于自动化Bambu Lab 3D打印机的完整流程：
-- 模型缩放调整
-- 支撑配置优化
-- 自动切片
-- 发送到打印机
+用户提到以下任意场景时触发：
+- 读取/检查 3MF 文件："帮我看看这个 3MF 文件"、"读取模型配置"
+- 缩放模型："放大到 2 倍"、"缩小一半"、"尺寸翻倍"
+- 修改支撑："加支撑"、"支撑设粗一点"、"优化支撑配置"
+- 查询打印机状态："打印机状态"、"打印进度"、"打印机在哪"
 
-## 使用场景
+## 控制流程
 
-1. **用户想要一键打印模型**
-2. **需要调整模型尺寸**
-3. **需要优化支撑配置**
-4. **需要批量处理多个模型**
+### STEP 1: 识别用户意图
 
-## 核心命令
+判断用户想要做什么：
+- **读取 3MF 文件** → 调用 `print3d_read_3mf(file_path)`
+- **缩放模型** → 调用 `print3d_scale_model(input_file, scale, output_file)`
+- **修改支撑** → 调用 `print3d_update_support(input_file, output_file, branch_diameter, threshold_angle, wall_count, interface_layers)`
+- **查询打印机状态** → 调用 `print3d_get_printer_status(ip, access_code, serial)`
 
-### 1. 检查和读取3MF文件
+### STEP 2: 参数确认
 
-```python
-import zipfile
-import json
+**文件路径**：
+- 用户未提供路径时询问："3MF 文件在哪？"
+- 支持相对路径和绝对路径
 
-def read_3mf_config(file_path):
-    """读取3MF文件中的配置"""
-    with zipfile.ZipFile(file_path, 'r') as z:
-        config = json.loads(z.read('Metadata/project_settings.config'))
-        return config
+**缩放比例**：
+- `scale=2.0` 表示放大到 2 倍
+- `scale=0.5` 表示缩小到一半
+- 默认 `scale=1.0`（不缩放）
 
-def read_3mf_model_info(file_path):
-    """读取3MF模型尺寸信息"""
-    with zipfile.ZipFile(file_path, 'r') as z:
-        model_xml = z.read('3D/3dmodel.model').decode('utf-8')
-        # 解析transform矩阵获取尺寸
-        import re
-        matrices = re.findall(r'transform="([^"]*)"', model_xml)
-        return matrices
-```
+**支撑配置参数**：
+| 参数 | 说明 | 范围 | 默认值 |
+|------|------|------|--------|
+| `branch_diameter` | 树状支撑主干直径 | 2-15mm | 3 |
+| `threshold_angle` | 支撑阈值角度 | 30-60° | 45 |
+| `wall_count` | 支撑墙数 | 0-4 | 1 |
+| `interface_layers` | 界面层数 | 2-6 | 3 |
 
-### 2. 修改支撑配置
+**打印机连接参数**：
+- `ip`：打印机 IP 地址（如 `192.168.2.8`）
+- `access_code`：访问码（打印机设置 → LAN 中查看）
+- `serial`：打印机序列号
 
-```python
-def update_support_config(config, settings):
-    """
-    更新支撑配置
-    
-    settings = {
-        "branch_diameter": "12",  # 主干直径 (2-15mm)
-        "threshold_angle": "45",   # 支撑角度 (30-60°)
-        "wall_count": "4",         # 墙数 (0-4)
-        "interface_layers": "6",   # 界面层数 (2-6)
-    }
-    """
-    config.update({
-        "enable_support": "1",
-        "support_type": "tree(auto)",
-        "support_threshold_angle": settings.get("threshold_angle", "45"),
-        "tree_support_branch_diameter": settings.get("branch_diameter", "3"),
-        "tree_support_tip_diameter": str(float(settings.get("branch_diameter", "3")) * 0.2),
-        "tree_support_branch_angle": "65" if float(settings.get("branch_diameter", "3")) > 6 else "50",
-        "tree_support_wall_count": settings.get("wall_count", "1"),
-        "support_interface_top_layers": settings.get("interface_layers", "3"),
-        "support_interface_bottom_layers": settings.get("interface_layers", "3"),
-        "support_xy_distance": "1.0",
-        "support_speed": "150" if float(settings.get("branch_diameter", "3")) > 6 else "80",
-    })
-    return config
-```
+### STEP 3: 执行与反馈
 
-### 3. 缩放3MF模型
-
-```python
-import zipfile
-import re
-
-def scale_3mf_model(input_file, output_file, scale):
-    """
-    缩放3MF模型
-    
-    矩阵格式: 3x4矩阵，元素0,4,8分别控制X,Y,Z缩放
-    """
-    with zipfile.ZipFile(input_file, 'r') as zip_in:
-        model_data = zip_in.read('3D/3dmodel.model').decode('utf-8')
-        
-        def scale_transform(match):
-            matrix_str = match.group(1)
-            try:
-                values = matrix_str.split()
-                if len(values) == 12:
-                    # 索引0,4,8分别是X,Y,Z缩放因子
-                    values[0] = str(float(values[0]) * scale)
-                    values[4] = str(float(values[4]) * scale)
-                    values[8] = str(float(values[8]) * scale)
-                    return f'transform="{" ".join(values)}"'
-            except:
-                pass
-            return match.group(0)
-        
-        scaled_model = re.sub(r'transform="([^"]*)"', scale_transform, model_data)
-        
-        with zipfile.ZipFile(output_file, 'w', zipfile.ZIP_DEFLATED) as zip_out:
-            for item in zip_in.namelist():
-                data = zip_in.read(item)
-                if item == '3D/3dmodel.model':
-                    zip_out.writestr(item, scaled_model.encode('utf-8'))
-                else:
-                    zip_out.writestr(item, data)
-```
-
-### 4. 检查打印机状态
-
-```python
-import paho.mqtt.client as mqtt
-import json
-import ssl
-
-def get_printer_status(ip, access_code, serial):
-    """通过MQTT获取打印机状态"""
-    client = mqtt.Client()
-    client.username_pw_set("bblp", access_code)
-    client.tls_set(cert_reqs=ssl.CERT_NONE)
-    client.tls_insecure_set(True)
-    
-    status = {}
-    def on_message(c, u, msg):
-        try:
-            data = json.loads(msg.payload)
-            if 'print' in data:
-                status.update(data['print'])
-        except:
-            pass
-    
-    client.on_connect = lambda c,u,f,rc: c.subscribe(f'device/{serial}/report')
-    client.on_message = on_message
-    
-    client.connect(ip, 8883, 5)
-    client.loop_start()
-    time.sleep(2)
-    client.loop_stop()
-    client.disconnect()
-    
-    return {
-        'state': status.get('gcode_state', '未知'),
-        'bed_temp': status.get('bed_temper', 'N/A'),
-        'nozzle_temp': status.get('nozzle_temper', 'N/A'),
-        'progress': status.get('mc_percent', 'N/A'),
-    }
-```
-
-### 5. 完整一键流程
-
-```python
-def one_click_print(input_file, scale=1.0, support_settings=None):
-    """
-    一键打印完整流程
-    
-    Args:
-        input_file: 输入3MF文件路径
-        scale: 缩放比例 (默认1.0)
-        support_settings: 支撑配置字典
-    
-    Returns:
-        output_file: 生成的文件路径
-    """
-    from pathlib import Path
-    
-    input_path = Path(input_file)
-    output_file = input_path.parent / f"{input_path.stem}_optimized.3mf"
-    
-    # 1. 读取原配置
-    with zipfile.ZipFile(input_file, 'r') as z:
-        config = json.loads(z.read('Metadata/project_settings.config'))
-        model_data = z.read('3D/3dmodel.model').decode('utf-8')
-    
-    # 2. 更新支撑配置
-    if support_settings:
-        config = update_support_config(config, support_settings)
-    
-    # 3. 缩放模型
-    if scale != 1.0:
-        import re
-        def scale_transform(match):
-            matrix_str = match.group(1)
-            try:
-                values = matrix_str.split()
-                if len(values) == 12:
-                    values[0] = str(float(values[0]) * scale)
-                    values[4] = str(float(values[4]) * scale)
-                    values[8] = str(float(values[8]) * scale)
-                    return f'transform="{" ".join(values)}"'
-            except:
-                pass
-            return match.group(0)
-        model_data = re.sub(r'transform="([^"]*)"', scale_transform, model_data)
-    
-    # 4. 写入新文件
-    with zipfile.ZipFile(input_file, 'r') as zip_in:
-        with zipfile.ZipFile(output_file, 'w', zipfile.ZIP_DEFLATED) as zip_out:
-            for item in zip_in.namelist():
-                data = zip_in.read(item)
-                if item == 'Metadata/project_settings.config':
-                    zip_out.writestr(item, json.dumps(config, indent=4))
-                elif item == '3D/3dmodel.model':
-                    zip_out.writestr(item, model_data.encode('utf-8'))
-                else:
-                    zip_out.writestr(item, data)
-    
-    return output_file
-```
+调用对应工具后，根据返回结果回复用户：
+- **读取成功**：反馈模型尺寸、当前支撑配置
+- **缩放成功**：反馈输出文件路径和新尺寸
+- **支撑修改成功**：反馈输出文件路径和修改后的配置
+- **状态查询成功**：反馈打印进度、温度、状态
+- **失败**：说明原因（文件不存在、参数错误、打印机离线）
 
 ## 支撑粗细配置参考
 
@@ -218,32 +59,29 @@ def one_click_print(input_file, scale=1.0, support_settings=None):
 | 标准 | 3-4mm | 一般模型 |
 | 粗 | 6-8mm | 大模型，需要稳固支撑 |
 | 超粗 | 10-12mm | 超大模型，支撑绝对不能断 |
-| 巨粗 | 15mm+ | 特殊需求 |
+| 巨粗 | 15mm | 特殊需求 |
 
 ## 常见问题
 
 ### Q: 支撑拆除困难？
-A: 增加`support_xy_distance`到1.0mm，增加界面层数到5-6层
+A: 增加 `interface_layers` 到 5-6 层，增大 `branch_diameter` 到 6mm 以上
 
 ### Q: 支撑断裂？
-A: 增加`tree_support_branch_diameter`到8mm以上，增加`tree_support_wall_count`到3-4层
+A: 增加 `branch_diameter` 到 8mm 以上，增加 `wall_count` 到 3-4 层
 
 ### Q: 模型太小？
-A: 使用scale参数放大，建议1.5-2.5倍
+A: 使用 `print3d_scale_model` 放大，建议 `scale=1.5~2.5`
 
-## 示例
+## 输出规则
 
-```python
-# 一键生成超大超粗版本
-output = one_click_print(
-    "lobster.3mf",
-    scale=2.5,
-    support_settings={
-        "branch_diameter": "12",
-        "threshold_angle": "55",
-        "wall_count": "4",
-        "interface_layers": "6",
-    }
-)
-print(f"生成文件: {output}")
-```
+- 操作结果必须明确反馈：动作 + 文件路径/状态
+- 支撑修改必须反馈修改后的关键参数（直径、角度）
+- 状态查询必须显示：打印进度、喷嘴温度、热床温度、当前状态
+- 文件操作必须反馈输出文件路径
+
+## 硬性规则
+
+- **绝不猜测文件路径**。如果用户说"打印这个"而没有指定文件，必须询问："哪个 3MF 文件？"
+- **绝不猜测打印机参数**。查询状态时必须提供 `ip`、`access_code`、`serial`，缺少任何一个都要询问。
+- **参数范围限制**：`branch_diameter` 2-15mm，`threshold_angle` 30-60°，`wall_count` 0-4，`interface_layers` 2-6。超出范围时拒绝执行并提示合理范围。
+- **输出文件默认命名**：缩放默认生成 `*_scaled.3mf`，支撑修改默认生成 `*_supported.3mf`。
