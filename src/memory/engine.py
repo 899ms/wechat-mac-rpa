@@ -69,6 +69,9 @@ _UPDATE_PROMPT = """请根据以下对话记录，更新用户 {user_name} 的 w
 主名：{user_name}
 别名：{user_aliases}
 
+【已确认身份信息（必须遵守，禁止 contradict）】
+{identity_context}
+
 【更新规则】
 1. 只记录**当前用户本人**的信息，严禁记录其他用户的信息
 2. 增量更新铁律（最重要）：
@@ -121,6 +124,9 @@ _DEFAULT_GROUP_WIKI = """# {group_name}
 """
 
 _UPDATE_GROUP_PROMPT = """请根据以下对话记录，更新群聊 {chat_name} 的 wiki。
+
+【已确认身份信息（必须遵守，禁止 contradict）】
+{identity_context}
 
 【更新规则】
 1. 只修改/新增变化的部分，保留未变动的内容
@@ -228,6 +234,35 @@ class MemoryEngine:
         names = [resolved]
         names.extend(self._aliases.get(resolved, []))
         return list(dict.fromkeys(names))  # 去重保序
+
+    def _build_identity_context(self, names: List[str]) -> str:
+        """根据 aliases + facts 构建身份约束文本，防止 LLM 在生成 wiki 时 invent 关系。"""
+        lines = []
+        seen = set()
+        for name in names:
+            resolved = self._resolve_alias(name)
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+
+            all_names = self._all_names_for(resolved)
+            if len(all_names) > 1:
+                lines.append(f"- {resolved} 的别名/微信名包括：{'、'.join(all_names[1:])}")
+
+            facts = self._facts.get(resolved, [])
+            for f in facts:
+                relation = f.get("relation", "")
+                value = f.get("value", "")
+                note = f.get("note", "")
+                if relation and value:
+                    line = f"- {resolved} 的 {relation} 是 {value}"
+                    if note:
+                        line += f"（{note}）"
+                    lines.append(line)
+
+        if not lines:
+            return "（暂无已确认身份信息，请仅根据对话内容推断，不确定的用 [待验证] 标记）"
+        return "\n".join(lines)
 
     # ── 读取接口 ──
 
@@ -432,7 +467,7 @@ class MemoryEngine:
                 lines.append(f"{sender}：{text}")
         if bot_replies:
             for reply in bot_replies:
-                lines.append(f"Bot：{reply}")
+                lines.append(f"我：{reply}")
         return "\n".join(lines)
 
     def _do_update(self, task: dict) -> None:
@@ -521,9 +556,11 @@ class MemoryEngine:
 
         now = time.strftime("%Y-%m-%d %H:%M")
         user_aliases = self._aliases.get(user_name, [])
+        identity_context = self._build_identity_context([user_name])
         prompt = _UPDATE_PROMPT.format(
             user_name=user_name,
             user_aliases="、".join(user_aliases) if user_aliases else "无",
+            identity_context=identity_context,
             current_wiki=current_wiki,
             chat_name=chat_name,
             current_time=now,
@@ -555,7 +592,15 @@ class MemoryEngine:
             return
 
         now = time.strftime("%Y-%m-%d %H:%M")
+        # 提取群里涉及的所有 sender，解析真实身份
+        involved = set()
+        for msg in messages:
+            sender = getattr(msg, "sender", "")
+            if sender:
+                involved.add(sender)
+        identity_context = self._build_identity_context(list(involved))
         prompt = _UPDATE_GROUP_PROMPT.format(
+            identity_context=identity_context,
             current_wiki=current_wiki,
             chat_name=chat_name,
             current_time=now,

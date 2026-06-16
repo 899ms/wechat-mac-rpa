@@ -83,6 +83,66 @@ class WeChatBot:
             enable_timestamps=True,
         )
         self.sender = WeChatMessageSender(silent_mode=os.environ.get("WECHAT_SILENT_MODE") == "1")
+
+        # 动态注册 send_file 工具（需要 sender 实例）
+        def _load_shareable_files() -> dict:
+            import json
+            from pathlib import Path
+            path = Path(__file__).parent.parent.parent / "data" / "shareable_files.json"
+            if not path.exists():
+                return {}
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+
+        def _send_file_tool(file_name: str = "", chat_name: str = "") -> str:
+            if not file_name:
+                return "file_name 不能为空"
+            shareable_files = _load_shareable_files()
+            file_path = shareable_files.get(file_name)
+            if not file_path:
+                available = "、".join(shareable_files.keys()) if shareable_files else "（暂无）"
+                return f"找不到文件 '{file_name}'。可发送文件：{available}"
+            abs_path = os.path.abspath(file_path)
+            if not os.path.exists(abs_path):
+                return f"文件不存在: {file_path}"
+            result = self.sender.send_file(abs_path, chat_name=chat_name)
+            if result.success:
+                return f"已发送文件: {file_name}"
+            return f"发送失败: {result.error}"
+
+        shareable_files = _load_shareable_files()
+        file_list = "\n".join(f"- {name}" for name in shareable_files.keys())
+        send_file_description = (
+            "给用户发送本地文件。仅当用户明确要求发送以下文件时调用：\n"
+            f"{file_list}\n\n"
+            "参数 file_name 必须是上面列表中的名称（如'简历'），chat_name 为当前聊天名称。\n"
+            "注意：当对方要求发送简历时，默认理解为对方（招聘方、朋友、HR 等）需要你的简历资料，"
+            "不是你本人要找工作。回复时不要提及'跳槽''找工作'等假设，避免让对方误解。"
+        )
+
+        registry.register(
+            name="send_file",
+            description=send_file_description,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "file_name": {
+                        "type": "string",
+                        "description": "要发送的文件名称，必须是可发送列表中的一项，如：简历",
+                    },
+                    "chat_name": {
+                        "type": "string",
+                        "description": "当前聊天名称（从会话信息中获取）",
+                    },
+                },
+                "required": ["file_name", "chat_name"],
+            },
+            func=_send_file_tool,
+        )
+
         self._login_handler = WeChatLoginHandler()
         self.on_message = on_message
         self.logger: BotLogger = get_logger()
@@ -92,7 +152,8 @@ class WeChatBot:
         self.debug_mode = debug_mode
         self.debug_logger = DebugLogger()
         # 免回复聊天列表：公众号、系统账号等不需要回复的聊天
-        self.no_reply_chats = {"腾讯新闻", "文件传输助手"}
+        raw_no_reply = os.environ.get("WECHAT_NO_REPLY_CHATS", "腾讯新闻,文件传输助手")
+        self.no_reply_chats = {c.strip() for c in raw_no_reply.split(",") if c.strip()}
 
         # 切换聊天防抖：10 秒内不重复切换同一个目标
         self._last_switch_target: str = ""
