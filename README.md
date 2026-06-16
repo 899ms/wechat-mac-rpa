@@ -169,7 +169,19 @@ graph LR
 - **依赖**：`pip install -r requirements.txt`
 - **配置**：复制 `.env.example` 为 `.env`，填入 API Key
 - **启动**：`python3 run_bot.py`
-- **后台**：`python3 scripts/admin.py`
+- **管理后台（LaunchAgent 常驻）**：
+  ```bash
+  # 首次加载（用户登录时自动启动，崩溃自动重启）
+  launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.wechat-mac-rpa.admin.plist
+  launchctl enable gui/$(id -u)/com.wechat-mac-rpa.admin
+  launchctl kickstart gui/$(id -u)/com.wechat-mac-rpa.admin
+  ```
+  常用操作：
+  - 查看状态：`launchctl list | grep com.wechat-mac-rpa.admin`
+  - 手动重启：`launchctl kickstart -k gui/$(id -u)/com.wechat-mac-rpa.admin`
+  - 停止服务：`launchctl bootout gui/$(id -u)/com.wechat-mac-rpa.admin`
+  - 日志：`tail -f logs/admin-launchd.log logs/admin.log`
+  - 前台调试用：`python3 scripts/admin.py`
 - **测试**：`python3 -m pytest src/tests/test_*_benchmark.py -v`
 - **OCR Benchmark**：`python3 src/tests/test_ocr_quality_benchmark.py`
 - **生成报告**：`python3 scripts/generate_ocr_benchmark_report.py`

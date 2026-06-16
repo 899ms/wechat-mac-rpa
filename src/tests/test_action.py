@@ -108,12 +108,51 @@ class TestWeChatMessageSender:
         assert result.success is False
         assert "not implemented" in result.error.lower()
 
-    def test_send_file_not_implemented(self):
+    def test_send_file_file_not_exists(self):
         sender = WeChatMessageSender()
-        result = sender.send_file("/tmp/test.txt")
+        result = sender.send_file("/tmp/nonexistent_file_12345.txt")
         assert isinstance(result, ActionResult)
         assert result.success is False
-        assert "not implemented" in result.error.lower()
+        assert "不存在" in result.error
+
+    def test_send_file_silent_mode_returns_success(self):
+        sender = WeChatMessageSender(silent_mode=True)
+        result = sender.send_file("/tmp/nonexistent_file_12345.txt")
+        assert isinstance(result, ActionResult)
+        assert result.success is True
+        assert "[文件]" in result.sent_text
+
+    def test_send_file_invokes_copy_and_paste_scripts(self):
+        import tempfile
+
+        sender = WeChatMessageSender()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("test content")
+            tmp_path = f.name
+
+        try:
+            with patch("src.action.message_sender.subprocess.run") as mock_run:
+                # 让 frontmost 校验返回 WeChat，使流程能继续到文件复制/粘贴
+                def _side_effect(*args, **kwargs):
+                    mocked = MagicMock(returncode=0)
+                    cmd = args[0] if args else []
+                    if isinstance(cmd, list) and cmd and cmd[0] == "osascript":
+                        script = cmd[-1] if cmd else ""
+                        if "frontApp" in script:
+                            mocked.stdout = b"WeChat"
+                    return mocked
+
+                mock_run.side_effect = _side_effect
+                result = sender.send_file(tmp_path)
+
+            assert result.success is True
+            assert "[文件]" in result.sent_text
+
+            # 验证整个流程调用了 subprocess.run（至少包括 frontmost/focus/copy/paste/return）
+            assert mock_run.call_count >= 4
+        finally:
+            import os
+            os.unlink(tmp_path)
 
 
 class TestUIInteractorInterface:
