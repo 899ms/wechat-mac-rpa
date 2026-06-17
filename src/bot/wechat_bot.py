@@ -2,6 +2,7 @@
 """L5 Bot Orchestrator - 主循环编排"""
 
 import os
+import subprocess
 import time
 from pathlib import Path
 from typing import Callable, Optional
@@ -152,7 +153,7 @@ class WeChatBot:
         self.debug_mode = debug_mode
         self.debug_logger = DebugLogger()
         # 免回复聊天列表：公众号、系统账号等不需要回复的聊天
-        raw_no_reply = os.environ.get("WECHAT_NO_REPLY_CHATS", "腾讯新闻,文件传输助手")
+        raw_no_reply = os.environ.get("WECHAT_NO_REPLY_CHATS", "腾讯新闻,文件传输助手,公众号,服务号")
         self.no_reply_chats = {c.strip() for c in raw_no_reply.split(",") if c.strip()}
 
         # 切换聊天防抖：10 秒内不重复切换同一个目标
@@ -290,7 +291,14 @@ class WeChatBot:
                     self.logger.warning("当前聊天名为空但检测到消息，标题栏识别失败，跳过切换避免误点")
                     self.debug_logger.log_action("none", action_input="", success=False, error="标题栏识别失败，跳过避免误点")
                 else:
-                    self.logger.warning("当前聊天名为空且无消息，可能未打开任何聊天窗口，尝试切换到未读")
+                    self.logger.warning("当前聊天名为空且无消息，可能未打开任何聊天窗口")
+                    # 先尝试从服务号/公众号/文章列表等异常视图返回
+                    recovered = self._recover_from_non_chat_view(result)
+                    if recovered:
+                        self.debug_logger.log_action("recover", action_input="Esc", success=True, error="尝试从非聊天视图返回")
+                        return
+                    # 恢复失败或本身就是普通视图，尝试切换到未读
+                    self.logger.warning("尝试切换到未读")
                     switch_target = self._try_switch_to_unread_chat(result)
                     if switch_target:
                         self.debug_logger.log_action("switch", action_input=switch_target, success=True)
@@ -594,6 +602,33 @@ class WeChatBot:
             except Exception as e:
                 self.logger.error(f"Tick #{self._tick_id} 未捕获异常: {e}", exc_info=True)
             time.sleep(interval)
+
+    def _recover_from_non_chat_view(self, result: PerceptionResult) -> bool:
+        """当当前视图不是普通聊天窗口时（如服务号/公众号列表），尝试 Esc 返回。
+
+        检测依据：chat_name 为空且左侧聊天列表不可见。此时按 Esc 通常能
+        从服务号/公众号/文章列表退回到聊天列表。
+        """
+        if result.chat_name:
+            return False
+        if result.chat_list_items:
+            # 左侧聊天列表可见，说明是普通聊天视图（可能只是当前聊天名没识别到）
+            return False
+
+        self.logger.warning("[Recovery] 当前不在聊天视图（chat_name 为空且列表不可见），尝试 Esc 返回")
+        try:
+            subprocess.run(
+                ["osascript", "-e", 'tell application "System Events" to key code 53'],
+                timeout=3,
+                capture_output=True,
+                check=True,
+            )
+            time.sleep(0.8)
+            self.logger.info("[Recovery] Esc 返回已发送，等待下一轮重新感知")
+            return True
+        except Exception as e:
+            self.logger.warning(f"[Recovery] Esc 返回失败: {e}")
+            return False
 
     def _try_switch_to_unread_chat(self, result: PerceptionResult) -> str:
         """检测到其他聊天有未读时，切换到未读数最多的那个。
