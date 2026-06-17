@@ -29,7 +29,7 @@ graph LR
     end
 
     subgraph Memory["记忆层"]
-        M[LLM Wiki + 向量检索]
+        M[LLM Wiki + 向量数据库]
     end
 
     subgraph Flywheel["数据飞轮"]
@@ -97,26 +97,52 @@ graph TB
 
 ---
 
-### 记忆系统：每个联系人都有自己的 Wiki
+### 记忆系统：多路召回 + Rerank
 
-Bot 不是无状态聊天机器人。记忆系统为每个联系人、群聊维护独立的 **LLM Wiki**（Markdown 格式），并构建在多路召回与重排之上。
+记忆系统不是简单的“每个联系人一个 Wiki”。它把 **WeFlow 初始化**和**运行时对话**当作原始输入数据，向上抽象出两个索引层：**LLM Wiki**（结构化 Markdown）和**向量数据库**（语义向量）。线上召回时两路并行，最终通过 Rerank 融合排序，把最相关的片段注入 Agent 上下文。
 
-- **启动时全量注入（WeFlow）**：Bot 启动时从微信数据库导出全量历史，直接写入 LLM Wiki，上线第一天就拥有完整背景知识。
-- **增量构建（运行时更新）**：新对话被后台异步队列消费，LLM 接收「现有 wiki + 新对话」，输出更新后的完整 wiki。所有新增事实标注来源，严禁删除现有内容。
-- **多路召回**：关键词召回做文本匹配，RAG 向量检索做语义匹配，两路结果汇总后经 BM25 重排，选出 top-k 段落注入 Agent 上下文。
+- **原始输入数据**
+  - **WeFlow 初始化**：Bot 启动时从微信数据库导出全量历史聊天记录，作为初始语料。
+  - **运行时对话**：每个 tick 感知到的新消息，持续追加到原始数据流中。
+- **中间抽象化索引层**
+  - **LLM Wiki**：由 LLM 从原始对话中提炼、结构化的长期事实（按联系人/群聊独立维护），增量更新，标注来源，严禁删除已有内容。
+  - **向量数据库**：对原始对话做切片和嵌入，提供语义级检索能力。
+- **线上多路召回**
+  - **LLM Wiki 关键字召回**：从结构化 wiki 中做关键词/实体匹配，召回精准事实。
+  - **向量数据库 向量召回**：从向量索引中做语义相似度召回，捕获同义、上下文相关片段。
+- **Rerank 融合排序**
+  - 两路结果汇总后，综合 **BM25** 文本相关性和**向量相似度**重新打分，选出 top-k 注入 Agent 上下文。
 - **人工 Overrides**：通过外挂 JSON 实现任意字段覆写，LLM 更新时不会破坏人工修改。
 
 所有数据本地存储，不上传云端。
 
 ```mermaid
 graph TB
-    WeFlow["WeFlow 全量注入"] --> Wiki["LLM Wiki<br/>Markdown 格式"]
-    Runtime["运行时对话"] --> Queue["异步更新队列"]
-    Queue --> Wiki
-    Wiki --> Keyword["关键词召回"]
-    Wiki --> RAG["向量检索"]
-    Keyword --> Rerank["重排<br/>BM25 + 语义"]
-    RAG --> Rerank
+    subgraph Raw["原始输入数据"]
+        WeFlow["WeFlow 初始化<br/>历史全量聊天记录"]
+        Runtime["运行时对话<br/>增量消息"]
+    end
+
+    subgraph Index["中间抽象化索引层"]
+        Wiki["LLM Wiki<br/>结构化 Markdown"]
+        VectorDB["向量数据库<br/>语义嵌入"]
+    end
+
+    subgraph Online["线上多路召回"]
+        KeywordRecall["LLM Wiki 关键字召回"]
+        VectorRecall["向量数据库 向量召回"]
+    end
+
+    WeFlow --> Wiki
+    WeFlow --> VectorDB
+    Runtime --> Wiki
+    Runtime --> VectorDB
+
+    Wiki --> KeywordRecall
+    VectorDB --> VectorRecall
+
+    KeywordRecall --> Rerank["Rerank<br/>BM25 + 向量相似度"]
+    VectorRecall --> Rerank
     Rerank --> Context["上下文注入 Agent"]
 ```
 
