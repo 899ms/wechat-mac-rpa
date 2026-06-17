@@ -8,27 +8,49 @@
 - screen_abs = window_rect + item_rect / scale_factor
 """
 
+import logging
 import subprocess
+import time
 from typing import Optional
 
 from src.models.base import ChatListItem, Rect
+
+_logger = logging.getLogger("src.chat_list_clicker")
 
 
 class ChatListClicker:
     """点击左侧聊天列表中的指定项，切换当前聊天窗口。"""
 
+    # 类级全局冷却：任意两次真实点击之间至少间隔这么多秒，
+    # 防止 bot 在异常状态下高频连点导致微信窗口布局错乱。
+    MIN_CLICK_INTERVAL_SECONDS = 1.0
+    _last_click_time: float = 0.0
+
     def __init__(self, window_rect: Rect, scale_factor: float = 2.0):
         self.window_rect = window_rect
         self.scale_factor = scale_factor
+
+    def _can_click(self) -> bool:
+        """检查是否距离上次点击已超过最小冷却时间。"""
+        now = time.time()
+        elapsed = now - ChatListClicker._last_click_time
+        if elapsed < ChatListClicker.MIN_CLICK_INTERVAL_SECONDS:
+            _logger.warning(
+                f"点击被全局冷却跳过: 距离上次点击仅 {elapsed:.2f}s, "
+                f"需间隔 {ChatListClicker.MIN_CLICK_INTERVAL_SECONDS}s"
+            )
+            return False
+        return True
 
     def click_item(self, item: ChatListItem) -> bool:
         """
         点击聊天列表项的中心位置。
 
         策略：
-        1. 先激活微信窗口（确保有焦点）
-        2. 点击位置取列表项中心（rect 包含昵称+预览，x 偏移确保在条目内）
-        3. 点击后等待右侧展开，避免快速连续点击导致误触
+        1. 先检查全局冷却，避免 1 秒内连续点击
+        2. 激活微信窗口（确保有焦点）
+        3. 点击位置取列表项中心（rect 包含昵称+预览，x 偏移确保在条目内）
+        4. 点击后等待右侧展开，避免快速连续点击导致误触
 
         Args:
             item: 要点击的 ChatListItem，包含 rect（截图像素坐标）
@@ -36,6 +58,9 @@ class ChatListClicker:
         Returns:
             True 如果点击命令执行成功
         """
+        if not self._can_click():
+            return False
+
         # 点击位置：取 rect 中心，避免偏左偏右点到相邻项
         click_x = item.rect.x + item.rect.width // 2
         click_y = item.rect.y + item.rect.height // 2
@@ -52,7 +77,6 @@ class ChatListClicker:
                 capture_output=True,
                 check=True,
             )
-            import time
             time.sleep(0.5)
             # Step 2: 点击聊天列表项
             subprocess.run(
@@ -60,11 +84,10 @@ class ChatListClicker:
                 check=True,
                 timeout=5,
             )
+            ChatListClicker._last_click_time = time.time()
             # Step 3: 等待右侧聊天内容加载
             time.sleep(2.5)
-            import logging
-            _click_logger = logging.getLogger("src.chat_list_clicker")
-            _click_logger.info(
+            _logger.info(
                 f"点击聊天列表: screen=({abs_x},{abs_y}) "
                 f"window=({self.window_rect.x},{self.window_rect.y}) "
                 f"rect_in_screenshot=({click_x},{click_y}) scale={self.scale_factor}"
