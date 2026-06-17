@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """L2 Capture - 窗口截图模块"""
 
+import glob
 import logging
+import os
 import subprocess
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 import Quartz
@@ -204,7 +207,6 @@ class WindowCapture:
         t_capture_start = time.time()
         # 清理旧截图（超过1小时的临时文件，避免 /tmp 无限累积）
         try:
-            import glob
             cutoff = time.time() - 3600
             for old in glob.glob("/tmp/wechat_capture_*.png"):
                 try:
@@ -217,8 +219,6 @@ class WindowCapture:
 
         # 每次调用生成新的输出路径，避免覆盖旧截图
         # 这是 SmartPerceptionPipeline 像素 diff 正确工作的前提
-        import os
-        from datetime import datetime
         ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
         pid = os.getpid()
         self.output_path = f"/tmp/wechat_capture_{ts}_{pid}.png"
