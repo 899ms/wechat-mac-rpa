@@ -18,70 +18,48 @@ class TestMessageSenderInterface:
 
 
 class TestWeChatMessageSender:
-    def test_send_invokes_pbcopy_and_osascript_with_correct_args(self):
+    def test_send_invokes_pbcopy_and_subprocess(self):
+        """发送成功时会调用 pbcopy 与发送子流程"""
         sender = WeChatMessageSender()
         text = "你好，世界"
 
-        with patch("src.action.message_sender.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
+        with patch.object(sender, "_ensure_wechat_frontmost", return_value=(True, "")), \
+             patch.object(sender, "_focus_input", return_value=(0, "")), \
+             patch.object(sender, "_pbcopy", return_value=(0, "")), \
+             patch.object(sender, "_paste", return_value=(0, "")), \
+             patch.object(sender, "_verify", return_value=(text, 0, 0)), \
+             patch.object(sender, "_send_return", return_value=(0, "")), \
+             patch("src.action.message_sender.subprocess.run") as mock_run:
             result = sender.send(text)
 
         assert result.success is True
         assert result.sent_text == text
+        mock_run.assert_called()  # 至少会调用 pbpaste 读取原始剪贴板
 
-        # Should be called 4 times: activate WeChat, pbcopy, focus input, paste AppleScript
-        assert mock_run.call_count == 4
-
-        calls = mock_run.call_args_list
-
-        # 1. Activate WeChat
-        assert calls[0][0][0] == [
-            "osascript",
-            "-e",
-            'tell application "WeChat" to activate',
-        ]
-
-        # 2. pbcopy with encoded text
-        assert calls[1][0][0] == ["pbcopy"]
-        assert calls[1][1]["input"] == text.encode("utf-8")
-        assert calls[1][1]["timeout"] == 2
-
-        # 3. Focus input box AppleScript
-        assert calls[2][0][0][0] == "osascript"
-        assert calls[2][0][0][1] == "-e"
-        assert "tell application" in calls[2][0][0][2]
-        assert calls[2][1]["capture_output"] is True
-        assert calls[2][1]["timeout"] == 5
-
-        # 4. AppleScript paste
-        assert calls[3][0][0][0] == "osascript"
-        assert calls[3][0][0][1] == "-e"
-        script = calls[3][0][0][2]
-        assert 'keystroke "v" using command down' in script
-        assert "keystroke return" in script
-        assert calls[3][1]["capture_output"] is True
-        assert calls[3][1]["timeout"] == 5
-
-    def test_send_includes_wechat_activation_step(self):
+    def test_send_includes_wechat_frontmost_check(self):
+        """发送时会检查 WeChat 是否为 frontmost"""
         sender = WeChatMessageSender()
 
-        with patch("src.action.message_sender.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
+        with patch.object(sender, "_ensure_wechat_frontmost", return_value=(True, "")) as mock_frontmost, \
+             patch.object(sender, "_focus_input", return_value=(0, "")), \
+             patch.object(sender, "_pbcopy", return_value=(0, "")), \
+             patch.object(sender, "_paste", return_value=(0, "")), \
+             patch.object(sender, "_verify", return_value=("test", 0, 0)), \
+             patch.object(sender, "_send_return", return_value=(0, "")):
             sender.send("test")
 
-        calls = mock_run.call_args_list
-        assert calls[0][0][0] == [
-            "osascript",
-            "-e",
-            'tell application "WeChat" to activate',
-        ]
+        mock_frontmost.assert_called()
 
     def test_send_returns_success_action_result(self):
         sender = WeChatMessageSender()
         text = "hello"
 
-        with patch("src.action.message_sender.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
+        with patch.object(sender, "_ensure_wechat_frontmost", return_value=(True, "")), \
+             patch.object(sender, "_focus_input", return_value=(0, "")), \
+             patch.object(sender, "_pbcopy", return_value=(0, "")), \
+             patch.object(sender, "_paste", return_value=(0, "")), \
+             patch.object(sender, "_verify", return_value=(text, 0, 0)), \
+             patch.object(sender, "_send_return", return_value=(0, "")):
             result = sender.send(text)
 
         assert isinstance(result, ActionResult)
@@ -89,17 +67,16 @@ class TestWeChatMessageSender:
         assert result.sent_text == text
         assert result.error is None
 
-    def test_send_returns_failure_action_result_on_subprocess_error(self):
+    def test_send_returns_failure_when_frontmost_check_fails(self):
         sender = WeChatMessageSender()
 
-        with patch("src.action.message_sender.subprocess.run") as mock_run:
-            mock_run.side_effect = subprocess.CalledProcessError(1, "pbcopy")
+        with patch.object(sender, "_ensure_wechat_frontmost", return_value=(False, "无法激活微信")):
             result = sender.send("hello")
 
         assert isinstance(result, ActionResult)
         assert result.success is False
         assert result.error is not None
-        assert "CalledProcessError" in result.error or "pbcopy" in result.error
+        assert "无法激活微信" in result.error
 
     def test_send_image_not_implemented(self, tmp_path):
         sender = WeChatMessageSender()

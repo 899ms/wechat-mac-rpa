@@ -61,13 +61,15 @@ class TestWeChatBot:
         bot.sender.send.return_value = ActionResult(success=True, sent_text="在的")
 
         mock_state = Mock()
+        mock_state.pending_self_messages = []
         bot.global_store = Mock()
         bot.global_store.merge_tick.return_value = (mock_state, [msg])
+        bot.global_store.chats = {"测试群": mock_state}
 
         bot.tick()
 
         bot.generator.generate.assert_called_once()
-        bot.sender.send.assert_called_once_with("在的")
+        bot.sender.send.assert_called_once_with("在的", chat_name="测试群")
         bot.global_store.mark_replied.assert_called_once()
 
     def test_tick_perception_none(self, bot):
@@ -137,4 +139,4 @@ class TestWeChatBot:
         result = bot.send_to_chat("测试群", "hello")
 
         assert result.success is True
-        bot.sender.send.assert_called_once_with("hello")
+        bot.sender.send.assert_called_once_with("hello", chat_name="测试群")
