@@ -18,8 +18,11 @@ class TestTickDebugInfo:
 
 
 class TestDebugLogger:
-    def test_start_tick(self):
-        logger = DebugLogger(base_dir="/tmp/test_debug")
+    @pytest.fixture
+    def logger(self, tmp_path):
+        return DebugLogger(base_dir=str(tmp_path / "test_debug"))
+
+    def test_start_tick(self, logger):
         info = logger.start_tick(1, "screenshot.png")
         assert info.tick_id == 1
         assert info.screenshot_path == "screenshot.png"
@@ -41,8 +44,7 @@ class TestDebugLogger:
         with pytest.raises(RuntimeError, match="start_tick"):
             logger.save()
 
-    def test_log_ocr(self):
-        logger = DebugLogger(base_dir="/tmp/test_debug")
+    def test_log_ocr(self, logger):
         logger.start_tick(1, "s.png")
         mock_elem = MagicMock()
         mock_elem.text = "hello"
@@ -52,8 +54,7 @@ class TestDebugLogger:
         assert len(logger.current.ocr_elements) == 1
         assert logger.current.ocr_elements[0]["text"] == "hello"
 
-    def test_log_layout_chat_list(self):
-        logger = DebugLogger(base_dir="/tmp/test_debug")
+    def test_log_layout_chat_list(self, logger):
         logger.start_tick(1, "s.png")
         mock_elem = MagicMock()
         mock_elem.text = "test"
@@ -63,8 +64,7 @@ class TestDebugLogger:
         assert logger.current.layout_chat_list_nicknames == ["nick"]
         assert logger.current.layout_chat_list_unread == ["1"]
 
-    def test_log_bot_decision(self):
-        logger = DebugLogger(base_dir="/tmp/test_debug")
+    def test_log_bot_decision(self, logger):
         logger.start_tick(1, "s.png")
         logger.log_bot_decision(
             chat_name="群A",
@@ -77,15 +77,13 @@ class TestDebugLogger:
         assert logger.current.bot_should_reply is True
         assert logger.current.bot_reply_text == "hello"
 
-    def test_log_action(self):
-        logger = DebugLogger(base_dir="/tmp/test_debug")
+    def test_log_action(self, logger):
         logger.start_tick(1, "s.png")
         logger.log_action(action="send", action_input="hello", success=True)
         assert logger.current.action == "send"
         assert logger.current.action_result_success is True
 
-    def test_log_session(self):
-        logger = DebugLogger(base_dir="/tmp/test_debug")
+    def test_log_session(self, logger):
         logger.start_tick(1, "s.png")
         logger.log_session(
             input_chat_name="群A",
@@ -96,16 +94,14 @@ class TestDebugLogger:
         assert logger.current.session_input_chat_name == "群A"
         assert logger.current.session_total_stored == 5
 
-    def test_log_perception_output(self):
-        logger = DebugLogger(base_dir="/tmp/test_debug")
+    def test_log_perception_output(self, logger):
         logger.start_tick(1, "s.png")
         logger.log_perception_output(chat_name="群A", messages_count=3, chat_list_count=12)
         assert logger.current.perception_chat_name == "群A"
         assert logger.current.perception_messages_count == 3
         assert logger.current.perception_chat_list_count == 12
 
-    def test_log_reply_generation(self):
-        logger = DebugLogger(base_dir="/tmp/test_debug")
+    def test_log_reply_generation(self, logger):
         logger.start_tick(1, "s.png")
         logger.log_reply_generation(
             system_prompt="sys",
@@ -120,8 +116,7 @@ class TestDebugLogger:
         assert logger.current.loaded_skills == ["skill1"]
         assert logger.current.active_llm == "deepseek"
 
-    def test_log_reply_generation_trace(self):
-        logger = DebugLogger(base_dir="/tmp/test_debug")
+    def test_log_reply_generation_trace(self, logger):
         logger.start_tick(1, "s.png")
         trace = [
             {"round": 1, "type": "llm_request", "messages": [{"role": "user", "content": "hi"}]},

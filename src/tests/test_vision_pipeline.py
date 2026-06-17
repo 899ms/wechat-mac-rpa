@@ -18,12 +18,13 @@ class TestVisionPipeline:
     def pipeline(self):
         return VisionPipeline(PROFILE_WECHAT_MAC_1760X1280)
 
-    def test_perceive_success(self, pipeline):
+    def test_perceive_success(self, pipeline, tmp_path):
         """正常感知流程返回 PerceptionResult"""
+        image_path = str(tmp_path / "test.png")
         # Mock capture
         mock_capture = Mock()
         mock_capture.capture.return_value = Mock(
-            image_path="/tmp/test.png",
+            image_path=image_path,
             window_rect=Rect(0, 0, 1760, 1280),
             scale_factor=1.0
         )
@@ -73,10 +74,10 @@ class TestVisionPipeline:
         assert result.chat_name == "测试群"
         assert len(result.messages) == 1
         assert len(result.chat_list_items) == 1
-        assert result.screenshot_path == "/tmp/test.png"
+        assert result.screenshot_path == image_path
 
         mock_capture.capture.assert_called_once()
-        mock_ocr.recognize.assert_called_once_with("/tmp/test.png")
+        mock_ocr.recognize.assert_called_once_with(image_path)
         mock_layout.parse.assert_called_once()
         mock_extractor.extract.assert_called_once()
 
@@ -89,11 +90,12 @@ class TestVisionPipeline:
         result = pipeline.perceive()
         assert result is None
 
-    def test_perceive_ocr_empty(self, pipeline):
+    def test_perceive_ocr_empty(self, pipeline, tmp_path):
         """OCR 为空时仍然返回有效 PerceptionResult"""
+        image_path = str(tmp_path / "empty.png")
         mock_capture = Mock()
         mock_capture.capture.return_value = Mock(
-            image_path="/tmp/empty.png",
+            image_path=image_path,
             window_rect=Rect(0, 0, 1760, 1280),
             scale_factor=1.0
         )

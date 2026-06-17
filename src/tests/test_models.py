@@ -102,7 +102,8 @@ class TestChatListItem:
 
 
 class TestPerceptionResult:
-    def test_creation(self):
+    def test_creation(self, tmp_path):
+        image_path = str(tmp_path / "test.png")
         msg = ChatMessage(
             text="hi", sender="Alice", sender_type=SenderType.OTHER, chat_name="测试群"
         )
@@ -114,9 +115,9 @@ class TestPerceptionResult:
             chat_name="测试群",
             messages=[msg],
             chat_list_items=[item],
-            screenshot_path="/tmp/test.png"
+            screenshot_path=image_path
         )
         assert pr.chat_name == "测试群"
         assert len(pr.messages) == 1
         assert len(pr.chat_list_items) == 1
-        assert pr.screenshot_path == "/tmp/test.png"
+        assert pr.screenshot_path == image_path

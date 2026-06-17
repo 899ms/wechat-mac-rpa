@@ -101,23 +101,23 @@ class TestWeChatMessageSender:
         assert result.error is not None
         assert "CalledProcessError" in result.error or "pbcopy" in result.error
 
-    def test_send_image_not_implemented(self):
+    def test_send_image_not_implemented(self, tmp_path):
         sender = WeChatMessageSender()
-        result = sender.send_image("/tmp/test.png")
+        result = sender.send_image(str(tmp_path / "test.png"))
         assert isinstance(result, ActionResult)
         assert result.success is False
         assert "not implemented" in result.error.lower()
 
-    def test_send_file_file_not_exists(self):
+    def test_send_file_file_not_exists(self, tmp_path):
         sender = WeChatMessageSender()
-        result = sender.send_file("/tmp/nonexistent_file_12345.txt")
+        result = sender.send_file(str(tmp_path / "nonexistent_file_12345.txt"))
         assert isinstance(result, ActionResult)
         assert result.success is False
         assert "不存在" in result.error
 
-    def test_send_file_silent_mode_returns_success(self):
+    def test_send_file_silent_mode_returns_success(self, tmp_path):
         sender = WeChatMessageSender(silent_mode=True)
-        result = sender.send_file("/tmp/nonexistent_file_12345.txt")
+        result = sender.send_file(str(tmp_path / "nonexistent_file_12345.txt"))
         assert isinstance(result, ActionResult)
         assert result.success is True
         assert "[文件]" in result.sent_text
