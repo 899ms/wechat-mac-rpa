@@ -75,12 +75,16 @@ class WeChatBot:
         registry = get_registry()
         register_builtin_tools(registry)
         # 再创建 Generator，把 memory_engine 和 tool_registry 直接传入
+        # JudgeWorker 默认关闭（deepseek token 消耗大），通过 ENABLE_JUDGE_WORKER=1 开启
+        judge_worker = _get_judge_worker() if os.environ.get("ENABLE_JUDGE_WORKER", "0") == "1" else None
+        if judge_worker is None:
+            self.logger.info("JudgeWorker 已禁用（ENABLE_JUDGE_WORKER 未设置），跳过 badcase 审计以节省 deepseek token")
         self.generator = ReplyGenerator(
             llm_client=actual_llm,
             complex_llm_client=complex_llm_client,
             memory_engine=self.memory_engine,
             tool_registry=registry,
-            judge_worker=_get_judge_worker(),
+            judge_worker=judge_worker,
             enable_timestamps=True,
         )
         self.sender = WeChatMessageSender(silent_mode=os.environ.get("WECHAT_SILENT_MODE") == "1")
@@ -601,6 +605,10 @@ class WeChatBot:
                 self.tick()
             except Exception as e:
                 self.logger.error(f"Tick #{self._tick_id} 未捕获异常: {e}", exc_info=True)
+            # 每 60 个 tick（约 5 分钟，按 5s 间隔）输出一次 DeepSeek token 统计
+            if self._tick_id > 0 and self._tick_id % 60 == 0:
+                from src.utils.qwen_client import QwenClient
+                QwenClient.log_token_stats(self.logger)
             time.sleep(interval)
 
     def _recover_from_non_chat_view(self, result: PerceptionResult) -> bool:
