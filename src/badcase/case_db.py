@@ -13,12 +13,15 @@ Case Database — SQLite 存储所有 badcase 的完整信息（原始 prompt、
 """
 
 import json
+import logging
 import sqlite3
 import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+_logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 DB_PATH = PROJECT_ROOT / "data" / "cases.db"

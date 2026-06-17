@@ -110,6 +110,7 @@ def extract_context_around_keywords(
     result_parts = []
     used_chars = 0
     budget = max_chars
+    last_end = 0
 
     # 先取第一个窗口（通常最重要），完整保留
     for window in merged:

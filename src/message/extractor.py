@@ -2,7 +2,7 @@
 """L3 Message Extractor - 从 UILayout 中提取结构化消息"""
 
 import re
-from typing import List
+from typing import Any, Dict, List
 
 from src.models.base import ChatMessage, OCRTextElement, Point, Rect, SenderType
 from src.layout.layout_parser import UILayout, TIMESTAMP_PATTERNS

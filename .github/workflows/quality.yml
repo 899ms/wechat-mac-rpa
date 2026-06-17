@@ -1,0 +1,90 @@
+name: Quality
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  ruff-critical:
+    name: Ruff Critical Checks
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+          cache: "pip"
+      - run: pip install ruff
+      - run: ruff check src --select E9,F63,F7,F82
+
+  ruff-style:
+    name: Ruff Style / Import Checks
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+          cache: "pip"
+      - run: pip install ruff
+      # 目前仓库遗留风格问题较多，先只报告不阻塞 merge； issues 输出到日志。
+      - run: ruff check src || true
+
+  mypy:
+    name: Mypy Type Check
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+          cache: "pip"
+      - run: pip install mypy types-requests types-beautifulsoup4 types-Pillow
+      # 目前类型注解遗留问题较多，先只报告不阻塞 merge； issues 输出到日志。
+      - run: mypy src || true
+
+  bandit:
+    name: Bandit Security Scan
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+          cache: "pip"
+      - run: pip install bandit
+      - run: bandit -r src -f json -o bandit-report.json || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          if-no-files-found: ignore
+
+  coverage:
+    name: Test Coverage
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - run: |
+          pytest \
+            src/tests/test_reply.py \
+            src/tests/test_debug_logger.py \
+            src/tests/test_layout_profile.py \
+            src/tests/test_message_extractor.py \
+            src/tests/test_session_memory.py \
+            --cov=src --cov-report=xml --cov-report=term
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage.xml
+          if-no-files-found: ignore
