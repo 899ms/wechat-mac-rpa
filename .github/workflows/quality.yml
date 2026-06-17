@@ -48,7 +48,6 @@ jobs:
   bandit:
     name: Bandit Security Scan
     runs-on: macos-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -56,6 +55,7 @@ jobs:
           python-version: "3.10"
           cache: "pip"
       - run: pip install bandit
+      # 目前安全扫描遗留问题较多，先只报告不阻塞 merge； issues 输出到日志。
       - run: bandit -r src -f json -o bandit-report.json || true
       - uses: actions/upload-artifact@v4
         if: always()
