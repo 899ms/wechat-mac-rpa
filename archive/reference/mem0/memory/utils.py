@@ -206,11 +206,11 @@ def process_telemetry_filters(filters):
 
     encoded_ids = {}
     if "user_id" in filters:
-        encoded_ids["user_id"] = hashlib.md5(filters["user_id"].encode()).hexdigest()
+        encoded_ids["user_id"] = hashlib.sha256(filters["user_id"].encode()).hexdigest()
     if "agent_id" in filters:
-        encoded_ids["agent_id"] = hashlib.md5(filters["agent_id"].encode()).hexdigest()
+        encoded_ids["agent_id"] = hashlib.sha256(filters["agent_id"].encode()).hexdigest()
     if "run_id" in filters:
-        encoded_ids["run_id"] = hashlib.md5(filters["run_id"].encode()).hexdigest()
+        encoded_ids["run_id"] = hashlib.sha256(filters["run_id"].encode()).hexdigest()
 
     return list(filters.keys()), encoded_ids
 

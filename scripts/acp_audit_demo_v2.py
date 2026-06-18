@@ -95,7 +95,8 @@ async def analyze_with_kimi(issue: dict, notes: str, timeout: int = 300) -> dict
             pass
         return {"success": False, "error": f"分析超时（>{timeout}秒）"}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        print(f"[Analyze] Error: {e}")
+        return {"success": False, "error": "分析异常，请查看服务端日志"}
 
 
 # ============ FastAPI App ============
