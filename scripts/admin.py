@@ -10,7 +10,10 @@ import html
 import json as _json
 import subprocess
 
-_e = html.escape
+
+def _e(s) -> str:
+    """HTML escape helper"""
+    return html.escape(str(s))
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from src.badcase.case_db import get_db
@@ -336,6 +339,9 @@ SCREENSHOTS_DIR = Path(__file__).parent.parent / "data" / "screenshots"
 
 def _safe_path(base: Path, rel: str) -> Path | None:
     """解析相对路径并确保结果在 base 目录内，防止目录遍历。"""
+    # 先拒绝包含 .. 或绝对路径的输入
+    if not rel or rel.startswith("/") or ".." in Path(rel).parts:
+        return None
     try:
         resolved = (base / rel).resolve()
         base_resolved = base.resolve()
@@ -507,7 +513,7 @@ def screenshot_detail(id: int):
                     text = e.get("text", "")
                     bbox = e.get("bbox", [])
                     conf = e.get("confidence", 0)
-                    ocr_rows += f"<tr><td style='font-size:10px;color:var(--muted)'>{bbox}</td><td>{text}</td><td>{conf:.0%}</td></tr>"
+                    ocr_rows += f"<tr><td style='font-size:10px;color:var(--muted)'>{_e(str(bbox))}</td><td>{_e(text)}</td><td>{conf:.0%}</td></tr>"
                 ocr_html = f"<table><tr><th>BBox</th><th>Text</th><th>置信度</th></tr>{ocr_rows}</table>"
             else:
                 ocr_html = "<span style='color:var(--muted)'>OCR elements 为空（可能为本地跳过路径）</span>"
@@ -521,10 +527,10 @@ def screenshot_detail(id: int):
                 val = dbg.get(key, [])
                 if val:
                     if isinstance(val, list):
-                        items = "<br>".join(str(v) for v in val)
-                        layout_parts.append(f"<div class='card'><b>{label}</b> ({len(val)}):<br><span style='font-size:11px'>{items}</span></div>")
+                        items = "<br>".join(_e(str(v)) for v in val)
+                        layout_parts.append(f"<div class='card'><b>{_e(label)}</b> ({len(val)}):<br><span style='font-size:11px'>{items}</span></div>")
                     else:
-                        layout_parts.append(f"<div class='card'><b>{label}</b>: {str(val)}</div>")
+                        layout_parts.append(f"<div class='card'><b>{_e(label)}</b>: {_e(str(val))}</div>")
             if layout_parts:
                 layout_html = "".join(layout_parts)
 
@@ -533,18 +539,18 @@ def screenshot_detail(id: int):
             api_response = dbg.get("api_response", "")
             api_thinking = dbg.get("api_thinking", "")
             if api_prompt:
-                api_prompt_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{api_prompt}</pre>"
+                api_prompt_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{_e(api_prompt)}</pre>"
             if api_response:
-                api_response_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{api_response}</pre>"
+                api_response_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{_e(api_response)}</pre>"
             if api_thinking:
-                api_thinking_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{api_thinking}</pre>"
+                api_thinking_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{_e(api_thinking)}</pre>"
 
             # 提取消息
             msgs = dbg.get("extraction_messages", [])
             if msgs:
                 msgs_html = ""
                 for m in msgs:
-                    msgs_html += f"<tr><td>{m.get('sender','')}</td><td>{m.get('text','')}</td><td>{m.get('chat_name','')}</td></tr>"
+                    msgs_html += f"<tr><td>{_e(m.get('sender',''))}</td><td>{_e(m.get('text',''))}</td><td>{_e(m.get('chat_name',''))}</td></tr>"
                 layout_parts.append(f"<div class='card'><b>提取的消息</b> ({len(msgs)}):<table><tr><th>发送者</th><th>文本</th><th>聊天</th></tr>{msgs_html}</table></div>")
         except Exception:
             pass

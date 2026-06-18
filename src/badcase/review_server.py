@@ -42,6 +42,8 @@ def _safe_filename(name: str) -> Optional[str]:
 
 def _safe_project_path(rel: str) -> Optional[Path]:
     """解析相对路径并确保结果在项目根目录内。"""
+    if not rel or rel.startswith("/") or ".." in Path(rel).parts:
+        return None
     try:
         target = (PROJECT_ROOT / rel).resolve()
         root = PROJECT_ROOT.resolve()
