@@ -29,6 +29,29 @@ DISMISSED_DIR = PROJECT_ROOT / "data" / "review_drafts" / "dismissed"
 for d in (PENDING_DIR, COMMITTED_DIR, DISMISSED_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
+
+def _safe_filename(name: str) -> Optional[str]:
+    """只允许纯文件名（不含路径分隔符），防止目录遍历。"""
+    if not name:
+        return None
+    stripped = name.replace("/", "").replace("\\", "").replace("..", "")
+    if not stripped or stripped in (".", ".."):
+        return None
+    return stripped
+
+
+def _safe_project_path(rel: str) -> Optional[Path]:
+    """解析相对路径并确保结果在项目根目录内。"""
+    try:
+        target = (PROJECT_ROOT / rel).resolve()
+        root = PROJECT_ROOT.resolve()
+        if target == root or root in target.parents:
+            return target
+    except (ValueError, OSError):
+        pass
+    return None
+
+
 app = FastAPI(title="Badcase Review")
 
 # ------------------------------------------------------------------
@@ -492,7 +515,9 @@ def api_commit_draft(draft_id: str, body: Dict[str, Any] = Body(default={})):
     try:
         _append_case_to_benchmark(benchmark_file, case_code)
     except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)})
+        import logging
+        logging.getLogger("review_server").warning(f"提交 benchmark 失败: {e}")
+        return JSONResponse({"success": False, "error": "提交 benchmark 失败，请查看服务端日志"})
 
     # 移动 draft
     src = _find_draft_path(draft_id)
@@ -545,8 +570,8 @@ def api_dismiss_draft(draft_id: str, body: Dict[str, Any] = Body(default={})):
 # 静态文件服务（截图、prompt.md 等）
 @app.get("/{path:path}")
 def serve_static(path: str):
-    file_path = PROJECT_ROOT / path
-    if file_path.exists() and file_path.is_file():
+    file_path = _safe_project_path(path)
+    if file_path and file_path.exists() and file_path.is_file():
         from fastapi.responses import FileResponse
         return FileResponse(file_path)
     return RedirectResponse("/")
@@ -557,16 +582,22 @@ def serve_static(path: str):
 # ------------------------------------------------------------------
 
 def _load_draft_anywhere(draft_id: str) -> Optional[Dict]:
+    safe_id = _safe_filename(draft_id)
+    if not safe_id:
+        return None
     for d in (PENDING_DIR, COMMITTED_DIR, DISMISSED_DIR):
-        p = d / f"{draft_id}.json"
+        p = d / f"{safe_id}.json"
         if p.exists():
             return json.loads(p.read_text(encoding="utf-8"))
     return None
 
 
 def _find_draft_path(draft_id: str) -> Optional[Path]:
+    safe_id = _safe_filename(draft_id)
+    if not safe_id:
+        return None
     for d in (PENDING_DIR, COMMITTED_DIR, DISMISSED_DIR):
-        p = d / f"{draft_id}.json"
+        p = d / f"{safe_id}.json"
         if p.exists():
             return p
     return None
