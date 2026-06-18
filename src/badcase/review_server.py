@@ -41,15 +41,15 @@ def _safe_filename(name: str) -> Optional[str]:
 
 
 def _safe_project_path(rel: str) -> Optional[Path]:
-    """解析相对路径并确保结果在项目根目录内，且为真实文件。"""
-    import os
-    if not rel or rel.startswith("/") or ".." in Path(rel).parts:
+    """只允许项目根目录下的相对路径（白名单字符），防止目录遍历。"""
+    import re
+    if not rel or rel.startswith("/") or not re.fullmatch(r"[a-zA-Z0-9_./\-]+", rel):
         return None
     try:
-        target = os.path.abspath(os.path.join(str(PROJECT_ROOT), os.path.normpath(rel)))
-        root = os.path.abspath(str(PROJECT_ROOT))
-        if os.path.commonpath([target, root]) == root and os.path.isfile(target):
-            return Path(target)
+        target = (PROJECT_ROOT / rel).resolve()
+        root = PROJECT_ROOT.resolve()
+        if target.is_file() and (target == root or root in target.parents):
+            return target
     except (ValueError, OSError):
         pass
     return None
