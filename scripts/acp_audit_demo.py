@@ -171,7 +171,7 @@ class AcpManager:
             import traceback
             print(f"[ACP] Error: {e}")
             traceback.print_exc()
-            return {"success": False, "error": str(e), "reply": self.client.get_full_reply()}
+            return {"success": False, "error": "分析异常，请查看服务端日志", "reply": self.client.get_full_reply()}
 
     def _build_prompt(self, issue: dict, notes: str) -> str:
         return f"""你是一个代码审计专家。请分析以下代码问题并给出修复方案。
