@@ -11,9 +11,6 @@ import json as _json
 import subprocess
 
 
-def _e(s) -> str:
-    """HTML escape helper"""
-    return html.escape(str(s))
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from src.badcase.case_db import get_db
@@ -146,10 +143,10 @@ def tick_list(page: int = Query(1), filter: str = Query("all")):
                 reply_preview = " | ".join(str(x) for x in (arr if isinstance(arr, list) else []))
             except: pass
         rows_html += f"""<tr>
-          <td><a href="/ticks/{r['id']}" style="color:var(--blue)">{_e(r['session_id'] or '')}:#{r['tick_id']}</a></td>
-          <td>{_e(r['chat_name'] or '-')}</td><td>{r['new_messages_count'] or r['messages_count'] or 0}条</td>
-          <td>{_e(status)}</td><td style="font-size:11px">{_e(reply_preview)}</td><td>{llm_score}</td><td>{_e(human)}</td><td>{r['duration_ms'] or 0}ms</td>
-          <td style="font-size:11px;color:var(--muted)">{_e(r['created_at'] if r['created_at'] else '')}</td></tr>"""
+          <td><a href="/ticks/{r['id']}" style="color:var(--blue)">{html.escape(r['session_id'] or '')}:#{r['tick_id']}</a></td>
+          <td>{html.escape(r['chat_name'] or '-')}</td><td>{r['new_messages_count'] or r['messages_count'] or 0}条</td>
+          <td>{html.escape(status)}</td><td style="font-size:11px">{html.escape(reply_preview)}</td><td>{llm_score}</td><td>{html.escape(human)}</td><td>{r['duration_ms'] or 0}ms</td>
+          <td style="font-size:11px;color:var(--muted)">{html.escape(r['created_at'] if r['created_at'] else '')}</td></tr>"""
 
     conn = db._get_conn()
     total = conn.execute(f"SELECT COUNT(*) FROM tick_log {where}").fetchone()[0]
@@ -158,9 +155,9 @@ def tick_list(page: int = Query(1), filter: str = Query("all")):
     content = f"""<p style="margin-bottom:12px"><a href="?filter=all">全部({total})</a> | <a href="?filter=replied">已回复</a> | <a href="?filter=skipped">跳过</a> | <span style="color:var(--muted);font-size:12px">每页20条</span></p>
     <table><tr><th>Tick</th><th>聊天</th><th>消息</th><th>状态</th><th>回复</th><th>LLM</th><th>👤</th><th>耗时</th><th>时间</th></tr>{rows_html}</table>
     <div style="margin-top:12px;font-size:13px">
-      <a href="?page={page-1}&filter={_e(filter)}" style="color:var(--blue);margin-right:12px" {'hidden' if page<=1 else ''}>← 上一页</a>
+      <a href="?page={page-1}&filter={html.escape(filter)}" style="color:var(--blue);margin-right:12px" {'hidden' if page<=1 else ''}>← 上一页</a>
       第 {page} 页 / 共 {total_pages} 页
-      <a href="?page={page+1}&filter={_e(filter)}" style="color:var(--blue);margin-left:12px">下一页 →</a>
+      <a href="?page={page+1}&filter={html.escape(filter)}" style="color:var(--blue);margin-left:12px">下一页 →</a>
     </div>"""
     return HTMLResponse(_page("Tick 查看", content, "/ticks"))
 
@@ -179,7 +176,7 @@ def tick_detail(id: int):
     try:
         import json as _j4
         reply_list = _j4.loads(replies) if replies else []
-        replies_display = "<br>".join(f'<span style="background:rgba(88,166,255,.15);padding:2px 8px;border-radius:4px;margin:2px;display:inline-block;font-size:13px">{_e(str(r))}</span>' for r in reply_list) if reply_list else _e(replies)
+        replies_display = "<br>".join(f'<span style="background:rgba(88,166,255,.15);padding:2px 8px;border-radius:4px;margin:2px;display:inline-block;font-size:13px">{html.escape(str(r))}</span>' for r in reply_list) if reply_list else html.escape(replies)
     except:
         replies_display = replies
     sp = d.get("system_prompt") or ""
@@ -192,13 +189,13 @@ def tick_detail(id: int):
     ms = d.get("duration_ms",0) or 0
     status = d.get("skip_reason") or ("已回复" if d.get("should_reply") else "无消息")
     content = f"""
-    <div class="card"><b>{_e(d.get("session_id",""))}:#{d["tick_id"]}</b> — {_e(d.get("created_at",""))}</div>
-    <div class="card"><b>聊天:</b> {_e(d.get("chat_name","?"))} {"(群)" if d.get("is_group") else "(私)"} | <b>状态:</b> {_e(status)} | <b>耗时:</b> {ms}ms</div>
+    <div class="card"><b>{html.escape(d.get("session_id",""))}:#{d["tick_id"]}</b> — {html.escape(d.get("created_at",""))}</div>
+    <div class="card"><b>聊天:</b> {html.escape(d.get("chat_name","?"))} {"(群)" if d.get("is_group") else "(私)"} | <b>状态:</b> {html.escape(status)} | <b>耗时:</b> {ms}ms</div>
     <div class="card"><b>消息:</b> 总{d.get("messages_count",0)}条 新{d.get("new_messages_count",0)}条 | <b>发送:</b> {"OK" if d.get("send_success") else "N/A"}</div>
     <div class="card"><b>Bot 回复:</b><br>{replies_display}</div>
-    <div class="card" style="border-left:3px solid var(--blue)"><b>📝 System Prompt ({len(sp)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{_e(sp)}</pre></div>
-    <div class="card" style="border-left:3px solid var(--green)"><b>📝 User Prompt ({len(up)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{_e(up)}</pre></div>
-    <div class="card" style="border-left:3px solid var(--muted)"><b>📝 Raw Response</b><pre style="font-size:10px;white-space:pre-wrap">{_e(raw)}</pre></div>
+    <div class="card" style="border-left:3px solid var(--blue)"><b>📝 System Prompt ({len(sp)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{html.escape(sp)}</pre></div>
+    <div class="card" style="border-left:3px solid var(--green)"><b>📝 User Prompt ({len(up)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{html.escape(up)}</pre></div>
+    <div class="card" style="border-left:3px solid var(--muted)"><b>📝 Raw Response</b><pre style="font-size:10px;white-space:pre-wrap">{html.escape(raw)}</pre></div>
     """
     # 工具调用 + 结果（合并 tool_calls_json 和 tool_results_json）
     try:
@@ -228,8 +225,8 @@ def tick_detail(id: int):
                     targs = ' '.join(f'{k}={v}' for k,v in (args_obj.items() if isinstance(args_obj, dict) else []))
                 except: pass
                 tools_html += f"""<div style="margin:8px 0;padding:10px;background:rgba(255,255,255,.03);border-left:3px solid var(--yellow);border-radius:4px">
-                  <div style="font-size:12px;margin-bottom:4px"><b style="color:var(--yellow)">{_e(tname)}</b> <span style="color:var(--muted);font-size:10px">{_e(targs)}</span></div>
-                  <pre style="font-size:11px;max-height:250px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.3);padding:8px;border-radius:4px;margin:0">{_e(tresult)}</pre>
+                  <div style="font-size:12px;margin-bottom:4px"><b style="color:var(--yellow)">{html.escape(tname)}</b> <span style="color:var(--muted);font-size:10px">{html.escape(targs)}</span></div>
+                  <pre style="font-size:11px;max-height:250px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.3);padding:8px;border-radius:4px;margin:0">{html.escape(tresult)}</pre>
                 </div>"""
             content += f"""<div class="card" style="border-left:3px solid var(--yellow)"><b>🔧 工具调用 & 结果 ({len(all_tools)}项)</b>{tools_html}</div>"""
     except: pass
@@ -243,13 +240,13 @@ def tick_detail(id: int):
                 s = int(dd.get("score", 0))
                 filled = min(s // 10, 10)
                 bar = "█"*filled + "░"*(10-filled)
-                judge_dims += f'<div style="margin:2px 0;font-size:11px">{bar} {_e(name)}: {_e(str(dd.get("score","?")))}/100 — {_e(dd.get("comment",""))}</div>'
+                judge_dims += f'<div style="margin:2px 0;font-size:11px">{bar} {html.escape(name)}: {html.escape(str(dd.get("score","?")))}/100 — {html.escape(dd.get("comment",""))}</div>'
         except: pass
     js = d.get("judge_score")
     js_str = f"{js:.0f}" if js is not None else "?"
     content += f"""
     <div class="card" style="border-left:3px solid orange">
-      <b>LLM Judge:</b> {js_str}/100 | is_badcase: {'是' if d.get('judge_is_badcase') else '否'} | {_e(d.get("judge_badcase_type") or "?")}<br>{judge_dims}
+      <b>LLM Judge:</b> {js_str}/100 | is_badcase: {'是' if d.get('judge_is_badcase') else '否'} | {html.escape(d.get("judge_badcase_type") or "?")}<br>{judge_dims}
     </div>
     """
 
@@ -267,13 +264,13 @@ def tick_detail(id: int):
       <form id="gt-form" style="margin-top:8px">
         <label style="display:block;margin:8px 0"><input type="radio" name="is_badcase" value="1" {checked1}> badcase <input type="radio" name="is_badcase" value="0" {checked0} style="margin-left:12px"> 正常</label>
         <select name="badcase_type" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;padding:4px 8px;border-radius:4px;margin:4px 0">{sel_opts}</select>
-        <textarea name="notes" rows="2" placeholder="点评..." style="width:100%;background:#161b22;color:#c9d1d9;border:1px solid #30363d;padding:8px;border-radius:4px;font-size:13px;margin:4px 0">{_e(hn or "")}</textarea>
+        <textarea name="notes" rows="2" placeholder="点评..." style="width:100%;background:#161b22;color:#c9d1d9;border:1px solid #30363d;padding:8px;border-radius:4px;font-size:13px;margin:4px 0">{html.escape(hn or "")}</textarea>
         <button type="submit" style="background:#58a6ff;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px">保存</button> <span id="save-status" style="font-size:12px;color:#3fb950"></span>
       </form>
     </div>
     <script>document.getElementById("gt-form").addEventListener("submit",async function(e){{e.preventDefault();var f=e.target;var r=await fetch("/api/gt/{id}",{{method:"POST",headers:{{"Content-Type":"application/json"}},body:JSON.stringify({{is_badcase:f.is_badcase.value==="1",badcase_type:f.badcase_type.value,notes:f.notes.value}})}});document.getElementById("save-status").textContent=(await r.json()).success?"OK":"FAIL";}});</script>
     """
-    return HTMLResponse(_page(f"Tick {_e(d.get('session_id',''))}:#{d['tick_id']}", content, "/ticks"))
+    return HTMLResponse(_page(f"Tick {html.escape(d.get('session_id',''))}:#{d['tick_id']}", content, "/ticks"))
 
 
 @app.get("/gt", response_class=HTMLResponse)
@@ -338,15 +335,14 @@ DEBUG_DIR = Path(__file__).parent.parent / "data" / "debug"
 SCREENSHOTS_DIR = Path(__file__).parent.parent / "data" / "screenshots"
 
 def _safe_path(base: Path, rel: str) -> Path | None:
-    """解析相对路径并确保结果在 base 目录内，防止目录遍历。"""
-    # 先拒绝包含 .. 或绝对路径的输入
-    if not rel or rel.startswith("/") or ".." in Path(rel).parts:
+    """只允许 base 目录下的纯文件名，防止目录遍历。"""
+    if not rel or "/" in rel or "\\" in rel or rel in (".", ".."):
         return None
     try:
-        resolved = (base / rel).resolve()
+        target = (base / rel).resolve()
         base_resolved = base.resolve()
-        if resolved == base_resolved or base_resolved in resolved.parents:
-            return resolved
+        if target.parent == base_resolved and target.is_file():
+            return target
     except (ValueError, OSError):
         pass
     return None
@@ -427,13 +423,13 @@ def screenshots_list(page: int = Query(1, ge=1), limit: int = Query(20, ge=5, le
         rows_html += "<tr>"
         rows_html += '<td><a href="/screenshots/' + str(tid) + '" style="color:var(--blue)">#' + str(tid) + '</a></td>'
         rows_html += "<td>-</td>"
-        rows_html += "<td>" + _e(chat_name) + "</td>"
+        rows_html += "<td>" + html.escape(chat_name) + "</td>"
         rows_html += "<td>" + img_tag + "</td>"
-        rows_html += '<td style="font-size:12px">' + _e(ocr_summary) + '</td>'
+        rows_html += '<td style="font-size:12px">' + html.escape(ocr_summary) + '</td>'
         rows_html += "<td>" + api_info + "</td>"
         rows_html += "</tr>"
 
-    safe_filter = _e(filter)
+    safe_filter = html.escape(filter)
     content = f"""
     <p style="color:var(--muted);font-size:13px;margin-bottom:12px">截图、OCR 识别结果、多模态 API — {total} 条
     <a href="?" style="color:var(--blue);margin-left:8px">{'<b>[全部]</b>' if filter=='all' else '[全部]'}</a>
@@ -481,7 +477,7 @@ def screenshot_detail(id: int):
     # 找 debug JSON（无论数据库有无记录，都尝试从 debug JSON 读取）
     debug_files = sorted(DEBUG_DIR.glob(f"tick_*_{tick_id}.json"))
     if not debug_files:
-        return HTMLResponse("<h1>Debug data not found</h1><p>没有找到 tick #%s 的 debug 数据</p>" % _e(str(tick_id)))
+        return HTMLResponse("<h1>Debug data not found</h1><p>没有找到 tick #%s 的 debug 数据</p>" % html.escape(str(tick_id)))
 
     dbg = {}
     sp = db_screenshot
@@ -513,7 +509,7 @@ def screenshot_detail(id: int):
                     text = e.get("text", "")
                     bbox = e.get("bbox", [])
                     conf = e.get("confidence", 0)
-                    ocr_rows += f"<tr><td style='font-size:10px;color:var(--muted)'>{_e(str(bbox))}</td><td>{_e(text)}</td><td>{conf:.0%}</td></tr>"
+                    ocr_rows += f"<tr><td style='font-size:10px;color:var(--muted)'>{html.escape(str(bbox))}</td><td>{html.escape(text)}</td><td>{conf:.0%}</td></tr>"
                 ocr_html = f"<table><tr><th>BBox</th><th>Text</th><th>置信度</th></tr>{ocr_rows}</table>"
             else:
                 ocr_html = "<span style='color:var(--muted)'>OCR elements 为空（可能为本地跳过路径）</span>"
@@ -527,10 +523,10 @@ def screenshot_detail(id: int):
                 val = dbg.get(key, [])
                 if val:
                     if isinstance(val, list):
-                        items = "<br>".join(_e(str(v)) for v in val)
-                        layout_parts.append(f"<div class='card'><b>{_e(label)}</b> ({len(val)}):<br><span style='font-size:11px'>{items}</span></div>")
+                        items = "<br>".join(html.escape(str(v)) for v in val)
+                        layout_parts.append(f"<div class='card'><b>{html.escape(label)}</b> ({len(val)}):<br><span style='font-size:11px'>{items}</span></div>")
                     else:
-                        layout_parts.append(f"<div class='card'><b>{_e(label)}</b>: {_e(str(val))}</div>")
+                        layout_parts.append(f"<div class='card'><b>{html.escape(label)}</b>: {html.escape(str(val))}</div>")
             if layout_parts:
                 layout_html = "".join(layout_parts)
 
@@ -539,29 +535,29 @@ def screenshot_detail(id: int):
             api_response = dbg.get("api_response", "")
             api_thinking = dbg.get("api_thinking", "")
             if api_prompt:
-                api_prompt_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{_e(api_prompt)}</pre>"
+                api_prompt_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{html.escape(api_prompt)}</pre>"
             if api_response:
-                api_response_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{_e(api_response)}</pre>"
+                api_response_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{html.escape(api_response)}</pre>"
             if api_thinking:
-                api_thinking_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{_e(api_thinking)}</pre>"
+                api_thinking_html = f"<pre style='font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px'>{html.escape(api_thinking)}</pre>"
 
             # 提取消息
             msgs = dbg.get("extraction_messages", [])
             if msgs:
                 msgs_html = ""
                 for m in msgs:
-                    msgs_html += f"<tr><td>{_e(m.get('sender',''))}</td><td>{_e(m.get('text',''))}</td><td>{_e(m.get('chat_name',''))}</td></tr>"
+                    msgs_html += f"<tr><td>{html.escape(m.get('sender',''))}</td><td>{html.escape(m.get('text',''))}</td><td>{html.escape(m.get('chat_name',''))}</td></tr>"
                 layout_parts.append(f"<div class='card'><b>提取的消息</b> ({len(msgs)}):<table><tr><th>发送者</th><th>文本</th><th>聊天</th></tr>{msgs_html}</table></div>")
         except Exception:
             pass
 
     fname = Path(sp).name if sp else ""
-    img_html = f'<img src="/api/screenshot-image/{_e(fname)}" style="max-width:100%;border-radius:4px;border:1px solid var(--border)" onerror="this.style.display=\'none\'">' if fname else '<span style="color:var(--muted)">无截图</span>'
+    img_html = f'<img src="/api/screenshot-image/{html.escape(fname)}" style="max-width:100%;border-radius:4px;border:1px solid var(--border)" onerror="this.style.display=\'none\'">' if fname else '<span style="color:var(--muted)">无截图</span>'
 
     display_id = f'{session_id}:#{tick_id}' if session_id else f'#{tick_id}'
     tick_link = f'<a href="/ticks/{id}" style="color:var(--blue);font-size:13px">→ 查看 Tick 详情</a>'
     content = f"""
-    <div class="card"><b>{_e(display_id)}</b> — {_e(ts)} | {_e(raw_chat)} | {tick_link}<br><span style="font-size:11px;color:var(--muted)">{_e(sp)}</span></div>
+    <div class="card"><b>{html.escape(display_id)}</b> — {html.escape(ts)} | {html.escape(raw_chat)} | {tick_link}<br><span style="font-size:11px;color:var(--muted)">{html.escape(sp)}</span></div>
 
     <div style="display:flex;gap:16px;flex-wrap:wrap">
       <div style="flex:1;min-width:300px">
@@ -578,7 +574,7 @@ def screenshot_detail(id: int):
     <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted)">📐 Layout 分组</summary><div class="card">{layout_html}</div></details>
     <p style="margin-top:12px"><a href="/screenshots" style="color:var(--blue)">返回列表</a></p>
     """
-    return HTMLResponse(_page(f"截图 {_e(display_id)}", content, "/screenshots"))
+    return HTMLResponse(_page(f"截图 {html.escape(display_id)}", content, "/screenshots"))
 
 
 # ── Benchmark Dashboard ──
