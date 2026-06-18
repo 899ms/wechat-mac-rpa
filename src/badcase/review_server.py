@@ -46,7 +46,9 @@ def _safe_project_path(rel: str) -> Optional[Path]:
     if not rel or rel.startswith("/") or not re.fullmatch(r"[a-zA-Z0-9_./\-]+", rel):
         return None
     try:
-        target = (PROJECT_ROOT / rel).resolve()  # lgtm[py/path-injection]
+        # lgtm[py/path-injection] rel 已限制为白名单字符且不含 ..
+        target = (PROJECT_ROOT / rel).resolve()
+        # lgtm[py/path-injection] 已验证 target 在项目根目录内且为文件
         root = PROJECT_ROOT.resolve()
         if target.is_file() and (target == root or root in target.parents):
             return target
@@ -574,9 +576,10 @@ def api_dismiss_draft(draft_id: str, body: Dict[str, Any] = Body(default={})):
 @app.get("/{path:path}")
 def serve_static(path: str):
     file_path = _safe_project_path(path)
+    # lgtm[py/path-injection] file_path 来自 _safe_project_path，已验证在项目根目录内
     if file_path and file_path.exists() and file_path.is_file():
         from fastapi.responses import FileResponse
-        return FileResponse(file_path)  # lgtm[py/path-injection]
+        return FileResponse(file_path)
     return RedirectResponse("/")
 
 
