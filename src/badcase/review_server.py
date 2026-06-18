@@ -42,12 +42,13 @@ def _safe_filename(name: str) -> Optional[str]:
 
 def _safe_project_path(rel: str) -> Optional[Path]:
     """解析相对路径并确保结果在项目根目录内，且为真实文件。"""
+    import os
     if not rel or rel.startswith("/") or ".." in Path(rel).parts:
         return None
     try:
-        target = (PROJECT_ROOT / rel).resolve()
+        target = (PROJECT_ROOT / os.path.normpath(rel)).resolve()
         root = PROJECT_ROOT.resolve()
-        if target.is_file() and (target == root or root in target.parents):
+        if target.is_file() and root in [target, *target.parents]:
             return target
     except (ValueError, OSError):
         pass

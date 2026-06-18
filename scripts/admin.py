@@ -336,15 +336,13 @@ SCREENSHOTS_DIR = Path(__file__).parent.parent / "data" / "screenshots"
 
 def _safe_path(base: Path, rel: str) -> Path | None:
     """只允许 base 目录下的纯文件名，防止目录遍历。"""
-    if not rel or "/" in rel or "\\" in rel or rel in (".", ".."):
+    import os
+    name = os.path.basename(rel)
+    if not name or name in (".", "..") or "/" in rel or "\\" in rel:
         return None
-    try:
-        target = (base / rel).resolve()
-        base_resolved = base.resolve()
-        if target.parent == base_resolved and target.is_file():
-            return target
-    except (ValueError, OSError):
-        pass
+    target = base / name
+    if target.is_file():
+        return target
     return None
 
 
