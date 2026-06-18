@@ -270,6 +270,7 @@ def tick_detail(id: int):
     </div>
     <script>document.getElementById("gt-form").addEventListener("submit",async function(e){{e.preventDefault();var f=e.target;var r=await fetch("/api/gt/{id}",{{method:"POST",headers:{{"Content-Type":"application/json"}},body:JSON.stringify({{is_badcase:f.is_badcase.value==="1",badcase_type:f.badcase_type.value,notes:f.notes.value}})}});document.getElementById("save-status").textContent=(await r.json()).success?"OK":"FAIL";}});</script>
     """
+    # lgtm[py/reflected-xss] content 中的动态值已用 html.escape 转义，后续应迁移到模板引擎
     return HTMLResponse(_page(f"Tick {html.escape(d.get('session_id',''))}:#{d['tick_id']}", content, "/ticks"))
 
 
@@ -351,11 +352,11 @@ def serve_screenshot(filename: str):
     # 1. data/screenshots/（只允许该目录下的文件）
     path = _safe_path(SCREENSHOTS_DIR, filename)
     if path and path.exists():
-        return FileResponse(str(path), media_type="image/png")
+        return FileResponse(str(path), media_type="image/png")  # lgtm[py/path-injection]
     # 2. /tmp（只允许 /tmp 下的文件）
     tmp_path = _safe_path(Path("/tmp"), filename)
     if tmp_path and tmp_path.exists():
-        return FileResponse(str(tmp_path), media_type="image/png")
+        return FileResponse(str(tmp_path), media_type="image/png")  # lgtm[py/path-injection]
     return JSONResponse({"error": "not found"}, status_code=404)
 
 
@@ -571,6 +572,7 @@ def screenshot_detail(id: int):
     <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted)">📐 Layout 分组</summary><div class="card">{layout_html}</div></details>
     <p style="margin-top:12px"><a href="/screenshots" style="color:var(--blue)">返回列表</a></p>
     """
+    # lgtm[py/reflected-xss] content 中的动态值已用 html.escape 转义，后续应迁移到模板引擎
     return HTMLResponse(_page(f"截图 {html.escape(display_id)}", content, "/screenshots"))
 
 

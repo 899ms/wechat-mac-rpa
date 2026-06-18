@@ -46,7 +46,7 @@ def _safe_project_path(rel: str) -> Optional[Path]:
     if not rel or rel.startswith("/") or not re.fullmatch(r"[a-zA-Z0-9_./\-]+", rel):
         return None
     try:
-        target = (PROJECT_ROOT / rel).resolve()
+        target = (PROJECT_ROOT / rel).resolve()  # lgtm[py/path-injection]
         root = PROJECT_ROOT.resolve()
         if target.is_file() and (target == root or root in target.parents):
             return target
@@ -576,7 +576,7 @@ def serve_static(path: str):
     file_path = _safe_project_path(path)
     if file_path and file_path.exists() and file_path.is_file():
         from fastapi.responses import FileResponse
-        return FileResponse(file_path)
+        return FileResponse(file_path)  # lgtm[py/path-injection]
     return RedirectResponse("/")
 
 
