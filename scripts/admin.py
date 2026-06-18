@@ -338,11 +338,15 @@ def _safe_path(base: Path, rel: str) -> Path | None:
     """只允许 base 目录下的纯文件名，防止目录遍历。"""
     import os
     name = os.path.basename(rel)
-    if not name or name in (".", "..") or "/" in rel or "\\" in rel:
+    if not name or name in (".", ".."):
         return None
-    target = base / name
-    if target.is_file():
-        return target
+    target = os.path.abspath(os.path.join(str(base), name))
+    base_abs = os.path.abspath(str(base))
+    try:
+        if os.path.commonpath([target, base_abs]) == base_abs and os.path.isfile(target):
+            return Path(target)
+    except (ValueError, OSError):
+        pass
     return None
 
 

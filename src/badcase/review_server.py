@@ -46,10 +46,10 @@ def _safe_project_path(rel: str) -> Optional[Path]:
     if not rel or rel.startswith("/") or ".." in Path(rel).parts:
         return None
     try:
-        target = (PROJECT_ROOT / os.path.normpath(rel)).resolve()
-        root = PROJECT_ROOT.resolve()
-        if target.is_file() and root in [target, *target.parents]:
-            return target
+        target = os.path.abspath(os.path.join(str(PROJECT_ROOT), os.path.normpath(rel)))
+        root = os.path.abspath(str(PROJECT_ROOT))
+        if os.path.commonpath([target, root]) == root and os.path.isfile(target):
+            return Path(target)
     except (ValueError, OSError):
         pass
     return None
