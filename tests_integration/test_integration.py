@@ -76,22 +76,14 @@ class TestVisionPipelineIntegration:
         assert len(result.messages) >= 1
 
     def test_private_w1han(self, pipeline):
-        """private_w1han fixture"""
-        img_path = str(FIXTURES_DIR / "private_w1han.png")
-        if not Path(img_path).exists():
-            pytest.skip("private_w1han.png not found")
-
-        self._mock_capture(pipeline, img_path)
-        result = pipeline.perceive()
-
-        assert result is not None
-        # 不强制要求消息数量与老代码一致（老代码本身在此 fixture 上也有失败）
+        """private_w1han fixture 已移除：包含真实私人聊天隐私数据"""
+        pytest.skip("private_w1han fixture 已移除（隐私数据清理）")
 
 
 class TestBotIntegration:
     """Bot 对 mock 感知结果的集成测试"""
 
-    def test_bot_tick_with_new_message(self):
+    def test_bot_tick_with_new_message(self, tmp_path):
         bot = WeChatBot(PROFILE_WECHAT_MAC_1760X1280)
 
         msg = ChatMessage(
@@ -102,7 +94,7 @@ class TestBotIntegration:
         mock_result.chat_name = "测试群"
         mock_result.messages = [msg]
         mock_result.chat_list_items = []
-        mock_result.screenshot_path = "/tmp/test.png"
+        mock_result.screenshot_path = str(tmp_path / "test.png")
 
         bot.perception = Mock()
         bot.perception.perceive.return_value = mock_result

@@ -189,54 +189,12 @@ class TestVisionPipelineRealScreenshots:
                 )
 
     def test_real_private_w1han_20260413(self):
-        """私聊截图 2026-04-13：验证对方灰色气泡消息被正确识别"""
-        result = run_fixture("real_private_w1han_20260413")
-        assert result is not None
-        assert result.chat_name == "W1han"
-
-        assert_no_timestamps_in_messages(result.messages)
-        assert_no_common_noise(result.messages)
-
-        expected = load_expected("real_private_w1han_20260413")
-        assert expected is not None
-        assert len(result.messages) == len(expected["messages"])
-
-        for i, exp in enumerate(expected["messages"]):
-            actual = result.messages[i]
-            assert actual.sender_type.value == exp["sender_type"]
-            assert actual.text == exp["text"] or exp["text"] in actual.text, (
-                f"消息[{i}] 不匹配: 期望 {exp['text']!r}, 实际 {actual.text!r}"
-            )
-
-        # 特别断言：对方消息必须存在
-        other_msgs = [m for m in result.messages if m.sender_type == SenderType.OTHER]
-        assert len(other_msgs) >= 1
-        assert any("没用的东西" in m.text for m in other_msgs)
+        """private_w1han fixture 已移除：包含真实私人聊天隐私数据"""
+        pytest.skip("real_private_w1han_20260413 fixture 已移除（隐私数据清理）")
 
     def test_real_private_w1han_20260414(self):
-        """私聊截图 2026-04-14：验证多轮对方消息识别"""
-        result = run_fixture("real_private_w1han_20260414")
-        assert result is not None
-        assert result.chat_name == "W1han"
-
-        assert_no_timestamps_in_messages(result.messages)
-        assert_no_common_noise(result.messages)
-
-        expected = load_expected("real_private_w1han_20260414")
-        assert expected is not None
-        assert len(result.messages) == len(expected["messages"])
-
-        for i, exp in enumerate(expected["messages"]):
-            actual = result.messages[i]
-            assert actual.sender_type.value == exp["sender_type"]
-            assert actual.text == exp["text"] or exp["text"] in actual.text, (
-                f"消息[{i}] 不匹配: 期望 {exp['text']!r}, 实际 {actual.text!r}"
-            )
-
-        # 特别断言：两条对方消息都必须存在
-        other_texts = [m.text for m in result.messages if m.sender_type == SenderType.OTHER]
-        assert "你是人工回复的吗" in other_texts
-        assert "你能关灯么" in other_texts
+        """private_w1han fixture 已移除：包含真实私人聊天隐私数据"""
+        pytest.skip("real_private_w1han_20260414 fixture 已移除（隐私数据清理）")
 
     def test_real_chat_wangqian_20260417(self):
         """2026-04-17 截图：
@@ -464,69 +422,16 @@ class TestBotFullPipeline:
         assert "王老板们和小天才（5）" in bot.global_store.chats
 
     def test_bot_replies_to_private_last_other_message(self):
-        """Bot 对私聊中最后一条对方消息产生回复"""
-        perception = run_fixture("real_private_w1han_20260413")
-        assert perception is not None
-
-        # 修改消息顺序，使最后一条为对方消息，以测试回复链路
-        other_msg = [m for m in perception.messages if m.sender_type != SenderType.SELF][0]
-        perception.messages = perception.messages[:]
-        perception.messages[-1] = other_msg
-
-        bot = WeChatBot(PROFILE_WECHAT_MAC_1760X1280)
-        bot.perception = Mock()
-        bot.perception.perceive.return_value = perception
-
-        bot.generator = Mock()
-        bot.generator.generate.return_value = ["测试私聊回复"]
-
-        bot.sender = Mock()
-        bot.sender.send.return_value = Mock(success=True)
-
-        bot.tick()
-        bot.sender.send.assert_called_once_with("测试私聊回复")
+        """private_w1han fixture 已移除：包含真实私人聊天隐私数据"""
+        pytest.skip("real_private_w1han_20260413 fixture 已移除（隐私数据清理）")
 
     def test_bot_replies_to_private_w1han_multiturn(self):
-        """Bot 对私聊多轮对话中最后一条对方消息产生回复"""
-        perception = run_fixture("real_private_w1han_20260414")
-        assert perception is not None
-
-        # 使最后一条为对方消息
-        other_msgs = [m for m in perception.messages if m.sender_type != SenderType.SELF]
-        perception.messages[-1] = other_msgs[-1]
-
-        bot = WeChatBot(PROFILE_WECHAT_MAC_1760X1280)
-        bot.perception = Mock()
-        bot.perception.perceive.return_value = perception
-
-        bot.generator = Mock()
-        bot.generator.generate.return_value = ["我可以帮你关灯"]
-
-        bot.sender = Mock()
-        bot.sender.send.return_value = Mock(success=True)
-
-        bot.tick()
-        bot.sender.send.assert_called_once_with("我可以帮你关灯")
+        """private_w1han fixture 已移除：包含真实私人聊天隐私数据"""
+        pytest.skip("real_private_w1han_20260414 fixture 已移除（隐私数据清理）")
 
     def test_bot_no_reply_when_only_self_messages(self):
-        """如果真实截图中只有自己的消息，Bot 不应回复"""
-        perception = run_fixture("real_private_w1han_20260413")
-        assert perception is not None
-
-        self_msgs = [m for m in perception.messages if m.sender_type == SenderType.SELF]
-        perception.messages = self_msgs
-
-        bot = WeChatBot(PROFILE_WECHAT_MAC_1760X1280)
-        bot.perception = Mock()
-        bot.perception.perceive.return_value = perception
-
-        bot.generator = Mock()
-        bot.sender = Mock()
-
-        bot.tick()
-
-        bot.generator.generate.assert_not_called()
-        bot.sender.send.assert_not_called()
+        """private_w1han fixture 已移除：包含真实私人聊天隐私数据"""
+        pytest.skip("real_private_w1han_20260413 fixture 已移除（隐私数据清理）")
 
     def test_bot_no_crash_when_perception_none(self):
         """当感知返回 None（如窗口未就绪）时 Bot 不应崩溃"""
@@ -645,27 +550,8 @@ class TestBotFullPipeline:
             )
 
     def test_bot_does_not_switch_when_current_has_reply(self):
-        """当前聊天有用户消息需要回复时，不应切换"""
-        perception = run_fixture("real_private_w1han_20260413")
-        assert perception is not None
-
-        # 修改使最后一条为对方消息
-        other_msgs = [m for m in perception.messages if m.sender_type != SenderType.SELF]
-        perception.messages[-1] = other_msgs[-1]
-
-        bot = WeChatBot(PROFILE_WECHAT_MAC_1760X1280, enable_chat_switch=True)
-        bot.perception = Mock()
-        bot.perception.perceive.return_value = perception
-
-        bot.generator = Mock()
-        bot.generator.generate.return_value = ["测试回复"]
-        bot.sender = Mock()
-        bot.sender.send.return_value = Mock(success=True)
-
-        with patch("src.bot.wechat_bot.ChatListClicker") as MockClicker:
-            bot.tick()
-            # 有用户消息需要回复，不应切换
-            MockClicker.assert_not_called()
+        """private_w1han fixture 已移除：包含真实私人聊天隐私数据"""
+        pytest.skip("real_private_w1han_20260413 fixture 已移除（隐私数据清理）")
 
 
 if __name__ == "__main__":

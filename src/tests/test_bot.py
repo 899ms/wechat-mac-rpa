@@ -18,13 +18,13 @@ class TestWeChatBot:
     def bot(self):
         return WeChatBot(PROFILE_WECHAT_MAC_1760X1280)
 
-    def test_tick_no_new_messages(self, bot):
+    def test_tick_no_new_messages(self, bot, tmp_path):
         """没有新消息时不发送回复"""
         mock_result = PerceptionResult(
             chat_name="测试群",
             messages=[ChatMessage(text="旧消息", sender="A", sender_type=SenderType.OTHER, chat_name="测试群")],
             chat_list_items=[],
-            screenshot_path="/tmp/1.png"
+            screenshot_path=str(tmp_path / "1.png")
         )
         bot.perception = Mock()
         bot.perception.perceive.return_value = mock_result
@@ -39,14 +39,14 @@ class TestWeChatBot:
         bot.global_store.merge_tick.assert_called_once()
         bot.global_store.mark_replied.assert_not_called()
 
-    def test_tick_replies_to_new_message(self, bot):
+    def test_tick_replies_to_new_message(self, bot, tmp_path):
         """有新消息且 policy 允许时发送回复"""
         msg = ChatMessage(text="在吗", sender="A", sender_type=SenderType.OTHER, chat_name="测试群")
         mock_result = PerceptionResult(
             chat_name="测试群",
             messages=[msg],
             chat_list_items=[],
-            screenshot_path="/tmp/2.png"
+            screenshot_path=str(tmp_path / "2.png")
         )
         bot.perception = Mock()
         bot.perception.perceive.return_value = mock_result
@@ -61,13 +61,15 @@ class TestWeChatBot:
         bot.sender.send.return_value = ActionResult(success=True, sent_text="在的")
 
         mock_state = Mock()
+        mock_state.pending_self_messages = []
         bot.global_store = Mock()
         bot.global_store.merge_tick.return_value = (mock_state, [msg])
+        bot.global_store.chats = {"测试群": mock_state}
 
         bot.tick()
 
         bot.generator.generate.assert_called_once()
-        bot.sender.send.assert_called_once_with("在的")
+        bot.sender.send.assert_called_once_with("在的", chat_name="测试群")
         bot.global_store.mark_replied.assert_called_once()
 
     def test_tick_perception_none(self, bot):
@@ -79,14 +81,14 @@ class TestWeChatBot:
 
         bot.perception.perceive.assert_called_once()
 
-    def test_tick_policy_declines(self, bot):
+    def test_tick_policy_declines(self, bot, tmp_path):
         """policy 返回 False 时不生成回复"""
         msg = ChatMessage(text="在吗", sender="A", sender_type=SenderType.OTHER, chat_name="测试群")
         mock_result = PerceptionResult(
             chat_name="测试群",
             messages=[msg],
             chat_list_items=[],
-            screenshot_path="/tmp/3.png"
+            screenshot_path=str(tmp_path / "3.png")
         )
         bot.perception = Mock()
         bot.perception.perceive.return_value = mock_result
@@ -106,7 +108,7 @@ class TestWeChatBot:
         bot.generator.generate.assert_not_called()
         bot.sender.send.assert_not_called()
 
-    def test_on_message_callback(self, bot):
+    def test_on_message_callback(self, bot, tmp_path):
         """on_message 回调被正确触发"""
         callback = Mock()
         bot.on_message = callback
@@ -116,7 +118,7 @@ class TestWeChatBot:
             chat_name="测试群",
             messages=[msg],
             chat_list_items=[],
-            screenshot_path="/tmp/4.png"
+            screenshot_path=str(tmp_path / "4.png")
         )
         bot.perception = Mock()
         bot.perception.perceive.return_value = mock_result
@@ -137,4 +139,4 @@ class TestWeChatBot:
         result = bot.send_to_chat("测试群", "hello")
 
         assert result.success is True
-        bot.sender.send.assert_called_once_with("hello")
+        bot.sender.send.assert_called_once_with("hello", chat_name="测试群")

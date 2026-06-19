@@ -45,6 +45,8 @@ class WeChatBot:
     def __init__(self, profile=None, on_message: Optional[Callable] = None, llm_client=None,
                  complex_llm_client=None, debug_mode: bool = False, use_openclaw: bool = True, perception=None,
                  enable_chat_switch: bool = True):
+        # 先初始化 logger，后续各步骤都可能需要记录日志
+        self.logger: BotLogger = get_logger()
         if perception is not None:
             self.perception = perception
         else:
@@ -150,7 +152,6 @@ class WeChatBot:
 
         self._login_handler = WeChatLoginHandler()
         self.on_message = on_message
-        self.logger: BotLogger = get_logger()
         self.running = False
         self.session_id = __import__('time').strftime("%Y%m%d%H%M%S") + "_" + str(os.getpid())
         self._tick_id = int(time.time())  # 跨重启唯一

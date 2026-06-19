@@ -27,7 +27,7 @@ class TestVisionPipelineNotReady:
         result = pipeline.perceive()
         assert result is None
 
-    def test_perceive_with_login_handler_success(self):
+    def test_perceive_with_login_handler_success(self, tmp_path):
         """login_handler 恢复成功后应正常返回 PerceptionResult"""
         from src.models.base import Rect, ChatMessage, ChatListItem, PerceptionResult
         from src.capture.window_capture import CaptureResult
@@ -37,7 +37,7 @@ class TestVisionPipelineNotReady:
 
         mock_capture = Mock()
         mock_capture.capture.return_value = CaptureResult(
-            image_path="/tmp/test.png",
+            image_path=str(tmp_path / "test.png"),
             window_rect=Rect(0, 0, 1760, 1280),
             scale_factor=1.0,
         )
