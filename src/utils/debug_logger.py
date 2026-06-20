@@ -11,6 +11,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -308,8 +311,8 @@ class DebugLogger:
             all_files = sorted(prompts_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
             for old_file in all_files[50:]:
                 old_file.unlink()
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("cleanup old debug logs failed: %s", e)
 
         return
 

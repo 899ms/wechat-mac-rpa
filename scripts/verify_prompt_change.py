@@ -3,6 +3,7 @@
 
 import json, os, sys, sqlite3
 from pathlib import Path
+import logging
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -21,6 +22,8 @@ from src.utils.qwen_client import QwenClient
 from src.tools.tool_registry import get_registry
 from src.tools.builtin_tools import register_builtin_tools
 from src.memory import MemoryEngine
+
+_logger = logging.getLogger(__name__)
 
 llm = QwenClient()
 
@@ -134,7 +137,8 @@ for tick_id in TICK_IDS:
             try:
                 data = json.loads(final_reply.strip())
                 new_replies = data.get("replies", [])
-            except:
+            except Exception as e:
+                _logger.warning("parse final reply failed: %s", e)
                 new_replies = [final_reply.strip()]
         else:
             new_replies = [final_reply.strip()]

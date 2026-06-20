@@ -384,8 +384,6 @@ class WeFlowPipeline:
             return self._chat_name_to_talker[cleaned]
 
         # 模糊匹配（应对 OCR 识别差异）
-        best_score = 0.0
-        best_talker = None
         for name, talker in self._chat_name_to_talker.items():
             # 简单包含匹配
             if name in chat_name or chat_name in name:

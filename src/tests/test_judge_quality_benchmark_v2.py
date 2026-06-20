@@ -19,6 +19,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
+import logging
 
 import pytest
 
@@ -41,6 +42,8 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH = PROJECT_ROOT / "data" / "cases.db"
 DEBUG_DIR = PROJECT_ROOT / "data" / "debug"
+
+_logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -116,8 +119,8 @@ def _load_gt_cases() -> List[JudgeBenchmarkCase]:
                 dbg_msgs = dbg.get("reply_llm_messages", []) or []
                 if dbg_msgs:
                     llm_messages = dbg_msgs
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.warning("load reply debug messages failed: %s", e)
 
         # fallback：用 raw_response 补充 assistant message，让 Judge 看到完整的 LLM 交互
         if len(llm_messages) <= 2:
@@ -157,8 +160,8 @@ def _load_gt_cases() -> List[JudgeBenchmarkCase]:
             try:
                 dbg = json.loads(debug_files[-1].read_text(encoding="utf-8"))
                 session_msgs = dbg.get("session_input_messages", []) or []
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.warning("load session debug messages failed: %s", e)
         if not session_msgs:
             # 从 user_prompt 的 [未读消息] 段粗略提取
             session_msgs = [{"sender": "unknown", "sender_type": "other", "text": up[:200]}]

@@ -6,7 +6,7 @@
 """
 
 import argparse
-import json
+
 import sys
 import time
 from pathlib import Path
@@ -63,10 +63,8 @@ def main():
         sys.exit(1)
     engine = MemoryEngine(llm_client=llm)
 
-    total = 0
     success = 0
     failed = 0
-    skipped = 0
     start_all = time.time()
 
     for idx, (name, state, _) in enumerate(chats, 1):

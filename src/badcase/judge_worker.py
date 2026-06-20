@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """JudgeWorker - 异步 badcase 判定，支持查证反思"""
 
-import json, logging, os, queue, re, sqlite3, subprocess, threading, time
-from dataclasses import dataclass
+import json, logging, queue, re, sqlite3, subprocess, threading
+
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 _logger = logging.getLogger("src.badcase.judge_worker")
 
@@ -333,8 +333,8 @@ class JudgeWorker:
                 tick_id,
             ))
             conn.commit(); conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("judge db write failed: %s", e)
 
         if not judge_result.get("is_badcase"):
             return
@@ -400,7 +400,9 @@ class JudgeWorker:
         tick_ts = tick_data.get("created_at", "")
         if tick_ts:
             try: now = datetime.fromisoformat(tick_ts)
-            except: now = datetime.now()
+            except Exception as e:
+                _logger.warning("parse tick timestamp failed: %s", e)
+                now = datetime.now()
         else:
             now = datetime.now()
         current_time = now.isoformat()

@@ -22,6 +22,7 @@ import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+import logging
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -29,6 +30,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 HISTORY_DIR = PROJECT_ROOT / "data" / "benchmark_history"
 HISTORY_DIR.mkdir(parents=True, exist_ok=True)
 TREND_FILE = HISTORY_DIR / "trend.json"
+
+_logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -153,7 +156,6 @@ def _run_unread_badge(use_api: bool = False) -> dict:
             else:
                 tn += 1
 
-        total_valid = tp + fp + tn + fn
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
         f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
@@ -234,8 +236,8 @@ def _load_history(days: int = 30) -> list[dict]:
             data = json.loads(f.read_text(encoding="utf-8"))
             data["date"] = date_str
             records.append(data)
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("load history file failed: %s", e)
     return records
 
 

@@ -4,6 +4,7 @@
 import json, sys, os, sqlite3
 from pathlib import Path
 from datetime import datetime
+import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 env_file = Path(__file__).parent.parent / ".env"
@@ -14,6 +15,8 @@ if env_file.exists():
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip())
+
+_logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).parent.parent
 DB_PATH = PROJECT_ROOT / "data" / "cases.db"
@@ -78,7 +81,9 @@ def build_judge_html() -> str:
         d = dict(r)
         dims_json = d.get("judge_dimensions_json", "{}") or "{}"
         try: dims = json.loads(dims_json)
-        except: dims = {}
+        except Exception as e:
+            _logger.warning("load judge dimensions failed: %s", e)
+            dims = {}
         target = dim_scores_bad if d["human_is_badcase"] else dim_scores_ok
         for dim_name in DIM_NAMES:
             s = dims.get(dim_name, {}).get("score", 0)
@@ -131,7 +136,9 @@ def build_judge_html() -> str:
         # 维度 bars
         dims_json = d.get("judge_dimensions_json", "{}") or "{}"
         try: dims = json.loads(dims_json)
-        except: dims = {}
+        except Exception as e:
+            _logger.warning("load judge dimensions failed: %s", e)
+            dims = {}
         dim_bars = ""
         for i, dim_name in enumerate(DIM_NAMES):
             s = dims.get(dim_name, {}).get("score", 0)
@@ -139,7 +146,9 @@ def build_judge_html() -> str:
 
         replies = d.get("replies_sent_json", "[]") or "[]"
         try: rlist = json.loads(replies); reply = " | ".join(rlist) if isinstance(rlist, list) else replies
-        except: reply = replies
+        except Exception as e:
+            _logger.warning("load replies failed: %s", e)
+            reply = replies
 
         html += f"""<div class="card {cls} c {filter_class}">
   <h3>{icon} <a href="/ticks/{d['id']}" style="color:var(--blue)">{sid}:#{d['tick_id']}</a> <span style="font-size:10px;color:var(--muted)">{d.get('chat_name','')}</span></h3>
@@ -179,10 +188,14 @@ def load_all_reply_cases() -> list:
         d = dict(r)
         replies = d.get("replies_sent_json", "[]") or "[]"
         try: rlist = json.loads(replies); bot_reply = " | ".join(rlist) if isinstance(rlist, list) else replies
-        except: bot_reply = replies
+        except Exception as e:
+            _logger.warning("load bot replies failed: %s", e)
+            bot_reply = replies
         tc = d.get("tool_calls_json", "[]") or "[]"
         try: tool_calls = json.loads(tc)
-        except: tool_calls = []
+        except Exception as e:
+            _logger.warning("load tool calls failed: %s", e)
+            tool_calls = []
         cases.append({
             "id": d["id"], "session_id": d.get("session_id", ""), "tick_id": d.get("tick_id", 0),
             "chat_name": d.get("chat_name", ""), "bot_reply": bot_reply,

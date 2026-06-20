@@ -369,7 +369,6 @@ class SmartPerceptionPipeline:
             )
             if curr_hash == self._last_hash:
                 skip_api = True
-                diff_ratio = 0.0
                 self._consecutive_low_diff += 1
                 _logger.info(
                     f"[SmartPipeline] 截图完全相同 (hash一致)，跳过API调用"

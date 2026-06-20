@@ -10,6 +10,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.session.global_store import GlobalStore
 from openai import OpenAI
 import chromadb
+import logging
+
+_logger = logging.getLogger(__name__)
 
 DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY")
 client = OpenAI(api_key=DASHSCOPE_API_KEY, base_url=os.environ.get("DASHSCOPE_BASE_URL", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"))
@@ -31,8 +34,8 @@ for m in messages:
     if ts:
         try:
             tstr = datetime.fromtimestamp(int(ts)).strftime("%Y-%m-%d %H:%M")
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("timestamp conversion failed: %s", e)
     lines.append(f"[{tstr}] {m.sender}: {m.text}")
 
 full_context = "\n".join(lines)

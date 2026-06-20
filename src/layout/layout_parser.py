@@ -3,14 +3,17 @@
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import numpy as np
 from PIL import Image
 from scipy import ndimage
+import logging
 
 from src.layout.profile import LayoutProfile
 from src.models.base import ChatListItem, OCRTextElement, Rect
+
+_logger = logging.getLogger(__name__)
 
 
 TIMESTAMP_PATTERNS = [
@@ -44,7 +47,6 @@ class LayoutParser:
     @staticmethod
     def clean_chat_name(text: str) -> str:
         """仅去除聊天列表中的时间戳后缀（如 '昨天 22:26'），时间戳是 UI 元素而非昵称。"""
-        import re
         text = re.sub(r'(昨天|今天)\s+\d{1,2}[:：]\d{2}$', '', text)
         text = re.sub(r'\s+\d{1,2}[:：]\d{2}$', '', text)
         return text.strip()
@@ -306,8 +308,8 @@ class LayoutParser:
                         red_pixels = np.sum(strict_red)
                         if red_pixels >= 50:
                             unread_for_group[idx] = "1"
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.warning("detect unread badge failed: %s", e)
 
         def _clean_nickname(text: str) -> str:
             """清理 OCR 产生的昵称污染：去掉噪声符号前缀和时间戳后缀。

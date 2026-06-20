@@ -27,9 +27,10 @@ import sys
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -43,8 +44,10 @@ if env_file.exists():
                 key, value = line.split("=", 1)
                 os.environ.setdefault(key.strip(), value.strip())
 
-from src.memory.engine import MemoryEngine, _DEFAULT_USER_WIKI, _DEFAULT_GROUP_WIKI
+from src.memory.engine import MemoryEngine
 from src.utils.qwen_client import QwenClient
+
+_logger = logging.getLogger(__name__)
 
 
 CHATS_DIR = Path("data/chats")
@@ -147,7 +150,6 @@ def build_wxid_index(all_chats: dict) -> dict:
     raw = defaultdict(lambda: {"names": defaultdict(int), "chats": defaultdict(list)})
 
     for stem, data in all_chats.items():
-        chat_name = data.get("chat_name", "") or stem
         for m in data.get("messages", []):
             if m.get("sender_type") == "self":
                 continue
@@ -197,8 +199,8 @@ def load_aliases() -> dict:
                 name_to_main[main_name] = main_name
                 for alias in cfg.get("aliases", []):
                     name_to_main[alias] = main_name
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("load alias config failed: %s", e)
     return existing, name_to_main
 
 
@@ -233,8 +235,8 @@ def update_aliases_json(wxid_index: dict, name_to_main: dict, dry_run: bool = Fa
         try:
             with open(aliases_path, encoding="utf-8") as f:
                 existing = json.load(f).get("users", {})
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("load aliases failed: %s", e)
 
     added = 0
     for wxid, info in wxid_index.items():
@@ -724,8 +726,8 @@ def main():
                 if m.get("time"):
                     try:
                         tstr = datetime.fromtimestamp(int(m["time"])).strftime("%Y-%m-%d")
-                    except:
-                        pass
+                    except Exception as e:
+                        _logger.warning("timestamp conversion failed: %s", e)
                 lines.append(f"- [{tstr}] {m['sender']} @ {m['chat']}: {m['text'][:100]}")
 
             path = topics_dir / f"{topic}.md"

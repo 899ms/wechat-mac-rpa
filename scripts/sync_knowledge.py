@@ -14,6 +14,9 @@
 import json
 import re
 from pathlib import Path
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 def parse_knowledge_source(md_path: Path) -> dict:
@@ -105,8 +108,8 @@ def update_aliases(people: list, aliases_path: Path):
     if aliases_path.exists():
         try:
             data = json.loads(aliases_path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("load aliases failed: %s", e)
 
     for p in people:
         name = p["name"]
@@ -132,8 +135,8 @@ def update_facts(people: list, facts_path: Path):
     if facts_path.exists():
         try:
             data = json.loads(facts_path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("load facts failed: %s", e)
 
     for p in people:
         name = p["name"]
@@ -156,8 +159,8 @@ def update_corrections(groups: list, corrections_path: Path):
     if corrections_path.exists():
         try:
             data = json.loads(corrections_path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("load corrections failed: %s", e)
 
     for g in groups:
         name = g["name"]

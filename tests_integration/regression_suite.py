@@ -140,8 +140,8 @@ def test_layout_extraction(reporter):
 
         try:
             profile = PROFILE_WECHAT_MAC_1760X1280
-            parser = LayoutParser(profile)
-            extractor = MessageExtractor(profile)
+            LayoutParser(profile)
+            MessageExtractor(profile)
             reporter.ok(f"{name} 的布局解析器可实例化")
         except Exception as e:
             reporter.fail(f"{name} 布局解析异常: {e}")

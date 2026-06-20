@@ -4,16 +4,19 @@ ACP 代码审计 Demo v2 - 使用 kimi --print 直接调用，更稳定
 """
 import asyncio
 import json
-import subprocess
+
 import sys
+import logging
 from pathlib import Path
-from typing import Optional
+
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 import uvicorn
+
+_logger = logging.getLogger(__name__)
 
 
 WORK_DIR = "/Users/yihanwang/wechat-mac-rpa"
@@ -91,8 +94,8 @@ async def analyze_with_kimi(issue: dict, notes: str, timeout: int = 300) -> dict
     except asyncio.TimeoutError:
         try:
             proc.kill()
-        except:
-            pass
+        except Exception as e:
+            _logger.warning("proc.kill failed: %s", e)
         return {"success": False, "error": f"分析超时（>{timeout}秒）"}
     except Exception as e:
         print(f"[Analyze] Error: {e}")
