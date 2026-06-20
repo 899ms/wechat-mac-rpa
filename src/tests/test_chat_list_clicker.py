@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """ChatListClicker 单元测试"""
 
-import pytest
 from unittest.mock import patch, MagicMock
 
 from src.action.chat_list_clicker import ChatListClicker

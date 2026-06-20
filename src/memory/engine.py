@@ -649,7 +649,7 @@ class MemoryEngine:
                 # 基础过滤
                 if not alias_text or alias_text == user_name:
                     continue
-                if alias_text in existing_mains and alias_text != user_name:
+                if alias_text in existing_mains:
                     continue  # 已经是其他人的主名，不采纳
                 if len(alias_text) > 30:
                     continue  # 过长，不太可能是别名
@@ -703,7 +703,7 @@ class MemoryEngine:
                 a = a.strip()
                 if not a or a == main:
                     continue
-                if a in existing_mains and a != main:
+                if a in existing_mains:
                     continue  # 已经是其他人的主名
                 if len(a) > 30:
                     continue
@@ -734,7 +734,7 @@ class MemoryEngine:
         added = []
         for alias in new_aliases:
             if alias != resolved and alias not in existing:
-                if alias in existing_mains and alias != resolved:
+                if alias in existing_mains:
                     continue  # 别名不能是其他人的主名
                 self._aliases[resolved].append(alias)
                 existing.add(alias)

@@ -1055,7 +1055,6 @@ class ReplyGenerator:
 
         from datetime import datetime
         chat_name = unreplied[-1].chat_name if unreplied else ""
-        now = datetime.now().strftime("%Y年%m月%d日 %H:%M")
         lines_local = []
 
         # 会话信息（含时间上下文）
@@ -1144,7 +1143,6 @@ class ReplyGenerator:
             recent_30min = [m for m in all_messages if _msg_ts(m) >= cutoff_ts]
 
             union_ids = {id(m) for m in recent_50} | {id(m) for m in recent_30min}
-            candidate = [m for m in all_messages if id(m) in union_ids]
 
             # 兜底：强制保留最近 5 条 bot 自己发的消息，防止被对方密集消息淹没
             self_msgs = [m for m in all_messages if m.sender_type == SenderType.SELF]

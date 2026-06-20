@@ -14,14 +14,13 @@ Judge LLM 质量 Meta-Benchmark — 基于生产环境真实 badcase
 """
 
 import argparse
-import hashlib
 import json
 import os
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List
 
 import pytest
 

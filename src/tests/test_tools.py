@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Tools 模块单元测试 —— ToolRegistry + builtin_tools + stock_tools"""
 
-import json
 import pytest
 from unittest.mock import patch, MagicMock
 

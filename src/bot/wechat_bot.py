@@ -52,6 +52,7 @@ class WeChatBot:
         else:
             self.perception = VisionPipeline(profile)
         self.global_store = GlobalStore()
+        self.logger: BotLogger = get_logger()
         self.policy = ReplyPolicy(require_at_in_group=False)
 
         if llm_client is not None:

@@ -7,10 +7,10 @@ A/B 实验 — 固定 Judge，变 Bot 参数，对比得分
     python3 scripts/run_experiment.py --exp reply_restraint_off --n-samples 10
 """
 
-import json, os, sys, time, sqlite3
+import json, os, sys, sqlite3
 from pathlib import Path
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional
+from dataclasses import dataclass
+from typing import List
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 

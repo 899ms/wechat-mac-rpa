@@ -83,7 +83,7 @@ if __name__ == "__main__":
     print(f"模型: {MODEL}\n")
 
     print("=== 测试1: round 0（带 tools）===")
-    for i in range(3):
+    for _ in range(3):
         msg = test_round0()
         if getattr(msg, "tool_calls", None):
             print(f"  → 返回了 tool_calls")
@@ -92,7 +92,7 @@ if __name__ == "__main__":
 
     print("\n=== 测试2: round 1（tool 结果回注 + 再传 tools）===")
     empty_count = 0
-    for i in range(5):
+    for _ in range(5):
         content = test_round1_with_tool_result()
         if not content.strip():
             empty_count += 1
@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
     print("\n=== 测试3: round 1（tool 结果回注 + 不传 tools）===")
     empty_count = 0
-    for i in range(3):
+    for _ in range(3):
         content = test_round1_no_tools()
         if not content.strip():
             empty_count += 1

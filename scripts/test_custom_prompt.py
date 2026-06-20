@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """测试：用自定义 prompt 让 mem0 提取群聊结构化信息"""
 
-import os, json, sys
+import os, sys
 from pathlib import Path
 from datetime import datetime
 

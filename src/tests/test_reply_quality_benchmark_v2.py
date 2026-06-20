@@ -16,12 +16,11 @@ Bot 回复质量 Benchmark — 基于生产环境人工标注的真实 tick
 """
 
 import json
-import os
 import sqlite3
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import pytest
 

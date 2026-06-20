@@ -10,7 +10,7 @@
 import json
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -251,7 +251,6 @@ if __name__ == "__main__":
         print(f"  [{c.type:6s}] {c.name:20s} {c.username}")
 
     print("\n=== Latest Messages (王芊) ===")
-    contact = client.get_contact("wxid_qxlscnesk92m21")
     msgs, _ = client.get_messages("wxid_qxlscnesk92m21", limit=5)
     for m in reversed(msgs):  # 正序
         prefix = "[自己]" if m.is_send else "[对方]"

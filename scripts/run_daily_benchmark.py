@@ -18,12 +18,10 @@ Cron 示例（每天凌晨 3:17）:
 
 import argparse
 import json
-import os
 import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))

@@ -59,7 +59,7 @@ def extract_context_around_keywords(
     clean_kws = []
     for kw in keywords:
         ck = kw.strip().lower()
-        ck = re.sub(r'[，。！？、；：""''（）【】\[\]{}]', '', ck)
+        ck = re.sub(r"[，。！？、；：\"'（）【】\[\]{}]", '', ck)
         if ck and len(ck) >= 2:  # 忽略单字和空串
             clean_kws.append(ck)
 

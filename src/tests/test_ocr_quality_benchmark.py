@@ -242,7 +242,7 @@ def _normalize_text(text: str, aggressive: bool = False) -> str:
     text = " ".join(text.split())
     if aggressive:
         # 去除 markdown 标记
-        text = re.sub(r'\*\*?|__?', '', text)
+        text = re.sub(r'\*{1,2}|_{1,2}', '', text)
         # 去除常见 emoji
         text = re.sub(r'[📱⚡️😂🤖💪👍🔥❤️✅❌👉👈]', '', text)
         # 去除项目符号

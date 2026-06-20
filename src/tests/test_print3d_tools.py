@@ -6,8 +6,6 @@ import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from src.tools.print_3d_tools import (
     print3d_read_3mf,
     print3d_scale_model,

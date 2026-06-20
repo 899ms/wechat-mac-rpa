@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """MessageSender paste 验证单元测试"""
 
-import subprocess
-from unittest.mock import Mock, patch, call
+from unittest.mock import Mock, patch
 import pytest
 
 from src.action.message_sender import WeChatMessageSender

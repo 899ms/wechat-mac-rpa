@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """L5 Bot Orchestrator 单元测试"""
 
-import time
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from src.bot.wechat_bot import WeChatBot
 from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
 from src.models.base import (
-    ChatMessage, ChatListItem, PerceptionResult,
-    ActionResult, SenderType, Rect, Point
+    ChatMessage, PerceptionResult,
+    ActionResult, SenderType
 )
 
 

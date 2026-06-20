@@ -2,7 +2,7 @@
 """VisionPipeline 异常日志测试"""
 
 import logging
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from src.perception.vision_pipeline import VisionPipeline
 from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280

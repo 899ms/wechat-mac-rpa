@@ -21,7 +21,6 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -199,6 +198,7 @@ def run_benchmark(use_api: bool = False, api_key: str | None = None, n_generatio
 
                 tool_log = []
                 final_reply = ""
+                raw = None
                 max_rounds = 3
                 try:
                     for round_i in range(max_rounds):
@@ -221,7 +221,7 @@ def run_benchmark(use_api: bool = False, api_key: str | None = None, n_generatio
                             final_reply = raw if isinstance(raw, str) else getattr(raw, "content", str(raw))
                             break
 
-                    if not final_reply and raw:
+                    if not final_reply and raw is not None:
                         final_reply = raw if isinstance(raw, str) else getattr(raw, "content", str(raw)) or "(空)"
                     # 解析 JSON 格式: {"replies": ["text1", "text2"]}
                     if final_reply.strip().startswith("{"):

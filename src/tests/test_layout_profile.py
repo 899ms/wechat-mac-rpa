@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """L2 LayoutProfile 单元测试"""
 
-import pytest
 from src.layout.profile import LayoutProfile, PROFILE_WECHAT_MAC_1760X1280
 
 

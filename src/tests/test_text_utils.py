@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Tests for src/utils/text_utils."""
 
-import pytest
 from src.utils.text_utils import _truncate_text, _compress_text
 
 
