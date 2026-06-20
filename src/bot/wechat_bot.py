@@ -50,6 +50,7 @@ class WeChatBot:
         else:
             self.perception = VisionPipeline(profile)
         self.global_store = GlobalStore()
+        self.logger: BotLogger = get_logger()
         self.policy = ReplyPolicy(require_at_in_group=False)
 
         if llm_client is not None:
@@ -150,7 +151,6 @@ class WeChatBot:
 
         self._login_handler = WeChatLoginHandler()
         self.on_message = on_message
-        self.logger: BotLogger = get_logger()
         self.running = False
         self.session_id = __import__('time').strftime("%Y%m%d%H%M%S") + "_" + str(os.getpid())
         self._tick_id = int(time.time())  # 跨重启唯一

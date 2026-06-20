@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """wechat-twin Bot — 合并重构版本"""
-import sys, os, time, fcntl
+import sys, os, fcntl
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """GlobalStore 单元测试"""
 
-import json
 import os
 import tempfile
 

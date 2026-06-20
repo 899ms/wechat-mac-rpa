@@ -2,11 +2,10 @@
 """登录恢复流程单元测试"""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
+from unittest.mock import Mock, patch
 
 from src.action.login_recovery import (
-    WeChatLoginHandler, LoginRecoveryResult, LoginRecoveryStatus
+    WeChatLoginHandler, LoginRecoveryStatus
 )
 from src.models.base import Rect, OCRTextElement, Point
 

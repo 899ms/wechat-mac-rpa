@@ -7,7 +7,6 @@
 """
 
 import json
-import re
 import sys
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -18,7 +17,7 @@ import pytest
 
 from src.bot.wechat_bot import WeChatBot
 from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
-from src.models.base import ChatMessage, SenderType
+from src.models.base import SenderType
 from src.perception.vision_pipeline import VisionPipeline
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"

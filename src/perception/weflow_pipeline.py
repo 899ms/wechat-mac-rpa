@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
 
-from src.models.base import ChatListItem, ChatMessage, OCRTextElement, PerceptionResult, Rect, SenderType
+from src.models.base import ChatMessage, PerceptionResult, SenderType
 from src.utils.chat_utils import _is_group_chat_name
 from src.utils.xml_utils import _extract_xml_text
 from src.capture.window_capture import WindowCapture, WeChatNotReadyError

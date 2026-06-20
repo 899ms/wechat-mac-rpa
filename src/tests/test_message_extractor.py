@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """L3 MessageExtractor 单元测试"""
 
-import pytest
-from src.models.base import Point, Rect, OCRTextElement, SenderType, ChatListItem
-from src.layout.profile import LayoutProfile, PROFILE_WECHAT_MAC_1760X1280
+from src.models.base import Point, Rect, OCRTextElement, SenderType
+from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
 from src.layout.layout_parser import UILayout
 from src.message.extractor import MessageExtractor
 

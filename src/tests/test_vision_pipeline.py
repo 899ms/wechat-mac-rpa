@@ -2,7 +2,7 @@
 """L3.5 VisionPipeline 单元测试"""
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from src.perception.vision_pipeline import VisionPipeline
 from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280

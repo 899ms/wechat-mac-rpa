@@ -2,7 +2,7 @@
 """微信未登录/窗口异常场景的集成测试"""
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 from pathlib import Path
 
 from src.capture.window_capture import WeChatNotReadyError

@@ -70,7 +70,8 @@ class SimpleMsg:
 def load_chatroom_names() -> dict:
     """加载 @chatroom 显示名称映射。"""
     if CHATROOM_NAMES_FILE.exists():
-        return json.load(open(CHATROOM_NAMES_FILE, encoding="utf-8"))
+        with open(CHATROOM_NAMES_FILE, encoding="utf-8") as f:
+            return json.load(f)
     return {}
 
 
@@ -189,7 +190,8 @@ def load_aliases() -> dict:
     name_to_main = {}
     if aliases_path.exists():
         try:
-            data = json.load(open(aliases_path, encoding="utf-8"))
+            with open(aliases_path, encoding="utf-8") as f:
+                data = json.load(f)
             existing = data.get("users", {})
             for main_name, cfg in existing.items():
                 name_to_main[main_name] = main_name
@@ -229,7 +231,8 @@ def update_aliases_json(wxid_index: dict, name_to_main: dict, dry_run: bool = Fa
     existing = {}
     if aliases_path.exists():
         try:
-            existing = json.load(open(aliases_path, encoding="utf-8")).get("users", {})
+            with open(aliases_path, encoding="utf-8") as f:
+                existing = json.load(f).get("users", {})
         except Exception:
             pass
 
@@ -347,7 +350,8 @@ def main():
     all_chats = {}
     for f in chat_files:
         try:
-            data = json.load(open(f, encoding="utf-8"))
+            with open(f, encoding="utf-8") as fp:
+                data = json.load(fp)
             all_chats[f.stem] = data
         except Exception as e:
             print(f"  ⚠️ 跳过 {f.name}: {e}")

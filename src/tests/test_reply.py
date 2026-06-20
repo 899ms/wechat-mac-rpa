@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Tests for L4 Reply modules."""
 
-import pytest
 from src.models.base import ChatMessage, SenderType
 from src.session.global_store import ChatState
 from src.reply.policy import ReplyPolicy

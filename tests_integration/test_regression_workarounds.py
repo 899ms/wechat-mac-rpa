@@ -15,8 +15,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import pytest
-
 from src.layout.layout_parser import LayoutParser, UILayout
 from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
 from src.message.extractor import MessageExtractor

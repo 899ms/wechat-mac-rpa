@@ -6,7 +6,6 @@
 2. 增大 Top N：从 5 改为 10，确保高分 non-primary 文档不被挤出
 """
 
-from pathlib import Path
 import pytest
 
 from src.memory.engine import MemoryEngine

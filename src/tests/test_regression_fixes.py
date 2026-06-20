@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """关键修复的回归测试 —— 防止已修复 bug 再次引入"""
 
-import pytest
 from unittest.mock import MagicMock
 
 from src.models.base import ChatMessage, SenderType
-from src.perception.smart_pipeline import SmartPerceptionPipeline
 from src.reply.generator import ReplyGenerator
 
 

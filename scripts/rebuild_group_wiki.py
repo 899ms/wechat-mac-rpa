@@ -19,7 +19,7 @@ from pathlib import Path
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.memory.engine import MemoryEngine, _DEFAULT_GROUP_WIKI, _UPDATE_GROUP_PROMPT
+from src.memory.engine import _DEFAULT_GROUP_WIKI, _UPDATE_GROUP_PROMPT
 from src.models.base import ChatMessage, SenderType
 from src.utils.llm_client import KimiClient
 
@@ -116,6 +116,7 @@ def update_group_wiki_direct(
         chat_name=group_name,
         current_time=now,
         conversation=conversation,
+        identity_context="",
     )
 
     try:

@@ -19,7 +19,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 _logger = logging.getLogger(__name__)
 
