@@ -58,8 +58,7 @@ filtered = [e for e in title_elems if not any(c in e.text for c in ['®', '©', 
 
 ### 验证结果
 - error_20260413_001.png: 识别正确 "W1han" ✓
-- private_w1han.png: 识别正确 "W1han" ✓
-- 全量测试: 9/9 通过 ✓
+- 全量测试: 8/8 通过 ✓（private_w1han.png 已移除，避免真实私聊隐私泄露）
 
 ### 状态
 - 错误样本状态: fixed
