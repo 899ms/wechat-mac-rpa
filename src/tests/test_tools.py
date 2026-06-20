@@ -148,7 +148,6 @@ class TestBuiltinTools:
             assert mock_get.call_args[0][0].startswith("https://")
 
     def test_register_builtin_tools(self):
-        reg = ToolRegistry()
         register_builtin_tools()
         reg2 = get_registry()
         assert reg2.has("get_current_time")

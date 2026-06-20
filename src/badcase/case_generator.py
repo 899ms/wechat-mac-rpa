@@ -8,9 +8,9 @@ CaseGenerator - 根据 draft 生成 benchmark case 代码
   P3: test_reply_quality_benchmark.py（多轮纠正，暂时复用 P2 文件）
 """
 
-import json
+
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 
@@ -76,7 +76,6 @@ class CaseGenerator:
     def _generate_p2_case(self, draft: Dict) -> str:
         tick_id = draft["tick_id"]
         badcase_type = draft["judge_result"]["badcase_type"]
-        severity = draft["judge_result"].get("severity", "P1")
         reason = draft["judge_result"].get("reason", "")
         expected = draft["judge_result"].get("expected_behavior", "")
 

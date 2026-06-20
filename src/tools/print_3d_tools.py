@@ -351,8 +351,8 @@ def print3d_get_printer_status(ip: str = "", access_code: str = "", serial: str 
             data = json.loads(msg.payload)
             if "print" in data:
                 status_data.update(data["print"])
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("parse mqtt payload failed: %s", e)
 
     client.on_connect = on_connect
     client.on_message = on_message

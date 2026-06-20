@@ -4,7 +4,7 @@
 所有涉及 chat_name 的处理逻辑统一放在这里，禁止各模块自己写正则。
 """
 
-from typing import Optional
+
 
 
 def _is_group_chat_name(chat_name: str) -> bool:

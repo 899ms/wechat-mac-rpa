@@ -108,7 +108,6 @@ def extract_context_around_keywords(
 
     # 在 max_chars 预算内取窗口，优先匹配密度高的
     result_parts = []
-    used_chars = 0
     budget = max_chars
     last_end = 0
 

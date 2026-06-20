@@ -59,7 +59,6 @@ def main():
         sys.exit(1)
     engine = MemoryEngine(llm_client=llm)
 
-    total = 0
     success = 0
     failed = 0
     start_all = time.time()

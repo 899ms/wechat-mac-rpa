@@ -382,14 +382,6 @@ class WeChatBot:
                 if self.on_message:
                     self.on_message(msg, state)
 
-            latest = None
-            should_send = False
-            for msg in reversed(unreplied):
-                if self.policy.should_reply(msg, state):
-                    latest = msg
-                    should_send = True
-                    break
-
             # 收集所有需要回复的未读消息
             to_reply = [msg for msg in unreplied if self.policy.should_reply(msg, state)]
             if not to_reply:
@@ -467,8 +459,8 @@ class WeChatBot:
                 if conn:
                     try:
                         conn.close()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        self.logger.warning("close tick_log connection failed: %s", e)
             self.logger.log_decision(
                 tick_id, should_reply=True,
                 reason=f"触发回复条件 (未读 {len(unreplied)} 条，需回复 {len(to_reply)} 条，生成 {len(replies)} 条回复)",
@@ -785,7 +777,6 @@ class WeChatBot:
         result = self.sender.send(text, chat_name=chat_name)
         if result.success:
             norm = _normalize_chat_name(chat_name)
-            is_group = _is_group_chat_name(chat_name)
             # 创建一条虚拟的已回复消息记录，放入 pending 等感知层确认
             from src.models.base import ChatMessage, SenderType
             msg = ChatMessage(

@@ -6,7 +6,7 @@ ACP 代码审计 Demo
 import asyncio
 import json
 import sys
-from contextlib import asynccontextmanager
+
 from pathlib import Path
 from typing import Optional
 
@@ -16,7 +16,7 @@ sys.path.insert(0, '/Users/yihanwang/.local/share/uv/tools/kimi-cli/lib/python3.
 import acp
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+
 import uvicorn
 
 

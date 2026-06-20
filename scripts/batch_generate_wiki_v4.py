@@ -5,16 +5,19 @@
 - 断点续传（跳过已有 wiki 文件）
 - 保存到 data/memory/wiki/groups/
 """
-import os
+
 import sys
 import time
 from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.session.global_store import GlobalStore
 from src.utils.qwen_client import QwenClient
+
+_logger = logging.getLogger(__name__)
 
 client = QwenClient(model="deepseek-v4-flash")
 wiki_dir = Path("data/memory/wiki/groups")
@@ -89,8 +92,8 @@ def format_conversation(messages):
         if ts_int:
             try:
                 tstr = datetime.fromtimestamp(int(ts_int)).strftime("%Y-%m-%d %H:%M")
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.warning("timestamp conversion failed: %s", e)
         lines.append(f"[{tstr}] {sender}: {text}")
     return "\n".join(lines)
 

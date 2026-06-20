@@ -39,7 +39,7 @@ class MessageExtractor:
         messages.extend(other_messages)
 
         # 3. 按 y 坐标排序
-        messages.sort(key=lambda m: self._message_y_position(m))
+        messages.sort(key=self._message_y_position)
 
         # 合并调试信息（不覆盖 _extract_other_messages 中设置的 clusters）
         self.debug_info.update({

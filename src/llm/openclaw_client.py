@@ -8,7 +8,7 @@
 import logging
 import os
 import time
-from typing import List, Dict, Any, Optional
+from typing import Optional
 
 
 def _get_openai_client():

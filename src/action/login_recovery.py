@@ -12,9 +12,9 @@ from enum import Enum
 from typing import List, Optional
 
 import Quartz
-import AppKit
 
-from src.models.base import Rect, OCRTextElement, Point
+
+from src.models.base import Rect, OCRTextElement
 from src.ocr.vision_ocr import VisionOCREngine
 
 

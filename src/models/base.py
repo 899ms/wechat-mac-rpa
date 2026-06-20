@@ -2,9 +2,9 @@
 """L1 Domain Models - 基础数据类型"""
 
 from dataclasses import dataclass
-from datetime import datetime
+
 from enum import Enum
-from typing import Callable, Dict, FrozenSet, List, Optional, Tuple
+from typing import Dict, FrozenSet, List, Optional
 
 # 媒体消息类型常量，供各模块统一引用
 MEDIA_MESSAGE_TYPES: FrozenSet[str] = frozenset({"image", "sticker", "mixed", "link_card", "video"})

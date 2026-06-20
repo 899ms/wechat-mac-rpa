@@ -212,8 +212,8 @@ class WindowCapture:
                 try:
                     if os.path.getmtime(old) < cutoff:
                         os.remove(old)
-                except OSError:
-                    pass
+                except OSError as e:
+                    _logger.warning("cleanup old screenshot failed: %s", e)
         except Exception as e:
             _logger.debug("[WindowCapture] 清理旧截图失败: %s", e)
 

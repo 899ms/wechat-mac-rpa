@@ -8,11 +8,14 @@ import os
 import sys
 from pathlib import Path
 from datetime import datetime
+import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.session.global_store import GlobalStore
 from mem0 import Memory
+
+_logger = logging.getLogger(__name__)
 
 DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY")
 
@@ -69,8 +72,8 @@ for m in messages:
     if ts:
         try:
             tstr = datetime.fromtimestamp(int(ts)).strftime("%Y-%m-%d %H:%M")
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("timestamp conversion failed: %s", e)
     lines.append(f"[{tstr}] {m.sender}: {m.text}")
 
 # 按embedding限制切分 chunk（每 chunk < 4000 字符，留安全余量）

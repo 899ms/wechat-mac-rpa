@@ -11,13 +11,16 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+import logging
+
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 HISTORY_DIR = PROJECT_ROOT / "data" / "benchmark_history"
 REPORT_PATH = PROJECT_ROOT / "benchmark_dashboard.html"
+
+_logger = logging.getLogger(__name__)
 
 
 def _load_history(days: int = 90) -> list[dict]:
@@ -29,8 +32,8 @@ def _load_history(days: int = 90) -> list[dict]:
             data = json.loads(f.read_text(encoding="utf-8"))
             data["date"] = f.stem
             records.append(data)
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("load history file failed: %s", e)
     if days and len(records) > days:
         records = records[-days:]
     return records
@@ -138,7 +141,6 @@ def _run_failing_cases() -> dict:
             score_std = 0
             n_runs = 1
             badcase_votes = 0
-            all_dim_vals = {}
             if cache_path.exists():
                 try:
                     cached = _json.loads(cache_path.read_text(encoding="utf-8"))
@@ -156,8 +158,8 @@ def _run_failing_cases() -> dict:
                         avg_dims[name] = {"score": round(statistics.mean(vals), 1) if vals else 0, "comment": comment}
                         if len(vals) >= 2 and len(set(vals)) > 1:
                             dim_var[name] = round(statistics.stdev(vals), 2)
-                except Exception:
-                    pass
+                except Exception as e:
+                    _logger.warning("compute dimension stats failed: %s", e)
 
             entry = {
                 "case_name": r.case_name,
@@ -217,8 +219,8 @@ def _collect_stability() -> list[dict]:
                             full_user_prompt = run.get("user_prompt", "")
                         if not full_system_prompt:
                             full_system_prompt = run.get("system_prompt", "")
-                except Exception:
-                    pass
+                except Exception as e:
+                    _logger.warning("load run prompts failed: %s", e)
             cases.append({
                 "case_name": r.case_name,
                 "source": r.source,
@@ -235,7 +237,7 @@ def _collect_stability() -> list[dict]:
                 "cross_similarity": r.cross_similarity,
             })
     except Exception as e:
-        pass
+        _logger.warning("load cases failed: %s", e)
     return cases
 
 

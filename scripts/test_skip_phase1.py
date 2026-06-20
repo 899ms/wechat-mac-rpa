@@ -4,6 +4,7 @@
 import os, json, sys
 from pathlib import Path
 from datetime import datetime
+import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -12,6 +13,8 @@ from mem0 import Memory
 from mem0.configs.prompts import ADDITIVE_EXTRACTION_PROMPT, generate_additive_extraction_prompt
 from mem0.memory.main import _build_session_scope
 from mem0.memory.utils import parse_messages
+
+_logger = logging.getLogger(__name__)
 
 DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY")
 
@@ -56,8 +59,8 @@ for m in messages:
     if ts:
         try:
             tstr = datetime.fromtimestamp(int(ts)).strftime("%Y-%m-%d %H:%M")
-        except:
-            pass
+        except Exception as e:
+            _logger.warning("timestamp conversion failed: %s", e)
     lines.append(f"[{tstr}] {m.sender}: {m.text}")
 
 full_context = "\n".join(lines)

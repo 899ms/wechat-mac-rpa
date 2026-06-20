@@ -71,7 +71,6 @@ class TestUnreadDetectionFixes:
         from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
         from src.layout.layout_parser import LayoutParser
 
-        parser = LayoutParser(PROFILE_WECHAT_MAC_1760X1280)
         # 验证 _parse_chat_list 中的阈值范围
         # scale_x 约 0.97，所以 unread_x_min ~ 78, unread_x_max ~ 165
         # 未读角标 center.x 约 137，应在范围内

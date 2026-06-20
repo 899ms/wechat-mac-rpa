@@ -5,8 +5,8 @@ Kimi LLM 客户端
 """
 
 import os
-import sys
-from pathlib import Path
+
+
 from typing import List, Dict
 
 try:
@@ -51,7 +51,6 @@ class KimiClient:
         # 新接口：直接传入 messages 列表
         if messages is not None:
             conv_messages = list(messages)
-            user_id = user_id or "default"
         else:
             # 旧接口：使用 user_id + message
             if user_id is None or message is None:

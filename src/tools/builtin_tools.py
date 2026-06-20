@@ -1,8 +1,8 @@
 """内置工具 - 时间、天气、搜索"""
 
-import json
+
 from datetime import datetime
-from typing import Dict, Any
+
 from urllib.parse import parse_qs, urlparse, unquote
 
 import requests
@@ -119,9 +119,10 @@ def _add_to_cache(url: str, text: str):
         del _PAGE_CACHE[oldest]
 
 
-def _search_keyword_in_text(text: str, keyword: str, results: list, is_fuzzy: bool = False, word: str = "") -> None:
+def _search_keyword_in_text(text: str, keyword: str, results: list, is_fuzzy: bool = False, word: str = "") -> list:
     """在 text 中查找 keyword（忽略大小写），将前后 200 字上下文加入 results。
     使用 str.find 替代正则，避免 re 模块依赖。
+    返回传入的 results 列表（已追加匹配结果）。
     """
     lower_text = text.lower()
     lower_kw = keyword.lower()
@@ -140,8 +141,9 @@ def _search_keyword_in_text(text: str, keyword: str, results: list, is_fuzzy: bo
         label = f"[关键词'{word}' 位置 {idx}]" if is_fuzzy else f"[位置 {idx}]"
         results.append(f"{label}: {ctx}")
         if len(results) >= 5:
-            return
+            return results
         pos = idx + len(keyword)
+    return results
 
 
 def _browse_url(url: str = "") -> str:
@@ -170,7 +172,8 @@ def _browse_url(url: str = "") -> str:
 
         # 2. 提取正文：按优先级尝试
         body = ""
-        if "mp.weixin.qq.com" in url:
+        parsed_url = urlparse(url)
+        if parsed_url.hostname == "mp.weixin.qq.com":
             # 微信公众号文章
             content_div = soup.find("div", id="js_content")
             if content_div:
@@ -219,12 +222,12 @@ def _search_in_page(url: str = "", keyword: str = "") -> str:
     text = _PAGE_CACHE[url]
     # 查找关键词位置，返回前后各 200 字的上下文
     results = []
-    _search_keyword_in_text(text, keyword, results, is_fuzzy=False)
+    results = _search_keyword_in_text(text, keyword, results, is_fuzzy=False)
     if not results:
         # 模糊搜索：按空格拆词
         words = keyword.split()
         for w in words:
-            _search_keyword_in_text(text, w, results, is_fuzzy=True, word=w)
+            results = _search_keyword_in_text(text, w, results, is_fuzzy=True, word=w)
             if results:
                 break
     if not results:

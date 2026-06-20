@@ -4,6 +4,7 @@
 import os
 import pytest
 from unittest.mock import patch, MagicMock
+from urllib.parse import urlparse
 
 from src.utils.qwen_client import QwenClient
 
@@ -23,7 +24,8 @@ class TestQwenClientInit:
         }, clear=True):
             client = QwenClient()
             assert client.is_deepseek_official
-            assert "deepseek.com" in str(client.client.base_url)
+            parsed = urlparse(str(client.client.base_url))
+            assert parsed.hostname == "api.deepseek.com"
 
     def test_missing_api_key_raises(self):
         with patch.dict(os.environ, {}, clear=True):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """L4 Action Layer 单元测试"""
 
-import subprocess
+
 from unittest.mock import MagicMock, patch
 
 import pytest

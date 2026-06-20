@@ -8,9 +8,9 @@
   python3 scripts/experiment_loop.py --compare 6 7                  # 对比两个实验
 """
 
-import json, os, sqlite3, sys, subprocess
+import json, sqlite3, sys, subprocess
 from pathlib import Path
-from datetime import datetime
+
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -148,7 +148,6 @@ def print_iteration_insights(analysis: dict):
     # 建议下一步
     print(f"\n   💡 下一步建议:")
     worst_dim = analysis['worst_dimension']
-    best_dim = analysis['best_dimension']
     if worst_dim[1] < -0.3:
         print(f"      1. 修复退化维度: {worst_dim[0]} ({worst_dim[1]:+.1f})")
     if analysis['degraded']:
@@ -178,7 +177,7 @@ def run_and_analyze(exp_name: str, all_labeled: bool = False, n_samples: int = 5
     analysis = analyze_experiment(latest_id)
     if "error" in analysis:
         print(f"Error: {analysis['error']}")
-        return
+        return None
 
     print_iteration_insights(analysis)
     print(f"\n📊 详细报告: http://localhost:8766/experiments/{latest_id}")

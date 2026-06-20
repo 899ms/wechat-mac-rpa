@@ -5,10 +5,10 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from src.models.base import ChatMessage, MEDIA_MESSAGE_TYPES, SenderType
-from src.tools import get_registry, register_builtin_tools
+from src.tools import get_registry
 from src.reply.session_memory import SessionMemory, _extract_query_key
 
 _logger = logging.getLogger("src.reply.generator")
@@ -169,8 +169,6 @@ class ReplyGenerator:
             self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
             return []
 
-        fallback_msg = unreplied[-1]
-
         if self.llm_client is None:
             self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
             return []
@@ -272,7 +270,6 @@ class ReplyGenerator:
             messages[0]["content"] = self._hermes_system_prompt()
             print(f"[Hermes] 使用精简 system prompt，不传 tools")
         tool_round_count = 0  # 已执行的 tool 轮数
-        max_tool_rounds = 10  # 最多允许 10 轮 tool 调用（如先 stock_query 再 web_search）
 
         for attempt in range(max_retries + 1):
             start_time = time.time()
@@ -378,8 +375,8 @@ class ReplyGenerator:
                             try:
                                 query_key = _extract_query_key(tool_name, tool_args)
                                 self.session_memory.add_tool_result(chat_name, tool_name, query_key, str(result)[:1000])
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                _logger.warning("add tool result failed: %s", e)
 
                             # 记录工具调用（summary）
                             tool_calls.append({
@@ -1164,13 +1161,7 @@ class ReplyGenerator:
         # 未读消息（带去重检查：如果历史中已有相似消息且 Bot 已回复，标记为'可能已处理'）
         lines_local.append("[未读消息]（重点回复）")
         # 从历史中提取 Bot 已回复的消息文本（用于去重判断）
-        replied_in_history = set()
-        if all_messages:
-            for m in all_messages:
-                if m.sender_type == SenderType.SELF and m.reply_time and m.text:
-                    # 提取 Bot 回复之前最后一个非 Bot 消息的文本作为"已处理"标记
-                    pass
-            # 简化：如果[未读消息]中的某条在[历史消息]中能找到 Bot 的回复且 Bot 回复在未读消息时间之前
+        # 简化：如果[未读消息]中的某条在[历史消息]中能找到 Bot 的回复且 Bot 回复在未读消息时间之前
             # 则标记为"可能已回复"
 
         skipped_hint = []

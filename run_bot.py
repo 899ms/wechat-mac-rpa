@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """wechat-twin Bot — 合并重构版本"""
+import logging
 import sys, os, fcntl
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -19,6 +20,8 @@ from src.layout.profile import PROFILE_WECHAT_MAC_1760X1280
 from src.perception.smart_pipeline import SmartPerceptionPipeline
 from src.utils.qwen_client import QwenClient
 
+_logger = logging.getLogger(__name__)
+
 
 class SingleInstanceLock:
     def __init__(self, pid_file=""):
@@ -30,7 +33,8 @@ class SingleInstanceLock:
         old_pid = ""
         try:
             with open(self.pid_file) as f: old_pid = f.read().strip()
-        except: pass
+        except Exception as e:
+            _logger.warning("read pid file failed: %s", e)
         try:
             self.fd = open(self.pid_file, "r+")
         except FileNotFoundError:
@@ -50,7 +54,8 @@ class SingleInstanceLock:
             fcntl.flock(self.fd, fcntl.LOCK_UN)
             self.fd.close()
             try: os.remove(self.pid_file)
-            except: pass
+            except Exception as e:
+                _logger.warning("remove pid file failed: %s", e)
 
 
 def main():
