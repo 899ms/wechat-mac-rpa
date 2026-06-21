@@ -11,18 +11,16 @@
 import logging
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
 
-from src.models.base import ChatMessage, PerceptionResult, SenderType
-from src.utils.chat_utils import _is_group_chat_name
-from src.utils.xml_utils import _extract_xml_text
-from src.capture.window_capture import WindowCapture, WeChatNotReadyError
-from src.ocr.vision_ocr import VisionOCREngine
+from src.capture.window_capture import WeChatNotReadyError, WindowCapture
 from src.layout.layout_parser import LayoutParser
 from src.layout.profile import LayoutProfile
-
+from src.models.base import ChatMessage, PerceptionResult, SenderType
+from src.ocr.vision_ocr import VisionOCREngine
+from src.utils.chat_utils import _is_group_chat_name
+from src.utils.xml_utils import _extract_xml_text
 
 from .weflow_client import WeFlowClient, WeFlowMessage
 
@@ -278,6 +276,7 @@ class WeFlowPipeline:
                 window_rect=capture_result.window_rect,
                 scale_factor=capture_result.scale_factor,
                 debug_info={"source": "weflow", "error": "unknown_talker", "chat_name": chat_name},
+                is_service_account_list=layout.is_service_account_list,
             )
 
         # 4. 增量同步：拉取新消息
@@ -305,6 +304,7 @@ class WeFlowPipeline:
                 "new_messages": len(new_messages),
                 "total_history": self.init_total_messages,
             },
+            is_service_account_list=layout.is_service_account_list,
         )
 
     def _sync_incremental(self, talker: str) -> list[WeFlowMessage]:

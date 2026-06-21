@@ -8,13 +8,12 @@
 import logging
 from typing import Optional
 
-from src.models.base import PerceptionResult
-from src.capture.window_capture import WindowCapture, WeChatNotReadyError
-from src.ocr.vision_ocr import VisionOCREngine
+from src.capture.window_capture import WeChatNotReadyError, WindowCapture
 from src.layout.layout_parser import LayoutParser
 from src.layout.profile import LayoutProfile
 from src.message.extractor import MessageExtractor
-
+from src.models.base import PerceptionResult
+from src.ocr.vision_ocr import VisionOCREngine
 from src.utils.debug_logger import DebugLogger
 
 _logger = logging.getLogger("src.vision_pipeline")
@@ -94,4 +93,5 @@ class VisionPipeline:
             window_rect=capture_result.window_rect,
             scale_factor=capture_result.scale_factor,
             debug_info=debug.__dict__,
+            is_service_account_list=layout.is_service_account_list,
         )

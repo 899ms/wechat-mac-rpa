@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """L3 Layout Parser - UI 布局分组"""
 
+import logging
 import re
 from dataclasses import dataclass
 from typing import Any, Dict, List
@@ -8,7 +9,6 @@ from typing import Any, Dict, List
 import numpy as np
 from PIL import Image
 from scipy import ndimage
-import logging
 
 from src.layout.profile import LayoutProfile
 from src.models.base import ChatListItem, OCRTextElement, Rect
@@ -35,6 +35,7 @@ class UILayout:
     timestamp_elements: List[OCRTextElement]
     self_bubbles: List[Rect]
     message_candidates: List[OCRTextElement]
+    is_service_account_list: bool = False
 
 
 class LayoutParser:
@@ -121,6 +122,9 @@ class LayoutParser:
         # 提取 chat_name
         chat_name = self._extract_chat_name(title_elements, width)
 
+        # 检测是否为服务号/订阅号/公众号列表（误点固定入口后会进入该视图）
+        is_service_account_list = self._detect_service_account_list(title_elements)
+
         t_parse_ms = (time.time() - t_parse_start) * 1000
         print(f"[Perf][Layout] parse: {t_parse_ms:.0f}ms "
               f"bubbles={t_bubble_ms:.0f}ms chat_list={t_chatlist_ms:.0f}ms "
@@ -144,6 +148,7 @@ class LayoutParser:
             timestamp_elements=timestamp_elements,
             self_bubbles=self_bubbles,
             message_candidates=message_candidates,
+            is_service_account_list=is_service_account_list,
         )
 
     def _detect_self_bubbles(self, arr: np.ndarray) -> List[Rect]:
@@ -248,7 +253,7 @@ class LayoutParser:
 
         # 未读检测：OCR 数字 + 颜色检测
         unread_for_group: List[str] = [""] * len(groups)
-        
+
         # 1) OCR 数字候选：只接受在头像右上角精确区域的小元素
         # 未读角标位于头像右上角，center.x 约 100-150（Retina），头像内部噪声 < 80，时间戳 > 180
         # 两位数字如 "39" 面积可达 560，故阈值放宽到 1000。
@@ -276,7 +281,7 @@ class LayoutParser:
                     best_idx = idx
             if best_idx >= 0:
                 unread_for_group[best_idx] = text
-        
+
         # 2) 颜色检测补充：对每个聊天项的头像右上角精确区域检测红色 badge
         if image_path:
             try:
@@ -284,14 +289,14 @@ class LayoutParser:
                 for idx, anchor_y in enumerate(group_anchor_y):
                     if unread_for_group[idx]:
                         continue  # OCR 已检测到数字，跳过颜色检测
-                    
+
                     # 头像顶部估算：昵称顶部 - 15
                     nick_top = groups[idx][0].bbox.y
                     avatar_top = nick_top - int(15 * scale_y)
                     # 头像在昵称左侧，宽度约 50-55px
                     nick_left = groups[idx][0].bbox.x
                     avatar_left = max(0, nick_left - int(55 * scale_x))
-                    
+
                     # badge 在头像右上角，取头像右上 badge_size x badge_size 区域
                     badge_size = int(25 * max(scale_x, scale_y))
                     avatar_width = int(55 * scale_x)
@@ -299,7 +304,7 @@ class LayoutParser:
                     y2 = min(img_arr.shape[0], avatar_top + badge_size)
                     x1 = max(0, avatar_left + avatar_width - badge_size)
                     x2 = min(img_arr.shape[1], avatar_left + avatar_width)
-                    
+
                     if y1 < y2 and x1 < x2:
                         region = img_arr[y1:y2, x1:x2, :].astype(int)
                         rr, gg, bb = region[:, :, 0], region[:, :, 1], region[:, :, 2]
@@ -406,3 +411,15 @@ class LayoutParser:
         candidates = filtered if filtered else title_elements
         best = max(candidates, key=lambda e: len(e.text))
         return self.clean_chat_name(best.text)
+
+    _SERVICE_ACCOUNT_TITLES = {"服务号", "订阅号", "公众号"}
+
+    def _detect_service_account_list(
+        self, title_elements: List[OCRTextElement]
+    ) -> bool:
+        """检测当前是否为服务号/订阅号/公众号列表视图。"""
+        for e in title_elements:
+            text = e.text.strip()
+            if text in self._SERVICE_ACCOUNT_TITLES:
+                return True
+        return False
