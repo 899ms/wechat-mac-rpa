@@ -4,6 +4,7 @@
 import json
 import logging
 import math
+import re
 import threading
 import time
 from pathlib import Path
@@ -15,6 +16,89 @@ except ImportError:
     Timeout: Any = None  # type: ignore[misc,assignment,no-redef]
 
 _logger = logging.getLogger("src.memory.engine")
+
+# ── 别名校验（防止把非别名噪声写进 aliases.json）──
+
+# 角色词 / 系统占位符：明显不是真人昵称，一律拒绝
+_ALIAS_BLACKLIST = {
+    "Bot", "bot", "我", "对方", "对话中", "匿名", "未知昵称", "未知", "群主", "群聊主人",
+    "群成员", "记录者", "记录人", "旁白", "ai开发小分队", "本人", "自己", "他人", "某人",
+    "无", "暂无", "未发现", "未发现其他显著别名",
+}
+
+# 描述性关键词：含这些词的字符串大概率是句子而非别名（与历史 invalid_keywords 对齐）
+_ALIAS_INVALID_KEYWORDS = [
+    "说", "提到", "认为", "和", "与", "让", "叫", "是", "在", "觉得", "告诉", "问",
+    "回答", "表示", "介绍", "@", "称为", "称呼", "未发现", "无其他", "显著别名",
+    "可能别名", "群友", "朋友", "邻居", "无其他别名",
+]
+
+# 房号 / 单元号模式：如 "6幢5号501"、"4-1-703"、"1幢10号802"
+_ROOM_NUMBER_RE = re.compile(r"\d+\s*[幢栋号楼室单元]\s*\d|\d+-\d+-\d+|\d+幢\d+号")
+
+# 别名长度上限：真实昵称不会太长
+_ALIAS_MAX_LEN = 15
+
+# 别名拆分符：顿号 / 斜杠 / 空格（拆完后逐条校验）
+_ALIAS_SPLIT_RE = re.compile(r"[、/／\|｜\s]+")
+
+# 广告群特征：群名带具体斤价（"6.99一斤"、"X.X元X斤...百果园" 等），命中即不入库
+_AD_GROUP_PATTERNS = [
+    re.compile(r"\d+\.?\d*\s*[元块]?\s*.*一斤"),
+    re.compile(r"\d+\.?\d*\s*[元块].*斤"),
+    re.compile(r"\d+\.?\d*\s*一斤"),
+]
+# 常见 emoji Unicode 码点集合（用于群名归一化剥离）
+_EMOJI_CODEPOINTS: frozenset[int] = frozenset(
+    [0x24C2]
+    + list(range(0x2702, 0x27B0 + 1))
+    + list(range(0x1F1E6, 0x1F1FF + 1))
+    + list(range(0x1F300, 0x1F5FF + 1))
+    + list(range(0x1F600, 0x1F64F + 1))
+    + list(range(0x1F680, 0x1F6FF + 1))
+    + list(range(0x1F900, 0x1F9FF + 1))
+    + list(range(0x1FA00, 0x1FAFF + 1))
+)
+
+
+def _strip_emoji(name: str) -> str:
+    """去除常见 emoji 字符。"""
+    return "".join(c for c in name if ord(c) not in _EMOJI_CODEPOINTS)
+
+
+def normalize_chat_name(name: str) -> str:
+    """群名/用户名归一化（FR-13）。
+
+    用于 wiki 路径计算与去重，避免 OCR 空格/前缀差异导致的重复群：
+    - 去除 emoji
+    - 折叠连续空白
+    - 去除首尾空白与常见前缀序号（"3D " / "1" 等数字前缀不剥离，避免误并）
+
+    注意：归一化只用于"判断是否重复"和"路径"，不改变显示名。
+    """
+    if not name:
+        return ""
+    n = _strip_emoji(name)
+    n = re.sub(r"\s+", " ", n).strip()
+    return n
+
+
+def _split_alias_string(s: str) -> List[str]:
+    """把 LLM 输出的别名串按顿号/斜杠/空格拆成单条，去重保序。
+
+    LLM 经常把多个别名写成 "老王、王总" 或 "Paul、坤蜀黍" 一整串，
+    不拆分会导致整串入库、按整串匹配，召回失败。
+    """
+    parts = _ALIAS_SPLIT_RE.split(s)
+    seen: set = set()
+    result: List[str] = []
+    for p in parts:
+        p = p.strip().strip("（）()「」『』“”\"'").strip()
+        if not p or p in seen:
+            continue
+        seen.add(p)
+        result.append(p)
+    return result
 
 
 # 默认 wiki 模板
@@ -74,13 +158,14 @@ _UPDATE_PROMPT = """请根据以下对话记录，更新用户 {user_name} 的 w
 
 【更新规则】
 1. 只记录**当前用户本人**的信息，严禁记录其他用户的信息
-2. 增量更新铁律（最重要）：
-   - 严禁删除现有 wiki 中的任何内容，除非明确超过 7 天且属于"近期动态"
-   - 保留现有 wiki 中的所有来源标注格式
-   - 对新增内容也必须标注来源
-   - "本次对话未提及" ≠ "信息已过期"，不要臆测删除
+2. 增量更新——编译而非堆叠（最重要）：
+   - wiki 是**编译后的摘要**，不是对话流水账。只记事实和事件，严禁把原文对话逐条搬进 wiki
+   - **身份事实**（姓名/职业/关系/偏好/MBTI）：增量保留，新信息覆盖旧信息，冲突标 `[待验证]`，不要臆测删除
+   - **近期动态**：滚动窗口，每人每天最多 1-2 条，只记事件摘要（如"2026-06-20 讨论AI能力"），不记原文对话
+   - 超过 7 天的"近期动态"**必须删除**或并入"说过的话"
+   - "本次对话未提及" ≠ "信息已过期"，但近期动态到期必须清理
 3. 标注日期：时间敏感的信息必须带日期（格式：YYYY-MM-DD），日期必须严格来自对话记录开头的时间戳。禁止编造、推测、推断任何日期
-4. 信息来源标注：所有事实信息（姓名、职业、城市、日期、关系等）都必须标注信息来源，格式 `（来源：某群/私聊/某人提及/日期）`，没有例外
+4. 信息来源标注：所有事实信息（姓名、职业、城市、日期、关系等）都必须标注信息来源，格式 `（来源：某群/私聊/某人提及/日期）`，没有例外。**关键：Bot 自己的回复（对话中以"我："或"【Bot回复】"开头的行）不是有效事实来源**——只有当前用户本人或群里其他人明确陈述的内容才能记为事实。Bot 的推测/猜测/回应，若用户未明确确认，不得写入 wiki，或标 `[待验证]`
 5. 时间戳缺失：无法确定日期时不标注或用 [待验证] 标记
 6. 过期处理：超过 7 天的"近期动态"移到"说过的话"或删除
 7. 冲突处理：新信息覆盖旧信息
@@ -91,9 +176,11 @@ _UPDATE_PROMPT = """请根据以下对话记录，更新用户 {user_name} 的 w
 12. 与其他人的关系：记录当前用户与其他人的社会关系，不限于群成员，包括对话中出现的所有人
 13. **区分陈述和疑问（严格）**：以"吗"、"呢"、"?"结尾的句子是疑问，不是事实陈述，严禁当作事实提取。例如"周宇之前在上海吗？"是疑问，不能提取为"周宇之前在上海"。
 14. MBTI 推断：根据用户的说话风格、用词习惯、决策方式等，推断其可能的 MBTI 类型，并简要说明依据
-15. 控制长度：个人 wiki 不超过 4000 字
+15. 控制长度：个人 wiki 不超过 4000 字（代码层有兜底截断，但仍请主动精简）
 16. 保持 Markdown 格式
 17. 别名发现（严格）：只记录当前用户本人的其他称呼。严禁记录其他人的名字。格式：`- 别名：xxx`
+18. **沉默≠确认（严格）**：用户"未否认"、"未反驳"、"没回应"绝对不能当作确认事实的依据。只有用户或他人明确陈述/肯定的内容才是 confirmed。Bot 自答后用户沉默的，标 `[待验证]` 或不记录
+19. **昵称/微信号唯一归属**：同一昵称/群昵称/微信号只能归属一个人。若现有 wiki 已把某昵称归给 A，对话中又出现该昵称指 B，必须核对清楚再记，不确定时标 `[待验证]`，严禁把同一昵称同时分给两人
 
 【现有 wiki】
 {current_wiki}
@@ -129,21 +216,26 @@ _UPDATE_GROUP_PROMPT = """请根据以下对话记录，更新群聊 {chat_name}
 {identity_context}
 
 【更新规则】
-1. 只修改/新增变化的部分，保留未变动的内容
-2. 标注日期：时间敏感的信息必须带日期（格式：YYYY-MM-DD），日期必须严格来自对话记录开头的时间戳。禁止编造、推测、推断任何日期
-3. 时间戳缺失：无法确定日期时不标注或用 [待验证] 标记
-4. 过期处理：超过 7 天的"近期动态"移到历史记录或删除
-5. 冲突处理：新信息覆盖旧信息
-6. 重点记录：
+1. wiki 是**编译后的摘要**，不是对话流水账——这是最重要的原则：
+   - 严禁把原文对话（每条发言 + Bot 回复全文）逐条搬进 wiki
+   - "近期话题 & 动态"只记**事件摘要**：每人每天最多 1-2 条，一句话概括发生了什么（如"2026-06-20 讨论AI能力，白姐认为ai干不好"）
+   - 不要记录每条发言的原文、不要记录 Bot 的回复原文
+2. 身份/关系信息（群成员画像、群规则文化）增量保留，新信息覆盖旧信息，冲突标 `[待验证]`
+3. 超过 7 天的"近期动态"**必须删除**或并入历史，保持滚动窗口精简
+4. 只修改/新增变化的部分，保留未变动的内容
+5. 标注日期：时间敏感的信息必须带日期（格式：YYYY-MM-DD），日期必须严格来自对话记录开头的时间戳。禁止编造、推测、推断任何日期
+6. 时间戳缺失：无法确定日期时不标注或用 [待验证] 标记
+7. 冲突处理：新信息覆盖旧信息
+8. 重点记录：
    - 群成员关系、身份、职业变化
-   - 群内热点话题、事件、约定
+   - 群内热点话题、事件、约定（摘要，非原文）
    - 群内文化、梗、常用语
    - 群规则、禁忌、注意事项
-7. 别名发现：在"群成员画像"中，如果某个成员有多个称呼，请一并记录。只记录该成员本人的称呼，严禁把其他成员的名字误记到此成员下。格式：`成员主名（别名1/别名2）`
-8. 多账号标注：如果对话来源包含不同账号标记，标注所属账号
-9. 不确定的信息用 [待验证] 标记
-10. 控制长度：群聊 wiki 不超过 4000 字
-11. 保持 Markdown 格式
+9. 别名发现：在"群成员画像"中，如果某个成员有多个称呼，请一并记录。只记录该成员本人的称呼，严禁把其他成员的名字误记到此成员下。格式：`成员主名（别名1/别名2）`
+10. 多账号标注：如果对话来源包含不同账号标记，标注所属账号
+11. 不确定的信息用 [待验证] 标记
+12. 控制长度：群聊 wiki 不超过 4000 字（代码层有兜底截断，但仍请主动精简）
+13. 保持 Markdown 格式
 
 【现有 wiki】
 {current_wiki}
@@ -197,6 +289,9 @@ class MemoryEngine:
             try:
                 data = json.loads(aliases_path.read_text(encoding="utf-8"))
                 for user, cfg in data.get("users", {}).items():
+                    if not self._is_valid_main_name(user):
+                        _logger.warning(f"aliases.json 中非法主名，跳过: {user}")
+                        continue
                     self._aliases[user] = cfg.get("aliases", [])
             except Exception as e:
                 _logger.warning(f"加载 aliases 失败: {e}")
@@ -326,6 +421,9 @@ class MemoryEngine:
         """把更新任务加入队列，后台异步执行。"""
         if not user_name or self.llm_client is None:
             return
+        if not self._is_valid_main_name(user_name):
+            _logger.warning(f"非法用户名，跳过 wiki 更新: {user_name}")
+            return
         resolved = self._resolve_alias(user_name)
         with self._queue_lock:
             self._update_queue.append({
@@ -341,6 +439,13 @@ class MemoryEngine:
                           messages: List, bot_replies: List[str]) -> None:
         """把群聊 wiki 更新任务加入队列，后台异步执行。"""
         if not group_name or self.llm_client is None:
+            return
+        if not self._is_valid_main_name(group_name):
+            _logger.warning(f"非法群名，跳过 wiki 更新: {group_name}")
+            return
+        # 广告群拦截（FR-14）：群名带具体斤价的团购广告不生成 wiki
+        if any(p.search(group_name) for p in _AD_GROUP_PATTERNS):
+            _logger.debug("广告群跳过 wiki 生成: %s", group_name)
             return
         with self._queue_lock:
             self._update_queue.append({
@@ -373,11 +478,135 @@ class MemoryEngine:
             _logger.warning(f"加载 wiki 失败 {path}: {e}")
             return ""
 
+    # 时效性 section：超长时优先从这些 section 底部（最老的条目）砍
+    _VOLATILE_SECTIONS = ("近期动态", "近期话题", "说过的话", "说过的话（短期）", "历史记录")
+
+    def _enforce_wiki_limits(self, wiki: str, max_chars: int = 4000) -> str:
+        """代码级长度护栏（NFR-2）。
+
+        LLM 不遵守长度约束时兜底：按 `## ` 切 section，超长时优先压缩
+        时效性 section（近期动态/说过的话），身份/关系 section 保留。
+        仍超长再整体尾部截断。这是 LLMWiki"编译摘要"原则的强制保障——
+        不让 wiki 退化成无限增长的流水账。
+        """
+        wiki = wiki.strip()
+        if len(wiki) <= max_chars:
+            return wiki
+
+        # 按 ## 标题切 section（保留标题行）
+        parts = re.split(r"(?=^## )", wiki, flags=re.MULTILINE)
+        header = parts[0] if parts else ""
+        sections = parts[1:] if len(parts) > 1 else []
+
+        def is_volatile(sec: str) -> bool:
+            title = sec.split("\n", 1)[0]
+            return any(v in title for v in self._VOLATILE_SECTIONS)
+
+        volatile = [s for s in sections if is_volatile(s)]
+        stable = [s for s in sections if not is_volatile(s)]
+
+        stable_len = len(header) + sum(len(s) for s in stable)
+        budget = max_chars - stable_len  # volatile 可用的字数预算
+
+        if budget < 0:
+            # 稳定 section 已超限：volatile 全部丢弃，整体截断
+            result = (header + "".join(stable)).strip()
+        elif not volatile:
+            result = (header + "".join(stable)).strip()
+        else:
+            # 按比例给每个 volatile section 分配预算，各自只保留尾部（最新的条目）
+            total_v = sum(len(s) for s in volatile)
+            compressed = []
+            for sec in volatile:
+                lines = sec.split("\n")
+                title_line = lines[0] if lines else ""
+                body = lines[1:]
+                # 该 section 分到的预算
+                share = max(200, int(budget * len(sec) / total_v)) if total_v > 0 else budget
+                if len(sec) <= share:
+                    compressed.append(sec)
+                    continue
+                # 从 body 尾部往前取，直到填满 share
+                kept = []
+                cur = len(title_line) + 1
+                for line in reversed(body):
+                    if cur + len(line) + 1 > share:
+                        break
+                    kept.append(line)
+                    cur += len(line) + 1
+                kept.reverse()
+                compressed.append("\n".join([title_line] + kept))
+            result = (header + "".join(stable) + "".join(compressed)).strip()
+
+        # 兜底：仍超长则整体尾部截断
+        if len(result) > max_chars:
+            # 给截断提示留空间
+            cap = max_chars - 30
+            truncated = result[:cap]
+            last_break = max(truncated.rfind("\n## "), truncated.rfind("\n- "), truncated.rfind("\n\n"))
+            if last_break > cap * 0.5:
+                truncated = truncated[:last_break]
+            result = truncated.strip() + "\n（…记忆已截断，超长部分省略）"
+
+        if len(result) < len(wiki):
+            _logger.info(f"[WikiLimit] {len(wiki)} → {len(result)} 字 (上限 {max_chars})")
+        return result
+
     def _save_wiki(self, path: Path, content: str) -> None:
         try:
+            content = self._enforce_wiki_limits(content)
+            content = self._sanitize_wiki_aliases(content, path.stem)
             path.write_text(content, encoding="utf-8")
         except Exception as e:
             _logger.warning(f"保存 wiki 失败 {path}: {e}")
+
+    def _sanitize_wiki_aliases(self, content: str, main_name: str) -> str:
+        """落盘前清洗 wiki 别名行（运行期护栏，防止 LLM 再积垃圾 token）。
+
+        对 ## 别名 段及任意"别名："开头的行：按顿号拆分，去掉 ** 和 （来源：…）
+        注解后逐条过 _is_valid_alias，剔除黑名单/描述性/房号等脏 token，保留合法别名。
+        """
+        try:
+            existing_mains = set(self._aliases.keys())
+        except Exception:
+            existing_mains = set()
+        lines = content.split("\n")
+        in_alias_section = False
+        changed = False
+        for i, raw in enumerate(lines):
+            if raw.startswith("## "):
+                in_alias_section = "别名" in raw
+                continue
+            # 捕获列表标记前缀（"- " / "* " 及前置空格）
+            lead_m = re.match(r"^(\s*[-*]\s*)", raw)
+            lead = lead_m.group(1) if lead_m else ""
+            body = raw[len(lead):]
+            is_alias_line = in_alias_section or body.startswith("别名")
+            if not is_alias_line:
+                continue
+            if not body.strip() or body.strip().startswith("（暂无"):
+                continue
+            m = re.match(r"^(别名[/／昵称]*\s*[：:])", body)
+            if not m:
+                continue
+            prefix = m.group(1)
+            rest = body[len(prefix):]
+            # 只按顿号拆（保留 （来源：…） 注解附着在别名上）
+            tokens = [t.strip() for t in rest.split("、") if t.strip()]
+            kept: List[str] = []
+            for tok in tokens:
+                core = re.sub(r"\*+", "", tok).strip()
+                core = re.sub(r"[（(].*[）)]", "", core).strip()
+                if not core:
+                    kept.append(tok)
+                    continue
+                if self._is_valid_alias(core, main_name, existing_mains):
+                    kept.append(tok)
+            if len(kept) != len(tokens):
+                new_body = prefix + "、".join(kept) if kept else prefix + "（暂无）"
+                lines[i] = lead + new_body
+                changed = True
+        return "\n".join(lines) if changed else content
 
     def _save_prompt(self, path: Path, prompt: str) -> None:
         """保存生成该 wiki 使用的 prompt，方便排查。截断过长的 conversation 部分。"""
@@ -620,8 +849,53 @@ class MemoryEngine:
 
     # ── 别名自动发现 ──
 
+    def _is_valid_main_name(self, name: str) -> bool:
+        """主名（wiki 文件名 stem / aliases.json 的 key）合法性校验。
+
+        拒绝：空 / 带文件系统非法字符 / 以点开头 / 过长。
+        用于防止 OCR 把 "白:" 这类脏文件名当作合法用户进入记忆系统。
+        """
+        name = name.strip()
+        if not name or name.startswith("."):
+            return False
+        if len(name) > 64:
+            return False
+        # Windows/macOS/Linux 非法文件名字符
+        if any(c in name for c in '\\/:*?"<>|'):
+            return False
+        return True
+
+    def _is_valid_alias(self, alias: str, main_name: str, existing_mains: set) -> bool:
+        """单条别名的统一校验。两个提取器共用，保证入库口径一致。
+
+        拒绝：空 / 等于主名 / 是其他人的主名 / 过长 / 含描述性关键词 / 含标点 /
+              房号模式 / 微信 ID / 角色词黑名单。
+        """
+        alias = alias.strip()
+        if not alias or alias == main_name:
+            return False
+        if alias in existing_mains:
+            return False
+        if len(alias) > _ALIAS_MAX_LEN:
+            return False
+        if alias in _ALIAS_BLACKLIST:
+            return False
+        if any(kw in alias for kw in _ALIAS_INVALID_KEYWORDS):
+            return False
+        if any(c in alias for c in '。，；：！？.,;:!?'):
+            return False
+        if alias.startswith("wxid_") or alias.endswith("@chatroom"):
+            return False
+        if _ROOM_NUMBER_RE.search(alias):
+            return False
+        return True
+
     def _extract_aliases_from_user_wiki(self, wiki: str, user_name: str) -> List[str]:
-        """从用户 wiki 的 ## 别名 段落提取别名。严格过滤，排除他人名字和无效条目。"""
+        """从用户 wiki 的 ## 别名 段落提取别名。
+
+        关键修复：LLM 常把多个别名写成 "老王、王总" 一整串，必须按顿号/斜杠
+        拆分后再逐条校验，否则整串入库会导致按子串（如 "王总"）召回失败。
+        """
         aliases: List[str] = []
         marker = "## 别名"
         if marker not in wiki:
@@ -632,9 +906,6 @@ class MemoryEngine:
             end = len(wiki)
         section = wiki[start:end]
 
-        # 明显不是别名的关键词（通常是描述性语句）
-        invalid_keywords = ["说", "提到", "认为", "和", "与", "让", "叫", "是", "在", "觉得", "告诉", "问", "回答", "表示", "介绍", "@"]
-        # 已有主名集合（避免把其他用户的主名当成别名）
         existing_mains = set(self._aliases.keys())
 
         for line in section.split("\n"):
@@ -646,21 +917,11 @@ class MemoryEngine:
                     alias_text = alias_text[3:].strip()
                 # 去掉括号里的来源说明，如 "qian（发现来源：某群）"
                 alias_text = alias_text.split("（")[0].split("(")[0].strip()
-                # 基础过滤
-                if not alias_text or alias_text == user_name:
-                    continue
-                if alias_text in existing_mains:
-                    continue  # 已经是其他人的主名，不采纳
-                if len(alias_text) > 30:
-                    continue  # 过长，不太可能是别名
-                if any(kw in alias_text for kw in invalid_keywords):
-                    continue  # 包含描述性关键词，可能是句子而非别名
-                if any(c in alias_text for c in '。，；！？.,;!?'):
-                    continue  # 包含标点，说明是句子
-                if alias_text.startswith("wxid_") or alias_text.endswith("@chatroom"):
-                    continue  # 微信 ID 模式，不是别名
-                if alias_text not in aliases:
-                    aliases.append(alias_text)
+                # 拆分整串："老王、王总" → ["老王", "王总"]
+                for alias in _split_alias_string(alias_text):
+                    if self._is_valid_alias(alias, user_name, existing_mains):
+                        if alias not in aliases:
+                            aliases.append(alias)
         return aliases
 
     def _extract_aliases_from_group_wiki(self, wiki: str) -> Dict[str, List[str]]:
@@ -672,7 +933,6 @@ class MemoryEngine:
             return result
         # 模式: **成员名（别名1/别名2）**
         existing_mains = set(self._aliases.keys())
-        invalid_keywords = ["说", "提到", "认为", "和", "与", "让", "叫", "是", "在", "觉得", "告诉", "问", "回答", "表示", "介绍", "@"]
         # 从 markdown 中提取 **成员名（别名1/别名2）** 格式
         # 遍历所有 **...** 模式，用字符串操作替代正则
         i = 0
@@ -698,22 +958,11 @@ class MemoryEngine:
             if paren_close == -1:
                 continue
             alias_str = content[paren_open + 1:paren_close].strip()
-            aliases = []
-            for a in alias_str.replace("、", "/").split("/"):
-                a = a.strip()
-                if not a or a == main:
-                    continue
-                if a in existing_mains:
-                    continue  # 已经是其他人的主名
-                if len(a) > 30:
-                    continue
-                if any(kw in a for kw in invalid_keywords):
-                    continue
-                if any(c in a for c in '。，；！？.,;!?'):
-                    continue
-                if a.startswith("wxid_") or a.endswith("@chatroom"):
-                    continue
-                aliases.append(a)
+            aliases: List[str] = []
+            for a in _split_alias_string(alias_str):
+                if self._is_valid_alias(a, main, existing_mains):
+                    if a not in aliases:
+                        aliases.append(a)
             if main and aliases:
                 result[main] = aliases
         return result
@@ -733,12 +982,15 @@ class MemoryEngine:
         existing_mains = set(self._aliases.keys())
         added = []
         for alias in new_aliases:
-            if alias != resolved and alias not in existing:
-                if alias in existing_mains:
-                    continue  # 别名不能是其他人的主名
-                self._aliases[resolved].append(alias)
-                existing.add(alias)
-                added.append(alias)
+            # 统一校验：拆分 + 过滤脏数据（防御性，防止上游传入未清洗的串）
+            for a in _split_alias_string(alias):
+                if not self._is_valid_alias(a, resolved, existing_mains):
+                    continue
+                if a in existing:
+                    continue
+                self._aliases[resolved].append(a)
+                existing.add(a)
+                added.append(a)
 
         if not added:
             return
@@ -841,15 +1093,19 @@ class MemoryEngine:
         _logger.info(f"[Snippet] extracted {len(snippets)} snippets, hit_keywords={hit_keywords}")
         return snippets
 
-    def search_keyword(self, keyword: str, max_chars: int = 6000) -> str:
+    def search_keyword(self, keyword: str, max_chars: int = 6000, return_scored: bool = False) -> Any:
         """BM25 搜索：召回 + 排序，返回最相关的 wiki 内容。
 
         召回：遍历所有 wiki，找到包含任意关键词的文档。
         排序：BM25 打分，按相关性排序，只返回 Top 10。
         命中本人 → 返回完整 wiki；命中别人 → 返回片段。
+
+        return_scored=True（诊断用）：返回 (结果文本, scored)，scored 是 BM25
+        召回+primary 调整后、LLM rerank 前的候选池（含所有 score>0 的文档）。
+        benchmark 用它测召回阶段召回率，区分召回问题 vs 排序问题。
         """
         if not keyword or len(keyword.strip()) < 2:
-            return ""
+            return ("", []) if return_scored else ""
         # 按空格分词（去掉太短的词）
         raw_keywords = [kw.strip() for kw in keyword.split() if len(kw.strip()) >= 2]
         if not raw_keywords:
@@ -867,6 +1123,9 @@ class MemoryEngine:
         docs: List[Tuple[str, str, bool]] = []  # (name, content, is_group)
         for path in (self.wiki_dir / "users").glob("*.md"):
             user = path.stem
+            if not self._is_valid_main_name(user):
+                _logger.warning(f"非法主名 wiki 文件，跳过搜索: {path.name}")
+                continue
             resolved_user = self._resolve_alias(user)
             wiki = self._load_wiki(path)
             facts = self._facts.get(resolved_user, [])
@@ -889,7 +1148,8 @@ class MemoryEngine:
 
         _logger.info(f"[Search] retrieved {len(docs)} docs")
         if not docs:
-            return f"未在本地记忆中找到关于'{keyword}'的信息"
+            msg = f"未在本地记忆中找到关于'{keyword}'的信息"
+            return (msg, []) if return_scored else msg
 
         # ── 2. BM25 排序 ──
         N = len(docs)
@@ -927,6 +1187,14 @@ class MemoryEngine:
         _logger.info(f"[Search] N={N} avgdl={avgdl:.1f} original_keywords={filtered_original} use_alias_group={use_alias_group} idf={ {k: round(v, 4) for k, v in idf.items()} }")
 
         # 打分：原始搜索词正常计算，扩展别名合并计算并降权 0.3
+        # 人名查询场景：查询词能 resolve 到某个 user 主名时，给 user wiki 轻微
+        # boost，避免提到该人名的群 wiki 因篇幅长、词频高而 BM25 分数压过
+        # user wiki，把跨人关系（如王芊 wiki 提到配偶王艺涵）挤出 Top10。
+        is_person_query = any(
+            self._resolve_alias(name) == self._resolve_alias(resolved_keyword)
+            for name, _, is_group in docs if not is_group
+        )
+        _logger.info(f"[Search] is_person_query={is_person_query} (resolved='{resolved_keyword}')")
         scored = []  # (name, content, is_group, score, is_primary)
         for name, content, is_group in docs:
             score = 0.0
@@ -943,6 +1211,9 @@ class MemoryEngine:
                 if alias_f > 0 and idf["__aliases__"] > 0.001:
                     denom = alias_f + k1 * (1 - b + b * dl / avgdl)
                     score += 0.3 * idf["__aliases__"] * alias_f * (k1 + 1) / denom
+            # 人名查询时 user wiki 加 boost，让跨人关系 user wiki 能进 Top10
+            if is_person_query and not is_group and score > 0:
+                score *= 1.3
             if score > 0:
                 # 本人判断：只有别名精确一致才算 primary
                 name_match = (self._resolve_alias(name) == self._resolve_alias(resolved_keyword))
@@ -960,7 +1231,8 @@ class MemoryEngine:
             _logger.info(f"[Search] non-primary top: {name} score={score:.4f}")
 
         if not scored:
-            return f"未在本地记忆中找到关于'{keyword}'的信息"
+            msg = f"未在本地记忆中找到关于'{keyword}'的信息"
+            return (msg, []) if return_scored else msg
 
         # 本人优先，然后按 BM25 分数排序
         scored.sort(key=lambda x: (not x[4], -x[3]))
@@ -980,6 +1252,15 @@ class MemoryEngine:
                 adjusted.append((name, content, is_group, score, False))
         scored = adjusted
         scored.sort(key=lambda x: (not x[4], -x[3]))
+
+        # 召回阶段候选池（rerank 前）的文档名列表，供 return_scored 诊断用
+        recall_pool_names = [name for name, _, _, _, _ in scored]
+
+        # ── 2.5 LLM rerank：用 LLM 对 BM25 候选按语义相关性重排 ──
+        # BM25 子串匹配无法理解关系语义（如"妈妈"=母亲≠岳母），LLM rerank 补这个短板。
+        # llm_client 为 None（benchmark 未传）或调用失败时自动降级回 BM25 顺序。
+        all_kw = filtered_original + (expanded_aliases if use_alias_group else [])
+        scored = self._llm_rerank(scored, keyword.strip(), all_kw)
 
         # ── 3. 取 Top 10，组装结果 ──
         results = []
@@ -1014,12 +1295,13 @@ class MemoryEngine:
                     results.append(tag + snippet)
 
         if not results:
-            return f"未在本地记忆中找到关于'{keyword}'的信息"
+            msg = f"未在本地记忆中找到关于'{keyword}'的信息"
+            return (msg, []) if return_scored else msg
 
         text = "\n".join(results)
         _logger.info(f"[Search] raw results length={len(text)} chars, max_chars={max_chars}")
         if len(text) <= max_chars:
-            return text
+            return (text, recall_pool_names) if return_scored else text
 
         # 优先保留本人的完整 wiki，其他人的 snippet 后截断
         primary_snippets = []
@@ -1046,7 +1328,88 @@ class MemoryEngine:
                 break
             truncated = truncated + "\n" + snippet if truncated else snippet
         _logger.info(f"[Search] truncated results length={len(truncated)} chars")
+        if return_scored:
+            return truncated, recall_pool_names
         return truncated
+
+    def _llm_rerank(
+        self,
+        scored: List[Tuple[str, str, bool, float, bool]],
+        query: str,
+        keywords: List[str],
+    ) -> List[Tuple[str, str, bool, float, bool]]:
+        """用 LLM 对 BM25 召回的候选重排。
+
+        输入 scored（已按 BM25 排序的 (name, content, is_group, score, is_primary)），
+        提取每个候选的最相关 snippet，让 LLM 按与 query 的语义相关性重排。
+
+        降级：llm_client 为 None / 调用异常 / 解析失败 → 返回原 scored（不阻断）。
+        LLM 能理解 BM25 无法处理的语义，如"妈妈=母亲≠岳母"的关系消歧。
+        """
+        if not scored or self.llm_client is None:
+            return scored
+        # 候选过多时只取前 10（与最终 top10 一致）
+        candidates = scored[:10]
+        if len(candidates) <= 1:
+            return scored
+
+        # 为每个候选提取最相关 snippet（复用 _extract_all_snippets）
+        snippet_kws = keywords if keywords else [query]
+        cand_lines: List[str] = []
+        for i, (name, content, _is_group, _score, _is_primary) in enumerate(candidates, 1):
+            snippets = self._extract_all_snippets(content, snippet_kws, max_snippets=1)
+            snippet = snippets[0] if snippets else content[:200]
+            # 截断防 prompt 过长：200 字让 LLM 看到完整关系描述（如"母亲"/"岳母"）
+            snippet = snippet.replace("\n", " ").strip()[:200]
+            cand_lines.append(f"[{i}] {name}：{snippet}")
+
+        prompt = (
+            "查询：{q}\n候选历史记忆片段（编号-内容）：\n{cands}\n\n"
+            "请按与查询的语义相关性从高到低排序，返回编号数组（JSON，如 [3,1,2,5]）。\n"
+            "排序原则：\n"
+            "1. 关系消歧：查询中的人物关系词（如妈妈=母亲、爸爸=父亲）指直系亲属，"
+            "不是配偶的父母（岳母/婆婆）或同名无关的人。候选 snippet 中明确写"
+            "'XX的妈妈/母亲'的优先于'XX配偶的母'。\n"
+            "2. 直接相关优先：候选内容直接描述查询对象本人的，优先于仅提及查询词的。\n"
+            "3. 过滤词面重叠：仅因群名/昵称含查询词而无实质关系的排最后。\n"
+            "只返回 JSON 数组，不要解释。"
+        ).format(q=query, cands="\n".join(cand_lines))
+
+        try:
+            resp = self.llm_client.chat(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=200,
+                timeout=30,
+            )
+            text = resp if isinstance(resp, str) else getattr(resp, "content", str(resp))
+            # 解析 [n,n,...] 编号数组
+            import re as _re
+            m = _re.search(r"\[([0-9,\s]+)\]", text)
+            if not m:
+                _logger.warning("[Search][LLMRerank] 未解析到编号数组，回退 BM25: %s", text[:80])
+                return scored
+            order = [int(x.strip()) for x in m.group(1).split(",") if x.strip().isdigit()]
+            if not order:
+                return scored
+
+            # 按 LLM 顺序重排候选；LLM 未列出的候选保留在后面（按原 BM25 顺序）
+            seen = set()
+            reranked: List[Tuple[str, str, bool, float, bool]] = []
+            for idx in order:
+                if 1 <= idx <= len(candidates) and idx not in seen:
+                    seen.add(idx)
+                    reranked.append(candidates[idx - 1])
+            for i, c in enumerate(candidates, 1):
+                if i not in seen:
+                    reranked.append(c)
+            # 保留 scored 10 之后的（若有）
+            reranked.extend(scored[10:])
+            _logger.info("[Search][LLMRerank] rerank ok, new order: %s", order)
+            return reranked
+        except Exception as e:
+            _logger.warning("[Search][LLMRerank] 调用失败，回退 BM25: %s", e)
+            return scored
 
     def _start_worker(self) -> None:
         """启动后台 worker 线程，定期处理更新队列。"""
@@ -1123,3 +1486,89 @@ class MemoryEngine:
                 break
 
         return results
+
+    # ── Lint 健康检查（FR-7/8，LLMWiki 核心操作）──
+
+    def lint_memory(self, max_wiki_chars: int = 4000) -> dict:
+        """扫描记忆库，产出问题清单。
+
+        检查项：
+        - conflicts: 同一别名指向多个主名
+        - bloated: 超长度上限的 wiki 文件
+        - duplicates: 归一化后同名的群/用户
+        - ad_groups: 命中广告群特征的 wiki
+        - stale: （占位）过时近期动态，需 LLM 判定，此处不自动检测
+
+        返回结构化 dict。调用方可据此自动截断 bloated、标记 conflicts 供人工审核。
+        """
+        report: Dict[str, Any] = {
+            "conflicts": [], "bloated": [], "duplicates": [], "ad_groups": [], "stale": [],
+        }
+
+        # 1. 别名冲突：同一别名出现在多个主名下
+        alias2mains: Dict[str, List[str]] = {}
+        for main, aliases in self._aliases.items():
+            for a in aliases:
+                alias2mains.setdefault(a, []).append(main)
+        for alias, mains in alias2mains.items():
+            if len(mains) > 1:
+                report["conflicts"].append({"alias": alias, "mains": mains})
+
+        # 2. 膨胀 wiki + 4. 广告群
+        for sub in ("users", "groups"):
+            d = self.wiki_dir / sub
+            if not d.exists():
+                continue
+            for path in d.glob("*.md"):
+                content = ""
+                try:
+                    content = path.read_text(encoding="utf-8")
+                except Exception as e:
+                    _logger.warning("[lint_memory] 读取 wiki 失败 %s: %s", path, e)
+                if content and len(content) > max_wiki_chars:
+                    report["bloated"].append({
+                        "path": str(path.relative_to(self.wiki_dir)),
+                        "chars": len(content),
+                    })
+                if sub == "groups" and any(p.search(path.stem) for p in _AD_GROUP_PATTERNS):
+                    report["ad_groups"].append(path.stem)
+
+        # 3. 重复群/用户（归一化后同名）
+        for sub in ("users", "groups"):
+            d = self.wiki_dir / sub
+            if not d.exists():
+                continue
+            norm_map: Dict[str, List[str]] = {}
+            for path in d.glob("*.md"):
+                norm = normalize_chat_name(path.stem)
+                norm_map.setdefault(norm, []).append(path.stem)
+            for norm, names in norm_map.items():
+                if len(names) > 1:
+                    report["duplicates"].append({"normalized": norm, "names": names})
+
+        _logger.info(
+            f"[Lint] conflicts={len(report['conflicts'])} bloated={len(report['bloated'])} "
+            f"duplicates={len(report['duplicates'])} ad_groups={len(report['ad_groups'])}"
+        )
+        return report
+
+    def lint_truncate_bloated(self, max_wiki_chars: int = 4000, apply: bool = False) -> list:
+        """对膨胀 wiki 执行截断（FR-8 可写回操作）。
+
+        apply=False 时只返回将截断的清单（dry-run）；
+        apply=True 时回写文件（不自动备份，调用方应先备份）。
+        """
+        report = self.lint_memory(max_wiki_chars)
+        actions = []
+        for item in report["bloated"]:
+            path = self.wiki_dir / item["path"]
+            try:
+                orig = path.read_text(encoding="utf-8")
+                truncated = self._enforce_wiki_limits(orig, max_wiki_chars)
+                if len(truncated) < len(orig):
+                    actions.append({"path": item["path"], "before": len(orig), "after": len(truncated)})
+                    if apply:
+                        path.write_text(truncated, encoding="utf-8")
+            except Exception as e:
+                _logger.warning(f"[Lint] 截断失败 {path}: {e}")
+        return actions

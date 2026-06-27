@@ -6,7 +6,7 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from src.models.base import MEDIA_MESSAGE_TYPES, ChatMessage, SenderType
 from src.reply.session_memory import SessionMemory, _extract_query_key
@@ -76,45 +76,75 @@ class ReplyGenerator:
         self.last_llm_messages: List[Dict] = []
         # 短期记忆（跨 tick 缓存工具结果）
         self.session_memory = SessionMemory()
-        # 幽默聊天 RAG 索引（可选，依赖 sklearn/numpy）
-        # 使用消息级索引：检索最相似的消息，并拉出前后多轮完整上下文
-        self._humor_vector_index = None
+        # 动态注册统一记忆搜索工具（如果 memory_engine 可用）
+        # 同时返回两路结果：wiki 摘要 + 历史聊天原文（如果索引就绪）
+        _history_available: Optional[Callable[[], bool]] = None
+        _search_history: Optional[Callable[..., str]] = None
         try:
-            import numpy  # noqa: F401
-            from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: F401
+            from src.memory.history_search import is_available as _history_available
+            from src.memory.history_search import search_history as _search_history
+        except Exception as e:  # pragma: no cover - 防御性
+            _logger.warning("[HistorySearch] 模块加载失败，仅启用 wiki 记忆搜索: %s", e)
 
-            from src.memory.vector_index import MessageVectorIndex
-            index_path = Path(__file__).parent.parent.parent / "data" / "vector_indexes" / "humor_messages_index.json"
-            if index_path.exists():
-                self._humor_vector_index = MessageVectorIndex(cache_path=index_path)
-                if self._humor_vector_index.messages:
-                    print(f"[HumorRAG] 已加载 {len(self._humor_vector_index.messages)} 条消息级历史案例")
-            else:
-                print(f"[HumorRAG] 索引文件不存在: {index_path}")
-        except Exception as e:
-            _logger.warning("[HumorRAG] 索引初始化失败: %s", e)
-            self._humor_vector_index = None
-        # 动态注册记忆搜索工具（如果 memory_engine 可用）
         if self.memory_engine is not None:
-            def _search_memory_adapter(query: str = "") -> str:
-                """适配器：工具参数名 query → 引擎参数名 keyword"""
-                return self.memory_engine.search_keyword(query)
+            def _search_memory_adapter(query: str = "", top_k: int = 5) -> str:
+                """适配器：同时搜索 wiki 摘要和历史聊天原文，合并返回。"""
+                parts: List[str] = []
+
+                # 1. wiki 长期记忆
+                wiki_result = self.memory_engine.search_keyword(query, max_chars=3000)
+                if wiki_result and "未在本地记忆中找到" not in wiki_result:
+                    parts.append(f"【人物/群聊摘要】\n{wiki_result}")
+
+                # 2. 历史聊天原文（可选，依赖索引）
+                if _history_available is not None and _search_history is not None and _history_available():
+                    try:
+                        history_result = _search_history(query, top_k=top_k)
+                        if history_result and "未找到" not in history_result:
+                            parts.append(f"【历史聊天原文】\n{history_result}")
+                    except Exception as e:
+                        _logger.warning("[search_memory] 历史原文检索失败: %s", e)
+
+                if not parts:
+                    return "未找到相关记忆。"
+                return "\n\n".join(parts)
 
             self.tool_registry.register(
                 name="search_memory",
-                description="搜索本地长期记忆（wiki）。用于查询身边的人：亲友、同事、同学、家族关系、熟人旧事。当你遇到某个人名但不知道 TA 是谁、和对方什么关系、TA 的近况/在哪/做什么、或对方提到的旧事背景时，必须调用此工具查询，禁止直接说'不知道''好久没联系了'。不要用于公众人物、公司、产品、新闻八卦。",
+                description=(
+                    "搜索本地记忆。同时返回两路结果："
+                    "(1) 人物/群聊摘要（wiki）：用于查身边的人是谁、什么关系、近况/在哪/做什么；"
+                    "(2) 历史聊天原文：用于回忆过去某段对话具体说了什么。"
+                    "当你遇到某个人名但不知道 TA 是谁、和对方什么关系、TA 提到的旧事背景、"
+                    "或对方说'上次说的那件事''之前聊过'时，必须调用此工具。"
+                    "不要用于公众人物、公司、产品、新闻八卦。"
+                ),
                 parameters={
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "搜索关键词。必须是单个具体的人名、昵称或名词，不要组合多个词，不要包含'关系''称呼''是谁''什么'等泛词。正确示例：'王海'、'小海哥'、'王璇'。错误示例：'王璇 王海 关系 称呼'",
+                            "description": (
+                                "搜索关键词。用自然语言描述你想查的人或事，"
+                                "可以是具体人名、昵称，也可以是事件描述。"
+                                "示例：'王海'、'小海哥'、'关于3D打印材料选择的讨论'、"
+                                "'王海说要去上海那次'。"
+                            ),
+                        },
+                        "top_k": {
+                            "type": "integer",
+                            "description": "历史原文返回片段数量，默认 5，范围 1-20。wiki 摘要不受此参数影响。",
+                            "default": 5,
                         },
                     },
                     "required": ["query"],
                 },
                 func=_search_memory_adapter,
             )
+            if _history_available is not None and _history_available():
+                print("[MemoryTool] search_memory 已注册（wiki + 历史原文）")
+            else:
+                print("[MemoryTool] search_memory 已注册（仅 wiki，历史索引未就绪）")
 
     def _submit_to_judge(self, tick_id: int, replies: List[str], unreplied: List[ChatMessage], all_messages: List[ChatMessage], is_group: bool):
         """把当前 tick 的数据提交给 JudgeWorker 异步判定"""
@@ -738,47 +768,6 @@ class ReplyGenerator:
             return "\n可用技能（系统会根据对话内容自动下发详细框架）：\n" + "\n".join(parts) + "\n"
         return ""
 
-    def _build_humor_query(self, all_messages: List[ChatMessage]) -> str:
-        """为 humor_chat 检索构建 query：取最近 3 轮非自己发的文本消息拼接。"""
-        if not all_messages:
-            return ""
-        # 从后往前找最近 3 条非自己且有文本的消息
-        recent_others = []
-        for m in reversed(all_messages):
-            if m.sender_type != SenderType.SELF and (m.text or "").strip():
-                recent_others.append(m)
-            if len(recent_others) >= 3:
-                break
-        if not recent_others:
-            return ""
-        # 转回时间正序
-        recent_others = list(reversed(recent_others))
-        return " | ".join(m.text.strip() for m in recent_others)
-
-    def _load_humor_retrieval_cases(self, query: str, sender_name: str, chat_type: str) -> str:
-        """为 humor_chat skill 检索相似历史对话片段（含完整上下文），格式化为 few-shot。"""
-        if not self._humor_vector_index:
-            return ""
-        try:
-            results = self._humor_vector_index.search(
-                query,
-                sender_name=sender_name or "",
-                chat_type="group" if chat_type == "group" else "single",
-                top_k=3,
-                context_radius=5,
-            )
-            if not results:
-                return ""
-            parts = []
-            for i, result in enumerate(results, 1):
-                context_text = self._humor_vector_index.format_context(result['context_messages'])
-                parts.append(f"--- 历史对话片段 {i} ---")
-                parts.append(context_text)
-            return "\n\n".join(parts)
-        except Exception as e:
-            _logger.warning("[HumorRAG] search failed: %s", e)
-            return ""
-
     def _hermes_system_prompt(self) -> str:
         """hermes 专用 system prompt：不含 tool 列表，只保留风格+格式。"""
         return (
@@ -843,22 +832,10 @@ class ReplyGenerator:
         )
         prompt = prompt.replace("{tools_description}", tools_desc)
 
-        # 注入检索 few-shot
-        dynamic_few_shot = "（无相关历史对话）"
-        if "humor_chat" in self.last_loaded_skills:
-            try:
-                query = self._build_humor_query(all_messages or unreplied or [])
-                sender_name = ""
-                if unreplied:
-                    sender_name = unreplied[-1].sender or ""
-                chat_type = "group" if is_group else "single"
-                if query:
-                    cases = self._load_humor_retrieval_cases(query, sender_name, chat_type)
-                    if cases:
-                        dynamic_few_shot = cases
-            except Exception as e:
-                _logger.warning("[HumorRAG] retrieval failed: %s", e)
-        prompt = prompt.replace("{dynamic_few_shot}", dynamic_few_shot)
+        # {dynamic_few_shot} 占位符：humor RAG 已移除（原 TF-IDF 索引废弃），
+        # 历史对话检索改由 search_history 工具按需调用。保留占位符替换以兼容
+        # 旧 skill prompt 模板。
+        prompt = prompt.replace("{dynamic_few_shot}", "（无相关历史对话）")
 
         # 保留 skill hint
         skill_hint = self._load_skill_one_liners()
