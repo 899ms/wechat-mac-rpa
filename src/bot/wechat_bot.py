@@ -503,7 +503,14 @@ class WeChatBot:
             )
 
             if not replies:
-                self.debug_logger.log_action("none", action_input="", success=False, error="所有消息都跳过")
+                # LLM 返回空 replies = 判断无需回复（群聊没@我/纯表情包等），
+                # 属正常决策。补明确日志，避免被误读为"漏回"。
+                self.logger.log_decision(
+                    tick_id, should_reply=False,
+                    reason=f"LLM 判断无需回复 (未读 {len(unreplied)} 条，均已处理)",
+                    latest_text=unreplied[-1].text if unreplied else ""
+                )
+                self.debug_logger.log_action("none", action_input="", success=False, error="LLM 判断无需回复")
                 # 即使不回复，也标记为已处理，避免下一轮又当成未读
                 for msg in to_reply:
                     self.global_store.mark_replied(chat_name, msg, "(未回复)")
@@ -523,6 +530,8 @@ class WeChatBot:
                 return
 
             # 逐条发送回复，间隔 1.5 秒
+            send_failed = False
+            send_skipped = False  # 静默模式跳过（非真实失败），应视为已处理避免卡循环
             for i, reply in enumerate(replies):
                 action_result = self.sender.send(reply, chat_name=chat_name)
                 if action_result.success:
@@ -539,16 +548,31 @@ class WeChatBot:
                         chat_state.pending_self_messages.append(self_msg)
                         self.logger.info("[Pending] %s 记录 pending self 消息 (pending 队列长度=%d): %.60s",
                                              chat_name, len(chat_state.pending_self_messages), reply)
+                elif action_result.skipped:
+                    # 静默模式主动跳过（非白名单聊天）：不真实发送，但视为已处理，
+                    # mark_replied 避免该聊天因"未回复"反复重试占满轮询、挡住白名单群。
+                    self.logger.log_send(tick_id, success=False, text=reply, error=action_result.error)
+                    self.debug_logger.log_action("send", action_input=reply, success=False, error=action_result.error or "")
+                    send_skipped = True
+                    break
                 else:
                     self.logger.log_send(tick_id, success=False, text=reply, error=action_result.error)
                     self.debug_logger.log_action("send", action_input=reply, success=False, error=action_result.error or "")
+                    send_failed = True
                     break
                 if i < len(replies) - 1:
                     time.sleep(1.5)
 
-            # 标记所有 to_reply 的消息为已回复（用最后一条回复文本）
-            for msg in to_reply:
-                self.global_store.mark_replied(chat_name, msg, reply_text)
+            # 只在发送成功或静默跳过时标记 to_reply 为已回复。
+            # 真实发送失败不 mark_replied，否则对方消息被永久跳过。
+            # 静默跳过 mark_replied：本就不打算发，不卡循环让 bot 能轮到其他聊天。
+            if not send_failed:
+                for msg in to_reply:
+                    self.global_store.mark_replied(chat_name, msg, reply_text)
+                if send_skipped:
+                    self.logger.info("[Bot] 静默跳过已 mark_replied，下轮不再重试 %s", chat_name)
+            else:
+                self.logger.info("[Bot] 发送失败，未 mark_replied，下轮仍会重试 %s", chat_name)
 
             # Judge 评分已由 generator._submit_to_judge 异步处理（唯一路径）
 
