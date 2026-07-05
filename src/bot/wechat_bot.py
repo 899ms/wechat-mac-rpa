@@ -42,7 +42,7 @@ def _try_create_openclaw_client():
 
 class WeChatBot:
     def __init__(self, profile=None, on_message: Optional[Callable] = None, llm_client=None,
-                 complex_llm_client=None, debug_mode: bool = False, use_openclaw: bool = True, perception=None,
+                 debug_mode: bool = False, use_openclaw: bool = True, perception=None,
                  enable_chat_switch: bool = True):
         # 先初始化 logger，后续各步骤都可能需要记录日志
         self.logger: BotLogger = get_logger()
@@ -82,7 +82,6 @@ class WeChatBot:
             self.logger.info("JudgeWorker 已禁用（ENABLE_JUDGE_WORKER 未设置），跳过 badcase 审计以节省 deepseek token")
         self.generator = ReplyGenerator(
             llm_client=actual_llm,
-            complex_llm_client=complex_llm_client,
             memory_engine=self.memory_engine,
             tool_registry=registry,
             judge_worker=judge_worker,
@@ -490,9 +489,6 @@ class WeChatBot:
                     loaded_skills=getattr(self.generator, 'last_loaded_skills', []),
                     skill_injected_content=getattr(self.generator, 'last_skill_injected_content', ''),
                     active_llm=getattr(self.generator, 'last_active_llm', ''),
-                    hermes_fallback_triggered=getattr(self.generator, 'last_hermes_fallback_triggered', False),
-                    hermes_messages=getattr(self.generator, 'last_hermes_messages', []),
-                    hermes_response=getattr(self.generator, 'last_hermes_response', ''),
                 )
             self.debug_logger.log_bot_decision(
                 chat_name=chat_name,
