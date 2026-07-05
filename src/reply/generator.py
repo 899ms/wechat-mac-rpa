@@ -7,7 +7,7 @@ import re
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.models.base import MEDIA_MESSAGE_TYPES, ChatMessage, SenderType
 from src.reply.session_memory import SessionMemory, _extract_query_key
@@ -201,6 +201,25 @@ class ReplyGenerator:
             func=lambda thought: "思考已记录，继续生成回复。",
         )
 
+        # 读取 Self-Refine prompt 文件
+        _prompt_dir = Path(__file__).parent.parent.parent / "prompts"
+        self._feedback_prompt = (_prompt_dir / "feedback.md").read_text(encoding="utf-8")
+        self._iterate_prompt = (_prompt_dir / "iterate.md").read_text(encoding="utf-8")
+
+        # Self-Refine 观测字段
+        self.last_self_refine_applied: bool = False
+        self.last_feedback_decision: str = ""
+        self.last_feedback_issues: List[str] = []
+        self.last_iterate_count: int = 0
+        self.last_feedback_raw: str = ""
+        self.last_iterate_raw: str = ""
+
+        # 开关（环境变量，默认启用）
+        self.enable_react_tools = os.environ.get("ENABLE_REACT_TOOLS", "1").lower() in ("1", "true", "yes", "on")
+        self.enable_self_refine = os.environ.get("ENABLE_SELF_REFINE", "1").lower() in ("1", "true", "yes", "on")
+        if self.enable_self_refine:
+            self.enable_react_tools = True
+
     def _submit_to_judge(self, tick_id: int, replies: List[str], unreplied: List[ChatMessage], all_messages: List[ChatMessage], is_group: bool):
         """把当前 tick 的数据提交给 JudgeWorker 异步判定"""
         import json
@@ -240,144 +259,110 @@ class ReplyGenerator:
         except Exception as e:
             _logger.debug("JudgeWorker submit failed: %s", e)
 
-    def generate(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage],
-                 is_group: bool = False, tick_id: int = 0,
-                 enable_time_awareness: Optional[bool] = None,
-                 enable_reply_restraint: Optional[bool] = None,
-                 enable_unread_dedup: Optional[bool] = None,
-                 enable_timestamps: Optional[bool] = None) -> List[str]:
-        """
-        生成回复内容，返回多条回复列表（最多3条）。
-        支持多轮工具调用，但总工具时间不超过 max_tool_seconds，超时后强制生成文本回复。
-        """
-        t_generate_start = time.time()
-        if not unreplied:
-            self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
-            return []
+    def _self_refine(
+        self,
+        messages: List[Dict],
+        replies: List[str],
+        deadline: float,
+    ) -> Tuple[str, Optional[List[str]], List[Dict], str]:
+        """Feedback 阶段。返回 decision, issues, updated_messages, raw_text。"""
+        feedback_messages = messages + [
+            {"role": "user", "content": self._feedback_prompt}
+        ]
+        timeout = max(1.0, deadline - time.time())
+        try:
+            raw = self.llm_client.chat(
+                messages=feedback_messages,
+                max_tokens=10000,
+                temperature=0.3,
+                timeout=timeout,
+            )
+            text = raw if isinstance(raw, str) else getattr(raw, "content", str(raw))
+        except Exception as e:
+            _logger.warning("[SelfRefine] Feedback 调用失败: %s", e)
+            text = ""
+        self.last_feedback_raw = text or ""
 
-        if self.llm_client is None:
-            self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
-            return []
+        data = self._extract_json(text) or {}
+        if not isinstance(data, dict):
+            return "pass", None, feedback_messages, text or ""
 
-        # 重置 debug 状态
-        self.last_system_prompt = ""
-        self.last_tools_context = ""
-        self.last_user_prompt = ""
-        self.last_raw_response = ""
-        self.last_llm_calls = []
-        self.last_tool_calls = []
-        self.last_generation_trace = []
-        self.last_loaded_skills = []
-        self.last_skill_injected_content = ""
-        self.last_llm_messages = []
+        decision = data.get("decision", "pass")
+        issues = data.get("issues", [])
+        if decision == "fail" and isinstance(issues, list) and issues:
+            return "fail", issues, feedback_messages, text or ""
+        return "pass", None, feedback_messages, text or ""
 
-        chat_name = unreplied[-1].chat_name if unreplied else ""
+    def _iterate(
+        self,
+        messages: List[Dict],
+        issues: List[str],
+        deadline: float,
+    ) -> Tuple[List[str], List[Dict], str]:
+        """Iterate 阶段。返回 replies, updated_messages, raw_text。"""
+        issues_text = "\n".join(f"- {issue}" for issue in issues)
+        iterate_messages = messages + [
+            {"role": "user", "content": f"{self._iterate_prompt}\n\n反馈问题：\n{issues_text}"}
+        ]
+        timeout = max(1.0, deadline - time.time())
+        try:
+            raw = self.llm_client.chat(
+                messages=iterate_messages,
+                max_tokens=10000,
+                temperature=0.7,
+                timeout=timeout,
+            )
+            text = raw if isinstance(raw, str) else getattr(raw, "content", str(raw))
+        except Exception as e:
+            _logger.warning("[SelfRefine] Iterate 调用失败: %s", e)
+            text = ""
+        self.last_iterate_raw = text or ""
 
-        # 模型辅助路由：提前到 system prompt 之前，让 prompt 也能感知已加载 skill
-        last_msg = unreplied[-1]
-        route_text = last_msg.text or last_msg.image_description or ""
-        t_route_start = time.time()
-        matched_skills = self._route_skills(route_text)
-        t_route_ms = (time.time() - t_route_start) * 1000
-        self.last_loaded_skills = matched_skills
+        replies = self._parse_replies(text)
+        return replies or [], iterate_messages, text or ""
 
-        # 模型选择：固定使用主 LLM（带 tools），让 LLM 自己决定是否需要工具。
-        active_llm = self.llm_client
-        _logger.info(f"[ModelSelect] matched_skills={matched_skills} → active_llm=deepseek（tools 可用）")
-        self.last_active_llm = "deepseek"
-
-        t_sp_start = time.time()
-        system_prompt = self._system_prompt(
-            enable_reply_restraint=enable_reply_restraint,
-            unreplied=unreplied,
-            all_messages=all_messages,
-            is_group=is_group,
-        )
-        t_sp_ms = (time.time() - t_sp_start) * 1000
-
-        t_tc_start = time.time()
-        tools_context = self._build_tools_context(chat_name)
-        t_tc_ms = (time.time() - t_tc_start) * 1000
-
-        t_up_start = time.time()
-        user_prompt = self._build_user_prompt(
-            unreplied, all_messages, is_group,
-            enable_time_awareness=enable_time_awareness,
-            enable_unread_dedup=enable_unread_dedup,
-            enable_timestamps=enable_timestamps,
-            tools_context=tools_context,
-        )
-        t_up_ms = (time.time() - t_up_start) * 1000
-
-        # Skill 兜底：明确场景未命中时，群聊默认 group_banter，私聊默认 casual_chat
-        if not matched_skills:
-            matched_skills = ["group_banter"] if is_group else ["casual_chat"]
-            _logger.info(f"[SkillRouter] 未命中明确 skill，兜底: {matched_skills}")
-
-        # Skill 注入：根据路由结果注入 Bot 的 skill
-        skill_parts = []
-        if matched_skills:
-            for skill_name in matched_skills:
-                content = self._load_skill_content(skill_name)
-                if content:
-                    skill_parts.append(f"【{skill_name} 技能指南】\n{content}")
-            if skill_parts:
-                user_prompt += "\n\n" + "\n\n".join(skill_parts)
-        self.last_skill_injected_content = "\n\n".join(skill_parts) if skill_parts else ""
-
-        self.last_system_prompt = system_prompt
-        self.last_tools_context = tools_context
-
-        # 追加生成阶段格式指令
-        reply_format_path = Path(__file__).parent.parent.parent / "prompts" / "reply_format.txt"
-        if reply_format_path.exists():
-            user_prompt += "\n\n" + reply_format_path.read_text(encoding="utf-8")
-
-        self.last_user_prompt = user_prompt
-
-        tools = self.tool_registry.to_openai_schemas()
-        # search_memory 始终暴露给 LLM，由 tool 描述和 system prompt 约束使用时机
-
+    def _react_generate(
+        self,
+        messages: List[Dict],
+        tools: List[Dict],
+        deadline: float,
+        chat_name: str = "",
+    ) -> Tuple[List[str], List[Dict]]:
+        """ReAct 生成阶段。返回 replies, final_messages。"""
         llm_calls: List[Dict] = []
         tool_calls: List[Dict] = []
         trace: List[Dict] = []
-
         max_retries = 2
-        max_tool_seconds = 25.0  # 工具调用阶段最多 25 秒
-        max_total_seconds = 60.0  # 给工具调用留余量
+        tool_round_count = 0
         overall_start_time = time.time()
-
-        # 构建 messages：system（人设）+ user（上下文含缓存）
-        messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
-        messages.append({"role": "user", "content": user_prompt})
-
-        tool_round_count = 0  # 已执行的 tool 轮数
 
         for attempt in range(max_retries + 1):
             start_time = time.time()
-
             try:
                 while True:
+                    # 剩余时间不足，直接结束
+                    remaining = deadline - time.time()
+                    if remaining < 1.0:
+                        _logger.warning("[ReactGenerate] 剩余时间不足，结束生成")
+                        self.last_llm_calls = llm_calls
+                        self.last_tool_calls = tool_calls
+                        self.last_generation_trace.extend(trace)
+                        return [], messages
+
                     elapsed = time.time() - start_time
                     total_elapsed = time.time() - overall_start_time
-                    force_no_tools = elapsed > max_tool_seconds
 
-                    # 总时间兜底
-                    if total_elapsed > max_total_seconds:
-                        force_no_tools = True
+                    # 时间或工具轮次达到上限后强制模型输出 JSON
+                    force_no_tools = (total_elapsed > (deadline - overall_start_time) or
+                                      tool_round_count >= MAX_TOOL_CALLS)
 
-                    # 达到工具调用上限后强制模型输出 JSON
-                    if tool_round_count >= MAX_TOOL_CALLS:
-                        force_no_tools = True
-
-                    # 调用 LLM
                     actual_tools = None if force_no_tools else (tools if tools else None)
-                    llm_timeout = 30
+                    llm_timeout = max(1.0, deadline - time.time())
                     _logger.info("[LLM] attempt=%d round=%d force_no_tools=%s tools=%s timeout=%s msg_count=%d",
                                  attempt + 1, tool_round_count, force_no_tools, bool(actual_tools), llm_timeout, len(messages))
                     t_llm_start = time.time()
-                    raw = active_llm.chat(messages=messages, tools=actual_tools, max_tokens=10000, timeout=llm_timeout)
-                    self.last_thinking = getattr(active_llm, "last_thinking", "") or ""
+                    raw = self.llm_client.chat(messages=messages, tools=actual_tools, max_tokens=10000, timeout=llm_timeout)
+                    self.last_thinking = getattr(self.llm_client, "last_thinking", "") or ""
                     self.last_llm_messages = [dict(m) for m in messages]
                     t_llm_ms = (time.time() - t_llm_start) * 1000
                     raw_content = raw if isinstance(raw, str) else getattr(raw, "content", str(raw))
@@ -505,17 +490,11 @@ class ReplyGenerator:
                     replies = self._parse_replies(text)
                     t_parse_ms = (time.time() - t_parse_start) * 1000
                     if replies:
-                        t_total_ms = (time.time() - t_generate_start) * 1000
-                        _logger.info(f"[Perf][Generate] total={t_total_ms:.0f}ms "
-                              f"sp={t_sp_ms:.0f}ms tc={t_tc_ms:.0f}ms up={t_up_ms:.0f}ms "
-                              f"route={t_route_ms:.0f}ms llm={sum(c.get('elapsed',0) for c in llm_calls)*1000:.0f}ms "
-                              f"parse={t_parse_ms:.0f}ms replies={len(replies)}")
-                        _logger.info(f"[Generate] deepseek 直接生成 replies={len(replies)} 条")
+                        _logger.info("[Generate] deepseek 直接生成 replies=%d 条", len(replies))
                         self.last_llm_calls = llm_calls
                         self.last_tool_calls = tool_calls
                         self.last_generation_trace.extend(trace)
-                        self._submit_to_judge(tick_id, replies, unreplied, all_messages, is_group)
-                        return replies
+                        return replies, messages
 
                     # LLM 明确输出了 {"replies": []} → 正确决策（不想回复），不 retry
                     if text and '"replies"' in text:
@@ -523,8 +502,7 @@ class ReplyGenerator:
                         self.last_llm_calls = llm_calls
                         self.last_tool_calls = tool_calls
                         self.last_generation_trace.extend(trace)
-                        self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
-                        return []
+                        return [], messages
 
                     # 空回复处理（LLM 返回空字符串或无效内容）
                     if force_no_tools:
@@ -556,8 +534,154 @@ class ReplyGenerator:
         self.last_llm_calls = llm_calls
         self.last_tool_calls = tool_calls
         self.last_generation_trace.extend(trace)
-        self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
-        return []
+        return [], messages
+
+    def generate(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage],
+                 is_group: bool = False, tick_id: int = 0,
+                 enable_time_awareness: Optional[bool] = None,
+                 enable_reply_restraint: Optional[bool] = None,
+                 enable_unread_dedup: Optional[bool] = None,
+                 enable_timestamps: Optional[bool] = None) -> List[str]:
+        """
+        生成回复内容，返回多条回复列表（最多3条）。
+        支持 ReAct 多轮工具调用，总超时预算 20s；启用 Self-Refine 时生成后追加 Feedback + Iterate。
+        """
+        t_generate_start = time.time()
+        if not unreplied:
+            self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
+            return []
+
+        if self.llm_client is None:
+            self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
+            return []
+
+        # 重置 debug 状态
+        self.last_system_prompt = ""
+        self.last_tools_context = ""
+        self.last_user_prompt = ""
+        self.last_raw_response = ""
+        self.last_llm_calls = []
+        self.last_tool_calls = []
+        self.last_generation_trace = []
+        self.last_loaded_skills = []
+        self.last_skill_injected_content = ""
+        self.last_llm_messages = []
+        self.last_self_refine_applied = False
+        self.last_feedback_decision = ""
+        self.last_feedback_issues = []
+        self.last_iterate_count = 0
+        self.last_feedback_raw = ""
+        self.last_iterate_raw = ""
+
+        chat_name = unreplied[-1].chat_name if unreplied else ""
+
+        # 模型辅助路由：提前到 system prompt 之前，让 prompt 也能感知已加载 skill
+        last_msg = unreplied[-1]
+        route_text = last_msg.text or last_msg.image_description or ""
+        t_route_start = time.time()
+        matched_skills = self._route_skills(route_text)
+        t_route_ms = (time.time() - t_route_start) * 1000
+        self.last_loaded_skills = matched_skills
+
+        # 模型选择：固定使用主 LLM（带 tools），让 LLM 自己决定是否需要工具。
+        active_llm = self.llm_client
+        _logger.info(f"[ModelSelect] matched_skills={matched_skills} → active_llm=deepseek（tools 可用）")
+        self.last_active_llm = "deepseek"
+
+        t_sp_start = time.time()
+        system_prompt = self._system_prompt(
+            enable_reply_restraint=enable_reply_restraint,
+            unreplied=unreplied,
+            all_messages=all_messages,
+            is_group=is_group,
+        )
+        t_sp_ms = (time.time() - t_sp_start) * 1000
+
+        t_tc_start = time.time()
+        tools_context = self._build_tools_context(chat_name)
+        t_tc_ms = (time.time() - t_tc_start) * 1000
+
+        t_up_start = time.time()
+        user_prompt = self._build_user_prompt(
+            unreplied, all_messages, is_group,
+            enable_time_awareness=enable_time_awareness,
+            enable_unread_dedup=enable_unread_dedup,
+            enable_timestamps=enable_timestamps,
+            tools_context=tools_context,
+        )
+        t_up_ms = (time.time() - t_up_start) * 1000
+
+        # Skill 兜底：明确场景未命中时，群聊默认 group_banter，私聊默认 casual_chat
+        if not matched_skills:
+            matched_skills = ["group_banter"] if is_group else ["casual_chat"]
+            _logger.info(f"[SkillRouter] 未命中明确 skill，兜底: {matched_skills}")
+
+        # Skill 注入：根据路由结果注入 Bot 的 skill
+        skill_parts = []
+        if matched_skills:
+            for skill_name in matched_skills:
+                content = self._load_skill_content(skill_name)
+                if content:
+                    skill_parts.append(f"【{skill_name} 技能指南】\n{content}")
+            if skill_parts:
+                user_prompt += "\n\n" + "\n\n".join(skill_parts)
+        self.last_skill_injected_content = "\n\n".join(skill_parts) if skill_parts else ""
+
+        self.last_system_prompt = system_prompt
+        self.last_tools_context = tools_context
+
+        # 追加生成阶段格式指令
+        reply_format_path = Path(__file__).parent.parent.parent / "prompts" / "reply_format.txt"
+        if reply_format_path.exists():
+            user_prompt += "\n\n" + reply_format_path.read_text(encoding="utf-8")
+
+        self.last_user_prompt = user_prompt
+
+        # 构建 messages：system（人设）+ user（上下文含缓存）
+        messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+        messages.append({"role": "user", "content": user_prompt})
+
+        # 工具开关：关闭 ReAct 时不向 LLM 暴露 tools
+        tools = self.tool_registry.to_openai_schemas() if self.enable_react_tools else []
+
+        # 生成阶段：ReAct 循环，总预算 20s
+        deadline = time.time() + 20.0
+        replies, final_messages = self._react_generate(messages, tools, deadline, chat_name)
+
+        # Self-Refine：Feedback + Iterate
+        if self.enable_self_refine and replies and deadline - time.time() >= 1.0:
+            decision, issues, feedback_messages, _ = self._self_refine(final_messages, replies, deadline)
+            self.last_self_refine_applied = True
+            self.last_feedback_decision = decision
+            self.last_feedback_issues = issues or []
+
+            if decision == "fail" and issues:
+                iter_count = 0
+                max_iter = int(os.environ.get("SELF_REFINE_MAX_ITER", "1"))
+                current_replies = replies
+                current_messages = feedback_messages
+
+                while iter_count < max_iter and issues and deadline - time.time() >= 1.0:
+                    new_replies, new_messages, _ = self._iterate(current_messages, issues, deadline)
+                    iter_count += 1
+                    if new_replies:
+                        current_replies = new_replies
+                        current_messages = new_messages
+
+                self.last_iterate_count = iter_count
+                replies = current_replies
+                final_messages = current_messages
+
+        # 更新最终观测字段
+        self.last_llm_messages = [dict(m) for m in final_messages]
+        self.last_raw_response = self.last_iterate_raw or self.last_feedback_raw or self.last_raw_response
+
+        t_total_ms = (time.time() - t_generate_start) * 1000
+        _logger.info("[Perf][Generate] total=%.0fms replies=%d self_refine=%s decision=%s iterate=%d",
+                     t_total_ms, len(replies), self.last_self_refine_applied,
+                     self.last_feedback_decision, self.last_iterate_count)
+        self._submit_to_judge(tick_id, replies, unreplied, all_messages, is_group)
+        return replies
 
     def _truncate_messages(self, messages: List[Dict]) -> List[Dict]:
         """截断 OpenAI message 数组，防止 debug JSON 过大。
