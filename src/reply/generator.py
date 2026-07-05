@@ -45,6 +45,9 @@ _QUESTION_MARKS = set("?？")
 _QUESTION_WORDS = {"吗", "呢", "谁", "什么", "哪里", "哪儿", "怎么", "多少", "哪些",
                    "几点", "干嘛", "干什么", "做什么", "住哪", "在哪", "是谁", "有谁"}
 
+# ReAct 工具调用上限
+MAX_TOOL_CALLS = 10
+
 
 def _should_offer_search_memory(text: str) -> bool:
     """基于简单规则判断是否为明显非记忆查询。
@@ -177,6 +180,27 @@ class ReplyGenerator:
             else:
                 _logger.info("[MemoryTool] search_memory 已注册（仅 wiki，历史索引未就绪）")
 
+        # 注册 think 工具：让模型在回复前停下来深入思考，不获取新信息
+        self.tool_registry.register(
+            name="think",
+            description=(
+                "在回复前停下来深入思考。用于需要深度推理、权衡多因素、分析意图、"
+                "检查人设一致性的场景。此工具不获取新信息，只记录你的思考过程。"
+                "在想清楚之前随时可以调用，次数不限。"
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "thought": {
+                        "type": "string",
+                        "description": "你的思考内容。尽情思考，越详细越好。"
+                    }
+                },
+                "required": ["thought"],
+            },
+            func=lambda thought: "思考已记录，继续生成回复。",
+        )
+
     def _submit_to_judge(self, tick_id: int, replies: List[str], unreplied: List[ChatMessage], all_messages: List[ChatMessage], is_group: bool):
         """把当前 tick 的数据提交给 JudgeWorker 异步判定"""
         import json
@@ -303,6 +327,12 @@ class ReplyGenerator:
 
         self.last_system_prompt = system_prompt
         self.last_tools_context = tools_context
+
+        # 追加生成阶段格式指令
+        reply_format_path = Path(__file__).parent.parent.parent / "prompts" / "reply_format.txt"
+        if reply_format_path.exists():
+            user_prompt += "\n\n" + reply_format_path.read_text(encoding="utf-8")
+
         self.last_user_prompt = user_prompt
 
         tools = self.tool_registry.to_openai_schemas()
@@ -336,13 +366,17 @@ class ReplyGenerator:
                     if total_elapsed > max_total_seconds:
                         force_no_tools = True
 
+                    # 达到工具调用上限后强制模型输出 JSON
+                    if tool_round_count >= MAX_TOOL_CALLS:
+                        force_no_tools = True
+
                     # 调用 LLM
                     actual_tools = None if force_no_tools else (tools if tools else None)
                     llm_timeout = 30
                     _logger.info("[LLM] attempt=%d round=%d force_no_tools=%s tools=%s timeout=%s msg_count=%d",
                                  attempt + 1, tool_round_count, force_no_tools, bool(actual_tools), llm_timeout, len(messages))
                     t_llm_start = time.time()
-                    raw = active_llm.chat(messages=messages, tools=actual_tools, max_tokens=2000, timeout=llm_timeout)
+                    raw = active_llm.chat(messages=messages, tools=actual_tools, max_tokens=10000, timeout=llm_timeout)
                     self.last_thinking = getattr(active_llm, "last_thinking", "") or ""
                     self.last_llm_messages = [dict(m) for m in messages]
                     t_llm_ms = (time.time() - t_llm_start) * 1000
@@ -416,7 +450,11 @@ class ReplyGenerator:
                             tool_args = tc.function.arguments
                             _logger.info("[Tool] 执行开始: %s(%s)", tool_name, tool_args[:100] if isinstance(tool_args, str) else str(tool_args)[:100])
                             t_tool_start = time.time()
-                            if self.tool_registry.has(tool_name):
+                            if tool_name == "think":
+                                # think 工具不调用外部服务，直接返回确认
+                                result = "思考已记录，继续生成回复。"
+                                _logger.info("[Tool] think 调用: %s", tool_args[:200] if isinstance(tool_args, str) else str(tool_args)[:200])
+                            elif self.tool_registry.has(tool_name):
                                 result = self.tool_registry.get(tool_name).execute(tool_args)
                             else:
                                 result = f"工具 {tool_name} 不存在"
