@@ -446,8 +446,10 @@ class WeChatBot:
                      messages_count, new_messages_count,
                      system_prompt, user_prompt, raw_response, tool_calls_json, tool_results_json,
                      session_input_messages_json, session_output_unreplied_json,
-                     should_reply, replies_sent_json, screenshot_path)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                     should_reply, replies_sent_json, screenshot_path,
+                     self_refine_applied, feedback_decision, feedback_issues, iterate_count,
+                     react_round_count, think_tool_called)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
                     self.session_id,
                     tick_id, chat_name, 1 if is_group else 0,
                     len(all_messages) if all_messages else 0,
@@ -462,6 +464,12 @@ class WeChatBot:
                     1,
                     _json.dumps(replies, ensure_ascii=False),
                     result.screenshot_path or '',
+                    1 if getattr(self.generator, 'last_self_refine_applied', False) else 0,
+                    getattr(self.generator, 'last_feedback_decision', '') or '',
+                    _json.dumps(getattr(self.generator, 'last_feedback_issues', []) or [], ensure_ascii=False),
+                    getattr(self.generator, 'last_iterate_count', 0) or 0,
+                    len(getattr(self.generator, 'last_tool_calls', []) or []),
+                    1 if any(tc.get('tool_name') == 'think' for tc in getattr(self.generator, 'last_tool_calls', []) or []) else 0,
                 ))
                 conn.commit()
             except Exception as e:
