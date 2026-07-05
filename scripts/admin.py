@@ -254,10 +254,14 @@ def tick_detail(id: int):
           <div><span style="color:var(--muted);font-size:12px">反馈问题:</span>{issues_display}</div>
         </div>
         """
+    # 截断显示，避免历史消息过多导致页面过长
+    sp_display = html.escape(sp[:8000]) + ("\n\n... (truncated)" if len(sp) > 8000 else "")
+    up_display = html.escape(up[:5000]) + ("\n\n... (中间省略) ...\n\n" + html.escape(up[-2000:]) if len(up) > 5000 else "")
+    raw_display = html.escape(raw[:10000]) + ("\n\n... (truncated)" if len(raw) > 10000 else "")
     content += f"""
-    <div class="card" style="border-left:3px solid var(--blue)"><b>📝 System Prompt ({len(sp)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{html.escape(sp)}</pre></div>
-    <div class="card" style="border-left:3px solid var(--green)"><b>📝 User Prompt ({len(up)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{html.escape(up)}</pre></div>
-    <div class="card" style="border-left:3px solid var(--muted)"><b>📝 Raw Response</b><pre style="font-size:10px;white-space:pre-wrap">{html.escape(raw)}</pre></div>
+    <div class="card" style="border-left:3px solid var(--blue)"><b>📝 System Prompt ({len(sp)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{sp_display}</pre></div>
+    <div class="card" style="border-left:3px solid var(--green)"><b>📝 User Prompt ({len(up)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{up_display}</pre></div>
+    <div class="card" style="border-left:3px solid var(--muted)"><b>📝 Raw Response</b><pre style="font-size:10px;white-space:pre-wrap">{raw_display}</pre></div>
     """
     # 工具调用 + 结果（合并 tool_calls_json 和 tool_results_json）
     try:
