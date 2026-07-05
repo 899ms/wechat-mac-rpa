@@ -473,8 +473,6 @@ class ReplyGenerator:
                               f"route={t_route_ms:.0f}ms llm={sum(c.get('elapsed',0) for c in llm_calls)*1000:.0f}ms "
                               f"parse={t_parse_ms:.0f}ms replies={len(replies)}")
                         _logger.info(f"[Generate] deepseek 直接生成 replies={len(replies)} 条")
-                        for r in replies:
-                            self.session_memory.add_reply(chat_name, r)
                         self.last_llm_calls = llm_calls
                         self.last_tool_calls = tool_calls
                         self.last_generation_trace.extend(trace)
