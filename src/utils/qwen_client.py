@@ -85,7 +85,10 @@ class QwenClient:
                 kwargs["tools"] = tools
             if response_format:
                 kwargs["response_format"] = response_format
-            # DeepSeek 官方平台：thinking 仅 reasoner 支持，flash/pro 开了会空回复
+            # DeepSeek 官方端点显示启用 thinking 可提升 reasoning_content 质量
+            if self.is_deepseek_official and "deepseek" in self.model.lower():
+                kwargs["extra_body"] = {"thinking": {"type": "enabled"}}
+            # DeepSeek v4-flash 实测已支持 reasoning_content，默认就会输出 thinking
             _logger = logging.getLogger("src.llm.qwen")
             _logger.info("[Qwen] request start: model=%s tools=%s timeout=%s",
                          kwargs.get("model"), bool(kwargs.get("tools")), kwargs.get("timeout"))
