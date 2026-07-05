@@ -220,6 +220,41 @@ def tick_detail(id: int):
     <div class="card"><b>聊天:</b> {html.escape(d.get("chat_name","?"))} {"(群)" if d.get("is_group") else "(私)"} | <b>状态:</b> {html.escape(status)} | <b>耗时:</b> {ms}ms</div>
     <div class="card"><b>消息:</b> 总{d.get("messages_count",0)}条 新{d.get("new_messages_count",0)}条 | <b>发送:</b> {"OK" if d.get("send_success") else "N/A"}</div>
     <div class="card"><b>Bot 回复:</b><br>{replies_display}</div>
+    """
+    # === 新增：Self-Refine / ReAct 过程 ===
+    sra = d.get("self_refine_applied")
+    fd = d.get("feedback_decision") or ""
+    fi = d.get("feedback_issues") or "[]"
+    ic = d.get("iterate_count") or 0
+    rc = d.get("react_round_count") or 0
+    ttc = d.get("think_tool_called") or 0
+    issues_display = ""
+    if sra:
+        try:
+            import json as _j_issues
+            issues_list = _j_issues.loads(fi) if fi else []
+            if issues_list:
+                issues_display = "".join(f'<li style="margin:2px 0">{html.escape(str(issue))}</li>' for issue in issues_list)
+                issues_display = f'<ul style="margin:4px 0;padding-left:16px;font-size:12px">{issues_display}</ul>'
+            else:
+                issues_display = '<span style="color:var(--muted);font-size:12px">无</span>'
+        except Exception as e:
+            _logger.debug("解析 feedback_issues 失败: %s", e)
+            issues_display = f'<pre style="font-size:11px">{html.escape(fi)}</pre>'
+        content += f"""
+        <div class="card" style="border-left:3px solid var(--purple)">
+          <b>🧠 Self-Refine 过程</b>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0;font-size:12px">
+            <div><span style="color:var(--muted)">启用:</span> {'是' if sra else '否'}</div>
+            <div><span style="color:var(--muted)">Feedback:</span> {html.escape(fd) or '-'}</div>
+            <div><span style="color:var(--muted)">Iterate:</span> {ic}轮</div>
+            <div><span style="color:var(--muted)">ReAct轮数:</span> {rc}</div>
+            <div><span style="color:var(--muted)">think工具:</span> {'是' if ttc else '否'}</div>
+          </div>
+          <div><span style="color:var(--muted);font-size:12px">反馈问题:</span>{issues_display}</div>
+        </div>
+        """
+    content += f"""
     <div class="card" style="border-left:3px solid var(--blue)"><b>📝 System Prompt ({len(sp)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{html.escape(sp)}</pre></div>
     <div class="card" style="border-left:3px solid var(--green)"><b>📝 User Prompt ({len(up)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{html.escape(up)}</pre></div>
     <div class="card" style="border-left:3px solid var(--muted)"><b>📝 Raw Response</b><pre style="font-size:10px;white-space:pre-wrap">{html.escape(raw)}</pre></div>
