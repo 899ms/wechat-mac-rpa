@@ -567,12 +567,19 @@ class WeChatBot:
                 if i < len(replies) - 1:
                     time.sleep(1.5)
 
-            # 只在发送成功或静默跳过时标记 to_reply 为已回复。
+            # 只在发送成功或静默跳过时标记本轮 unreplied 为已处理。
             # 真实发送失败不 mark_replied，否则对方消息被永久跳过。
             # 静默跳过 mark_replied：本就不打算发，不卡循环让 bot 能轮到其他聊天。
+            # 注意：这里标记的是本轮所有 unreplied（不只是 to_reply），
+            # 因为 bot 已经看过并决策过，不需要反复处理。
             if not send_failed:
-                for msg in to_reply:
-                    self.global_store.mark_replied(chat_name, msg, reply_text)
+                to_reply_set = set(id(m) for m in to_reply)
+                for msg in unreplied:
+                    # 实际回复的消息用真实 reply_text，选择不回复的消息用空字符串标记为已处理
+                    self.global_store.mark_replied(
+                        chat_name, msg,
+                        reply_text if id(msg) in to_reply_set else ""
+                    )
                 if send_skipped:
                     self.logger.info("[Bot] 静默跳过已 mark_replied，下轮不再重试 %s", chat_name)
             else:
