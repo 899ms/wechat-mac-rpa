@@ -609,7 +609,7 @@ class ReplyGenerator:
         prior = list(all_messages[:-n_unreplied]) + list(unreplied[:-1])
         context_msgs = [(m.sender, m.text) for m in prior if m.text][-3:]
 
-        matched_skills = self._route_skills(route_text, context_messages=context_msgs)
+        matched_skills = self._route_skills(route_text, context_messages=context_msgs, is_group=is_group)
         t_route_ms = (time.time() - t_route_start) * 1000
 
         # 队列模式检测：连续 3+ 条相同文本（非 bot 自身消息）→ 追加 group_banter
@@ -810,7 +810,8 @@ class ReplyGenerator:
             return md_file.read_text(encoding="utf-8").strip()
         return ""
 
-    def _route_skills(self, user_text: str, context_messages: Optional[List[Tuple[str, str]]] = None) -> List[str]:
+    def _route_skills(self, user_text: str, context_messages: Optional[List[Tuple[str, str]]] = None,
+                      is_group: bool = False) -> List[str]:
         """模型辅助路由：根据用户消息判断需要加载哪些 skill。
         用一次轻量 LLM 调用，只消耗几十 token。
         """
@@ -827,6 +828,8 @@ class ReplyGenerator:
             for i, s in enumerate(manifest)
         )
 
+        chat_type = "群聊" if is_group else "私聊"
+
         # 上下文块
         context_block = ""
         if context_messages:
@@ -836,6 +839,7 @@ class ReplyGenerator:
         router_prompt = (
             "你是 SkillRouter，只负责判断用户消息需要哪些技能。\n\n"
             f"可用技能：\n{skill_list}\n\n"
+            f"当前是：{chat_type}\n"
             f"{context_block}"
             f"用户消息：\"{user_text}\"\n\n"
             "注意：\n"
