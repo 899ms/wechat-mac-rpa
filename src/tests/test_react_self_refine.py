@@ -198,7 +198,7 @@ class TestForceSkill:
         ]
         gen = _make_generator(mock_llm, enable_self_refine=False)
         with patch.dict(os.environ, {"FORCE_SKILL": "handling_vent"}):
-            replies = gen.generate([sample_message], [sample_message])
+            gen.generate([sample_message], [sample_message])
         assert "handling_vent" in gen.last_loaded_skills
         assert "answering_questions" not in gen.last_loaded_skills
 
@@ -210,7 +210,7 @@ class TestForceSkill:
         ]
         gen = _make_generator(mock_llm, enable_self_refine=False)
         with patch.dict(os.environ, {"FORCE_SKILL": "nonexistent_skill"}):
-            replies = gen.generate([sample_message], [sample_message])
+            gen.generate([sample_message], [sample_message])
         assert "answering_questions" in gen.last_loaded_skills
         assert "nonexistent_skill" not in gen.last_loaded_skills
 
@@ -222,7 +222,7 @@ class TestForceSkill:
         ]
         gen = _make_generator(mock_llm, enable_self_refine=False)
         with patch.dict(os.environ, {"FORCE_SKILL": ""}):
-            replies = gen.generate([sample_message], [sample_message])
+            gen.generate([sample_message], [sample_message])
         assert "casual_chat" in gen.last_loaded_skills
 
 
@@ -244,7 +244,7 @@ class TestQueueDetection:
             ChatMessage(text="警惕资本主义打牌", sender="大刘",
                         sender_type=SenderType.OTHER, chat_name="群聊"),
         ]
-        replies = gen.generate(unreplied=[msgs[-1]], all_messages=msgs)
+        gen.generate(unreplied=[msgs[-1]], all_messages=msgs)
         assert "group_banter" in gen.last_loaded_skills
 
     def test_queue_not_triggered_for_two_identical(self, mock_llm):
@@ -260,7 +260,7 @@ class TestQueueDetection:
             ChatMessage(text="哈哈", sender="老李",
                         sender_type=SenderType.OTHER, chat_name="群聊"),
         ]
-        replies = gen.generate(unreplied=[msgs[-1]], all_messages=msgs)
+        gen.generate(unreplied=[msgs[-1]], all_messages=msgs)
         assert "group_banter" not in gen.last_loaded_skills
 
     def test_self_messages_dont_trigger_queue(self, mock_llm):
@@ -278,7 +278,7 @@ class TestQueueDetection:
             ChatMessage(text="好", sender="我",
                         sender_type=SenderType.SELF, chat_name="群聊"),
         ]
-        replies = gen.generate(unreplied=[msgs[-1]], all_messages=msgs)
+        gen.generate(unreplied=[msgs[-1]], all_messages=msgs)
         assert "group_banter" not in gen.last_loaded_skills
 
 
