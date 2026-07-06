@@ -13,6 +13,13 @@ def extract_json(text: str) -> Optional[Dict[str, Any]]:
     text = text.strip()
     if not text:
         return None
+    # 标准化引号：将各种 Unicode 引号替换为 ASCII 引号，防止 LLM 输出混杂
+    # 中文引号/书名号导致 json.JSONDecoder 解析失败
+    text = text.replace('“', '"').replace('”', '"')  # "" → ""
+    text = text.replace('‘', "'").replace('’', "'")  # '' → '
+    text = text.replace('「', '"').replace('」', '"')  # 「」 → " "
+    text = text.replace('『', '"').replace('』', '"')  # 『』 → " "
+    text = text.replace('＂', '"')  # ＂ → "
     # 去掉 markdown 代码块
     if "```" in text:
         parts = text.split("```", 2)
