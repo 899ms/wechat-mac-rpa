@@ -8,7 +8,7 @@ scipy>=1.10.0,<1.16
 Pillow>=12.2.0
 requests>=2.34.2
 httpx>=0.28.1
-beautifulsoup4>=4.11.0
+beautifulsoup4>=4.15.0
 
 # 微信自动化与 OCR
 pyautogui>=0.9.53
