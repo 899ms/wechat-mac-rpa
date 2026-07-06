@@ -13,7 +13,7 @@ beautifulsoup4>=4.11.0
 # 微信自动化与 OCR
 pyautogui>=0.9.53
 pytesseract>=0.3.10
-pyobjc-framework-Vision>=10.0
+pyobjc-framework-Vision>=12.2.1
 
 # 智能家居工具
 tinytuya>=1.19.0
