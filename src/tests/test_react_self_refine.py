@@ -124,6 +124,12 @@ class TestSelfRefine:
         assert gen.last_self_refine_applied is True
         assert gen.last_feedback_decision == "pass"
         assert gen.last_iterate_count == 0
+        # 消息流应包含 system + user + generation assistant + feedback prompt + feedback assistant
+        assert len(gen.last_llm_messages) == 5
+        assert gen.last_llm_messages[0]["role"] == "system"
+        assert gen.last_llm_messages[2]["role"] == "assistant"
+        assert gen.last_llm_messages[3]["role"] == "user"
+        assert gen.last_llm_messages[4]["role"] == "assistant"
 
     def test_self_refine_fail_triggers_iterate(self, mock_llm, sample_message):
         mock_llm.responses = [
@@ -139,6 +145,12 @@ class TestSelfRefine:
         assert gen.last_self_refine_applied is True
         assert gen.last_feedback_decision == "fail"
         assert gen.last_iterate_count == 1
+        # 消息流应包含 system + user + generation assistant + feedback prompt + feedback assistant + iterate prompt + iterate assistant
+        assert len(gen.last_llm_messages) == 7
+        assert gen.last_llm_messages[0]["role"] == "system"
+        assert gen.last_llm_messages[2]["role"] == "assistant"
+        assert gen.last_llm_messages[4]["role"] == "assistant"
+        assert gen.last_llm_messages[6]["role"] == "assistant"
 
     def test_self_refine_disabled(self, mock_llm, sample_message):
         mock_llm.responses = [
@@ -152,6 +164,9 @@ class TestSelfRefine:
         assert gen.last_self_refine_applied is False
         assert gen.last_feedback_decision == ""
         assert gen.last_iterate_count == 0
+        # 消息流应包含 system + user + generation assistant
+        assert len(gen.last_llm_messages) == 3
+        assert gen.last_llm_messages[2]["role"] == "assistant"
         # 关闭 Self-Refine 后不应调用 Feedback/Iterate，只应有 2 次 LLM 调用
         assert len(mock_llm.calls) == 2
 

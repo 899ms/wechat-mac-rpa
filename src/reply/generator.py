@@ -433,6 +433,8 @@ class ReplyGenerator:
                         # DeepSeek thinking mode 需要回传 reasoning_content，否则 round 1 会空返
                         if hasattr(raw, "reasoning_content") and raw.reasoning_content:
                             assistant_msg["reasoning_content"] = raw.reasoning_content
+                        elif self.last_thinking:
+                            assistant_msg["reasoning_content"] = self.last_thinking
                         messages.append(assistant_msg)
 
                         for tc in raw_tool_calls:
@@ -491,6 +493,11 @@ class ReplyGenerator:
                     # 文本回复（或强制无 tools 后的回复）
                     text = raw_content
                     self.last_raw_response = text
+                    # 把 assistant 的回复追加到消息流，便于按顺序展示
+                    assistant_msg = {"role": "assistant", "content": text or ""}
+                    if self.last_thinking:
+                        assistant_msg["reasoning_content"] = self.last_thinking
+                    messages.append(assistant_msg)
                     t_parse_start = time.time()
                     replies = self._parse_replies(text)
                     t_parse_ms = (time.time() - t_parse_start) * 1000
@@ -659,6 +666,8 @@ class ReplyGenerator:
             self.last_self_refine_applied = True
             self.last_feedback_decision = decision
             self.last_feedback_issues = issues or []
+            # Feedback 阶段本身已经产生了一条 assistant 消息，统一用 feedback_messages 作为最终消息流
+            final_messages = feedback_messages
 
             if decision == "fail" and issues:
                 iter_count = 0
