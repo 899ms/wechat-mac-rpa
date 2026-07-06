@@ -238,19 +238,19 @@ def tick_detail(id: int):
                 tool_call_id = m.get("tool_call_id") or ""
                 if role == "system":
                     title = f"#{idx} system"
-                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content[:5000])}{"..." if len(msg_content) > 5000 else ""}</pre>'
+                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content)}</pre>'
                     color = "var(--blue)"
                 elif role == "user":
                     title = f"#{idx} user"
-                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content[:5000])}{"..." if len(msg_content) > 5000 else ""}</pre>'
+                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content)}</pre>'
                     color = "var(--green)"
                 elif role == "assistant":
                     title = f"#{idx} assistant"
                     parts = []
                     if reasoning:
-                        parts.append(f'<div style="color:var(--muted);font-size:11px;margin-bottom:4px">[思考过程]</div><pre style="font-size:10px;white-space:pre-wrap;background:rgba(0,0,0,.15);padding:6px;border-radius:4px">{html.escape(reasoning[:5000])}{"..." if len(reasoning) > 5000 else ""}</pre>')
+                        parts.append(f'<div style="color:var(--muted);font-size:11px;margin-bottom:4px">[思考过程]</div><pre style="font-size:10px;white-space:pre-wrap;background:rgba(0,0,0,.15);padding:6px;border-radius:4px">{html.escape(reasoning)}</pre>')
                     if msg_content:
-                        parts.append(f'<div style="color:var(--muted);font-size:11px;margin:4px 0">[回复]</div><pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content[:5000])}{"..." if len(msg_content) > 5000 else ""}</pre>')
+                        parts.append(f'<div style="color:var(--muted);font-size:11px;margin:4px 0">[回复]</div><pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content)}</pre>')
                     if tool_calls:
                         tc_html = ""
                         for tc in tool_calls:
@@ -265,7 +265,7 @@ def tick_detail(id: int):
                     color = "var(--purple)"
                 elif role == "tool":
                     title = f"#{idx} tool ({html.escape(tool_call_id)})"
-                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content[:5000])}{"..." if len(msg_content) > 5000 else ""}</pre>'
+                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content)}</pre>'
                     color = "var(--yellow)"
                 else:
                     title = f"#{idx} {html.escape(role)}"
@@ -277,98 +277,7 @@ def tick_detail(id: int):
         _logger.warning("渲染 LLM 消息流失败: %s", e)
     content += llm_flow_html
 
-    # 截断显示，避免历史消息过多导致页面过长
-    sp_display = html.escape(sp[:8000]) + ("\n\n... (truncated)" if len(sp) > 8000 else "")
-    up_display = html.escape(up[:5000]) + ("\n\n... (中间省略) ...\n\n" + html.escape(up[-2000:]) if len(up) > 5000 else "")
-    raw_display = html.escape(raw[:10000]) + ("\n\n... (truncated)" if len(raw) > 10000 else "")
-    content += f"""
-    <div class="card" style="border-left:3px solid var(--blue)"><b>📝 System Prompt ({len(sp)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{sp_display}</pre></div>
-    <div class="card" style="border-left:3px solid var(--green)"><b>📝 User Prompt ({len(up)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{up_display}</pre></div>
-    <div class="card" style="border-left:3px solid var(--muted)"><b>📝 Raw Response（首次生成）</b><pre style="font-size:10px;white-space:pre-wrap">{raw_display}</pre></div>
-    """
-    # 工具调用 + 结果（合并 tool_calls_json 和 tool_results_json）
-    try:
-        import json as _j3
-        tc_list = _j3.loads(tools) if tools else []
-        tr_list = _j3.loads(tool_results) if tool_results else []
-        # 合并：优先用 tool_results_json 的完整结果，没有的话 fallback 到 result_preview
-        all_tools = []
-        seen = set()
-        for tr in tr_list:
-            name = tr.get("tool", "?")
-            seen.add(name)
-            all_tools.append({"tool_name": name, "arguments": tr.get("args", ""), "result_preview": tr.get("result", "")})
-        for t in tc_list:
-            name = t.get('tool_name', '?')
-            if name not in seen:
-                all_tools.append(t)  # 保持原始 result_preview（500字）
-        if all_tools:
-            tools_html = ""
-            for t in all_tools:
-                tname = t.get('tool_name', '?')
-                targs = t.get('arguments', '') or ''
-                tresult = t.get('result_preview', '') or ''
-                # Parse args if JSON string
-                try:
-                    args_obj = _j3.loads(targs) if isinstance(targs, str) else targs
-                    targs = ' '.join(f'{k}={v}' for k,v in (args_obj.items() if isinstance(args_obj, dict) else []))
-                except Exception as e:
-                    _logger.debug("解析工具参数失败: %s", e)
-                tools_html += f"""<div style="margin:8px 0;padding:10px;background:rgba(255,255,255,.03);border-left:3px solid var(--yellow);border-radius:4px">
-                  <div style="font-size:12px;margin-bottom:4px"><b style="color:var(--yellow)">{html.escape(tname)}</b> <span style="color:var(--muted);font-size:10px">{html.escape(targs)}</span></div>
-                  <pre style="font-size:11px;max-height:250px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.3);padding:8px;border-radius:4px;margin:0">{html.escape(tresult)}</pre>
-                </div>"""
-            content += f"""<div class="card" style="border-left:3px solid var(--yellow)"><b>🔧 工具调用 & 结果 ({len(all_tools)}项)</b>{tools_html}</div>"""
-    except Exception as e:
-        _logger.warning("渲染工具调用失败: %s", e)
-
-    # === Self-Refine / ReAct 过程（按实际发生顺序：生成 → Feedback → Iterate）===
-    sra = d.get("self_refine_applied")
-    fd = d.get("feedback_decision") or ""
-    fi = d.get("feedback_issues") or "[]"
-    ic = d.get("iterate_count") or 0
-    rc = d.get("react_round_count") or 0
-    ttc = d.get("think_tool_called") or 0
-    feedback_raw = d.get("feedback_raw_response") or ""
-    iterate_raw = d.get("iterate_raw_response") or ""
-    issues_display = ""
-    try:
-        import json as _j_issues
-        issues_list = _j_issues.loads(fi) if fi else []
-        if issues_list:
-            issues_display = "".join(f'<li style="margin:2px 0">{html.escape(str(issue))}</li>' for issue in issues_list)
-            issues_display = f'<ul style="margin:4px 0;padding-left:16px;font-size:12px">{issues_display}</ul>'
-        else:
-            issues_display = '<span style="color:var(--muted);font-size:12px">无</span>'
-    except Exception as e:
-        _logger.debug("解析 feedback_issues 失败: %s", e)
-        issues_display = f'<pre style="font-size:11px">{html.escape(fi)}</pre>'
-    feedback_raw_display = html.escape(feedback_raw[:8000]) + ("\n\n... (truncated)" if len(feedback_raw) > 8000 else "")
-    iterate_raw_display = html.escape(iterate_raw[:8000]) + ("\n\n... (truncated)" if len(iterate_raw) > 8000 else "")
-    iterate_block = ""
-    if ic > 0:
-        iterate_block = f"""<div style="margin-top:8px"><span style="color:var(--muted);font-size:12px">Iterate 原文:</span><pre style="font-size:10px;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px">{iterate_raw_display or "(空)"}</pre></div>"""
-    refine_note = ""
-    if not sra:
-        refine_note = '<div style="margin-top:6px;color:var(--muted);font-size:12px">Self-Refine 未触发（无生成回复或已禁用）</div>'
-    content += f"""
-    <div class="card" style="border-left:3px solid var(--purple)">
-      <b>🧠 Self-Refine 过程</b>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0;font-size:12px">
-        <div><span style="color:var(--muted)">启用:</span> {'是' if sra else '否'}</div>
-        <div><span style="color:var(--muted)">Feedback:</span> {html.escape(fd) or '-'}</div>
-        <div><span style="color:var(--muted)">Iterate:</span> {ic}轮</div>
-        <div><span style="color:var(--muted)">ReAct轮数:</span> {rc}</div>
-        <div><span style="color:var(--muted)">think工具:</span> {'是' if ttc else '否'}</div>
-      </div>
-      {refine_note}
-      <div><span style="color:var(--muted);font-size:12px">反馈问题:</span>{issues_display}</div>
-      <div style="margin-top:8px"><span style="color:var(--muted);font-size:12px">Feedback 原文:</span><pre style="font-size:10px;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px">{feedback_raw_display or "(空)"}</pre></div>
-      {iterate_block}
-    </div>
-    """
-
-    # 最终 Bot 回复（在 Self-Refine 之后）
+    # Bot 最终回复（作为消息流之后的摘要）
     content += bot_reply_html
 
     # === 新增：Judge 评分 ===
