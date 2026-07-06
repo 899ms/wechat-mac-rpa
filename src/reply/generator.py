@@ -213,6 +213,7 @@ class ReplyGenerator:
         self.last_iterate_count: int = 0
         self.last_feedback_raw: str = ""
         self.last_iterate_raw: str = ""
+        self.last_iterate_skipped_no_budget: bool = False
 
         # 开关（环境变量，默认启用）
         self.enable_react_tools = os.environ.get("ENABLE_REACT_TOOLS", "1").lower() in ("1", "true", "yes", "on")
@@ -262,7 +263,6 @@ class ReplyGenerator:
     def _self_refine(
         self,
         messages: List[Dict],
-        replies: List[str],
         deadline: float,
     ) -> Tuple[str, Optional[List[str]], List[Dict], str]:
         """Feedback 阶段。返回 decision, issues, updated_messages, raw_text。"""
@@ -276,6 +276,7 @@ class ReplyGenerator:
                 max_tokens=10000,
                 temperature=0.3,
                 timeout=timeout,
+                raise_on_error=True,
             )
             text = raw if isinstance(raw, str) else getattr(raw, "content", str(raw))
         except Exception as e:
@@ -283,18 +284,22 @@ class ReplyGenerator:
             text = ""
         self.last_feedback_raw = text or ""
 
+        # 空回复 → 调用失败，返回 error 而非 pass（避免管理端显示"Self-Refine: pass"误导）
+        if not text or not text.strip():
+            return "error", None, feedback_messages, ""
+
         # 把 Feedback 阶段的 assistant 回复也追加到消息流，便于后续按顺序展示
-        feedback_messages.append({"role": "assistant", "content": text or ""})
+        feedback_messages.append({"role": "assistant", "content": text})
 
         data = self._extract_json(text) or {}
         if not isinstance(data, dict):
-            return "pass", None, feedback_messages, text or ""
+            return "pass", None, feedback_messages, text
 
         decision = data.get("decision", "pass")
         issues = data.get("issues", [])
         if decision == "fail" and isinstance(issues, list) and issues:
-            return "fail", issues, feedback_messages, text or ""
-        return "pass", None, feedback_messages, text or ""
+            return "fail", issues, feedback_messages, text
+        return "pass", None, feedback_messages, text
 
     def _iterate(
         self,
@@ -314,6 +319,7 @@ class ReplyGenerator:
                 max_tokens=10000,
                 temperature=0.7,
                 timeout=timeout,
+                raise_on_error=True,
             )
             text = raw if isinstance(raw, str) else getattr(raw, "content", str(raw))
         except Exception as e:
@@ -584,6 +590,7 @@ class ReplyGenerator:
         self.last_iterate_count = 0
         self.last_feedback_raw = ""
         self.last_iterate_raw = ""
+        self.last_iterate_skipped_no_budget = False
 
         chat_name = unreplied[-1].chat_name if unreplied else ""
 
@@ -591,8 +598,34 @@ class ReplyGenerator:
         last_msg = unreplied[-1]
         route_text = last_msg.text or last_msg.image_description or ""
         t_route_start = time.time()
-        matched_skills = self._route_skills(route_text)
+        # 取最近消息作为路由上下文（含历史消息 + 同批次其它未读），帮助路由理解对话语境
+        n_unreplied = len(unreplied)
+        prior = list(all_messages[:-n_unreplied]) + list(unreplied[:-1])
+        context_msgs = [(m.sender, m.text) for m in prior if m.text][-3:]
+
+        matched_skills = self._route_skills(route_text, context_messages=context_msgs)
         t_route_ms = (time.time() - t_route_start) * 1000
+
+        # 队列模式检测：连续 3+ 条相同文本（非 bot 自身消息）→ 追加 group_banter
+        if "group_banter" not in matched_skills:
+            recent_texts = [
+                m.text for m in all_messages[-5:]
+                if m.text and m.sender_type != SenderType.SELF
+            ]
+            if len(recent_texts) >= 3 and len(set(recent_texts[-3:])) == 1:
+                matched_skills.append("group_banter")
+                _logger.info("[SkillRouter] 检测到队列模式（重复消息 %s），追加 group_banter", recent_texts[-1][:30])
+
+        # FORCE_SKILL 环境变量：跳过路由，强制注入指定 skill（用于隔离测试 skill 内容）
+        force_skill = os.environ.get("FORCE_SKILL", "").strip()
+        if force_skill:
+            manifest_names = {s["name"] for s in self._load_skill_manifest()}
+            if force_skill not in manifest_names:
+                _logger.warning("[SkillRouter] FORCE_SKILL=%s 不在可用 skill 列表中，忽略", force_skill)
+            else:
+                matched_skills = [force_skill]
+                _logger.warning("[SkillRouter] FORCE_SKILL=%s，跳过路由（注意：这是调试覆写，勿留生产环境）", force_skill)
+
         self.last_loaded_skills = matched_skills
 
         # 模型选择：固定使用主 LLM（带 tools），让 LLM 自己决定是否需要工具。
@@ -662,7 +695,7 @@ class ReplyGenerator:
 
         # Self-Refine：Feedback + Iterate
         if self.enable_self_refine and replies and deadline - time.time() >= 1.0:
-            decision, issues, feedback_messages, _ = self._self_refine(final_messages, replies, deadline)
+            decision, issues, feedback_messages, _ = self._self_refine(final_messages, deadline)
             self.last_self_refine_applied = True
             self.last_feedback_decision = decision
             self.last_feedback_issues = issues or []
@@ -670,19 +703,21 @@ class ReplyGenerator:
             final_messages = feedback_messages
 
             if decision == "fail" and issues:
-                iter_count = 0
-                max_iter = int(os.environ.get("SELF_REFINE_MAX_ITER", "1"))
                 current_replies = replies
                 current_messages = feedback_messages
 
-                while iter_count < max_iter and issues and deadline - time.time() >= 1.0:
+                # 单次 Iterate（无循环：issues 不刷新时循环无意义）
+                if deadline - time.time() >= 1.0:
                     new_replies, new_messages, _ = self._iterate(current_messages, issues, deadline)
-                    iter_count += 1
                     if new_replies:
                         current_replies = new_replies
                         current_messages = new_messages
+                    self.last_iterate_count = 1
+                else:
+                    self.last_iterate_skipped_no_budget = True
+                    _logger.warning("[SelfRefine] Iterate 因预算不足跳过 (deadline=%.1fs)",
+                                    deadline - time.time())
 
-                self.last_iterate_count = iter_count
                 replies = current_replies
                 final_messages = current_messages
 
@@ -764,7 +799,7 @@ class ReplyGenerator:
             return md_file.read_text(encoding="utf-8").strip()
         return ""
 
-    def _route_skills(self, user_text: str) -> List[str]:
+    def _route_skills(self, user_text: str, context_messages: Optional[List[Tuple[str, str]]] = None) -> List[str]:
         """模型辅助路由：根据用户消息判断需要加载哪些 skill。
         用一次轻量 LLM 调用，只消耗几十 token。
         """
@@ -780,10 +815,24 @@ class ReplyGenerator:
             f"{i+1}. {s['name']}：{s['description']}"
             for i, s in enumerate(manifest)
         )
+
+        # 上下文块
+        context_block = ""
+        if context_messages:
+            lines = "\n".join(f"  \"{s}: {t}\"" for s, t in context_messages)
+            context_block = f"最近对话：\n{lines}\n\n"
+
         router_prompt = (
             "你是 SkillRouter，只负责判断用户消息需要哪些技能。\n\n"
             f"可用技能：\n{skill_list}\n\n"
+            f"{context_block}"
             f"用户消息：\"{user_text}\"\n\n"
+            "注意：\n"
+            "- 连续多条相同文本通常是队列型群聊（跟风复读/排队祝贺），适合 group_banter\n"
+            "- @提及通常是群聊互动，适合 group_banter\n"
+            "- 信息询问、知识问题适合 answering_questions\n"
+            "- 吐槽/抱怨适合 handling_vent、夸奖适合 handling_praise\n"
+            "- 简单闲聊、无明确主题适合 casual_chat\n\n"
             "请输出 JSON，只包含技能 name 列表，不要其他内容：\n"
             '{"skills": ["skill_name1", "skill_name2"]}\n'
             "如果不需要任何技能，输出：{\"skills\": []}"

@@ -60,7 +60,7 @@ class QwenClient:
                 model, s["calls"], s["prompt"], s["completion"], s["total"]
             )
 
-    def chat(self, messages=None, user_id=None, message=None, system_prompt=None, tools=None, temperature=None, max_tokens=None, timeout=None, response_format=None) -> str:
+    def chat(self, messages=None, user_id=None, message=None, system_prompt=None, tools=None, temperature=None, max_tokens=None, timeout=None, response_format=None, raise_on_error=False) -> str:
         """生成回复，支持 tools（function calling）
 
         支持两种调用方式：
@@ -68,10 +68,10 @@ class QwenClient:
         2. 旧接口: chat(user_id="xxx", message="...", system_prompt="...")
         """
         if messages is not None:
-            return self._chat_with_messages(messages, tools=tools, temperature=temperature, max_tokens=max_tokens, timeout=timeout, response_format=response_format)
+            return self._chat_with_messages(messages, tools=tools, temperature=temperature, max_tokens=max_tokens, timeout=timeout, response_format=response_format, raise_on_error=raise_on_error)
         return self._chat_with_user_id(user_id, message, system_prompt)
 
-    def _chat_with_messages(self, messages: List[dict], tools=None, temperature=None, max_tokens=None, timeout=None, response_format=None) -> str:
+    def _chat_with_messages(self, messages: List[dict], tools=None, temperature=None, max_tokens=None, timeout=None, response_format=None, raise_on_error=False) -> str:
         """直接透传 messages 列表调用大模型，支持 tools 和自定义参数"""
         try:
             kwargs = {
@@ -131,7 +131,9 @@ class QwenClient:
                 text = reasoning
             return text
         except Exception as e:
-            print(f"Qwen LLM 错误: {e}")
+            _logger.warning("Qwen LLM 错误: %s", e, exc_info=True)
+            if raise_on_error:
+                raise
             return ""
 
     def _chat_with_user_id(self, user_id: str, message: str, system_prompt: Optional[str] = None) -> str:

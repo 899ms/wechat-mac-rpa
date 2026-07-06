@@ -9,6 +9,7 @@ Self-Refine（Feedback + Iterate）开关及 max_tool_calls 降级逻辑，
 import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+from unittest.mock import patch
 
 import pytest
 
@@ -169,6 +170,116 @@ class TestSelfRefine:
         assert gen.last_llm_messages[2]["role"] == "assistant"
         # 关闭 Self-Refine 后不应调用 Feedback/Iterate，只应有 2 次 LLM 调用
         assert len(mock_llm.calls) == 2
+
+    def test_self_refine_feedback_error_returns_error_decision(self, mock_llm, sample_message):
+        """Feedback 返回空 text 时 decision 应为 error，而非 pass。"""
+        mock_llm.responses = [
+            '{"skills": []}',                       # skill router
+            '{"replies": ["test reply"]}',          # ReAct 生成
+            MockResponse(content=""),               # Feedback 返回空
+        ]
+        gen = _make_generator(mock_llm, enable_self_refine=True)
+        replies = gen.generate([sample_message], [sample_message])
+
+        assert replies == ["test reply"]            # 保留原回复，不丢数据
+        assert gen.last_self_refine_applied is True
+        assert gen.last_feedback_decision == "error"
+        assert gen.last_iterate_count == 0
+
+
+class TestForceSkill:
+    """FORCE_SKILL 环境变量的测试。"""
+
+    def test_force_skill_valid_bypasses_router(self, mock_llm, sample_message):
+        """有效 skill 名 → 跳过路由，强制注入。"""
+        mock_llm.responses = [
+            '{"skills": ["answering_questions"]}',  # 路由应被跳过
+            '{"replies": ["test reply"]}',
+        ]
+        gen = _make_generator(mock_llm, enable_self_refine=False)
+        with patch.dict(os.environ, {"FORCE_SKILL": "handling_vent"}):
+            replies = gen.generate([sample_message], [sample_message])
+        assert "handling_vent" in gen.last_loaded_skills
+        assert "answering_questions" not in gen.last_loaded_skills
+
+    def test_force_skill_invalid_ignored(self, mock_llm, sample_message):
+        """不存在 skill 名 → 忽略，走正常路由。"""
+        mock_llm.responses = [
+            '{"skills": ["answering_questions"]}',
+            '{"replies": ["test reply"]}',
+        ]
+        gen = _make_generator(mock_llm, enable_self_refine=False)
+        with patch.dict(os.environ, {"FORCE_SKILL": "nonexistent_skill"}):
+            replies = gen.generate([sample_message], [sample_message])
+        assert "answering_questions" in gen.last_loaded_skills
+        assert "nonexistent_skill" not in gen.last_loaded_skills
+
+    def test_force_skill_empty_ignored(self, mock_llm, sample_message):
+        """FORCE_SKILL 为空字符串 → 正常路由。"""
+        mock_llm.responses = [
+            '{"skills": ["casual_chat"]}',
+            '{"replies": ["test reply"]}',
+        ]
+        gen = _make_generator(mock_llm, enable_self_refine=False)
+        with patch.dict(os.environ, {"FORCE_SKILL": ""}):
+            replies = gen.generate([sample_message], [sample_message])
+        assert "casual_chat" in gen.last_loaded_skills
+
+
+class TestQueueDetection:
+    """队列模式检测的测试。"""
+
+    def test_queue_three_identical_texts(self, mock_llm):
+        """连续 3 条相同文本 → 追加 group_banter。"""
+        mock_llm.responses = [
+            '{"skills": []}',
+            '{"replies": ["警惕资本主义打牌"]}',
+        ]
+        gen = _make_generator(mock_llm, enable_self_refine=False)
+        msgs = [
+            ChatMessage(text="警惕资本主义打牌", sender="老王",
+                        sender_type=SenderType.OTHER, chat_name="群聊"),
+            ChatMessage(text="警惕资本主义打牌", sender="老李",
+                        sender_type=SenderType.OTHER, chat_name="群聊"),
+            ChatMessage(text="警惕资本主义打牌", sender="大刘",
+                        sender_type=SenderType.OTHER, chat_name="群聊"),
+        ]
+        replies = gen.generate(unreplied=[msgs[-1]], all_messages=msgs)
+        assert "group_banter" in gen.last_loaded_skills
+
+    def test_queue_not_triggered_for_two_identical(self, mock_llm):
+        """只有 2 条相同 text → 不触发队列检测。"""
+        mock_llm.responses = [
+            '{"skills": []}',
+            '{"replies": ["ok"]}',
+        ]
+        gen = _make_generator(mock_llm, enable_self_refine=False)
+        msgs = [
+            ChatMessage(text="哈哈", sender="老王",
+                        sender_type=SenderType.OTHER, chat_name="群聊"),
+            ChatMessage(text="哈哈", sender="老李",
+                        sender_type=SenderType.OTHER, chat_name="群聊"),
+        ]
+        replies = gen.generate(unreplied=[msgs[-1]], all_messages=msgs)
+        assert "group_banter" not in gen.last_loaded_skills
+
+    def test_self_messages_dont_trigger_queue(self, mock_llm):
+        """bot 自身的重复消息不触发队列检测。"""
+        mock_llm.responses = [
+            '{"skills": []}',
+            '{"replies": ["好"]}',
+        ]
+        gen = _make_generator(mock_llm, enable_self_refine=False)
+        msgs = [
+            ChatMessage(text="好", sender="我",
+                        sender_type=SenderType.SELF, chat_name="群聊"),
+            ChatMessage(text="好", sender="我",
+                        sender_type=SenderType.SELF, chat_name="群聊"),
+            ChatMessage(text="好", sender="我",
+                        sender_type=SenderType.SELF, chat_name="群聊"),
+        ]
+        replies = gen.generate(unreplied=[msgs[-1]], all_messages=msgs)
+        assert "group_banter" not in gen.last_loaded_skills
 
 
 class TestReActLoop:
