@@ -223,6 +223,60 @@ def tick_detail(id: int):
     # Bot 回复卡片（最终输出），按实际流程放在 Self-Refine 之后
     bot_reply_html = f'<div class="card" style="border-left:3px solid var(--blue)"><b>🤖 Bot 回复:</b><br>{replies_display}</div>'
 
+    # 完整 LLM 消息流（按 message 顺序：system → user → assistant → tool → assistant(feedback) → ...）
+    llm_messages_json = d.get("llm_messages_json") or "[]"
+    llm_flow_html = ""
+    try:
+        msgs = _json.loads(llm_messages_json) if llm_messages_json else []
+        if msgs:
+            flow_items = []
+            for idx, m in enumerate(msgs, 1):
+                role = m.get("role", "?")
+                content = m.get("content") or ""
+                reasoning = m.get("reasoning_content") or ""
+                tool_calls = m.get("tool_calls") or []
+                tool_call_id = m.get("tool_call_id") or ""
+                if role == "system":
+                    title = f"#{idx} system"
+                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(content[:5000])}{"..." if len(content) > 5000 else ""}</pre>'
+                    color = "var(--blue)"
+                elif role == "user":
+                    title = f"#{idx} user"
+                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(content[:5000])}{"..." if len(content) > 5000 else ""}</pre>'
+                    color = "var(--green)"
+                elif role == "assistant":
+                    title = f"#{idx} assistant"
+                    parts = []
+                    if reasoning:
+                        parts.append(f'<div style="color:var(--muted);font-size:11px;margin-bottom:4px">[思考过程]</div><pre style="font-size:10px;white-space:pre-wrap;background:rgba(0,0,0,.15);padding:6px;border-radius:4px">{html.escape(reasoning[:5000])}{"..." if len(reasoning) > 5000 else ""}</pre>')
+                    if content:
+                        parts.append(f'<div style="color:var(--muted);font-size:11px;margin:4px 0">[回复]</div><pre style="font-size:10px;white-space:pre-wrap">{html.escape(content[:5000])}{"..." if len(content) > 5000 else ""}</pre>')
+                    if tool_calls:
+                        tc_html = ""
+                        for tc in tool_calls:
+                            fn = tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}
+                            tname = fn.get("name") or tc.get("tool_name") or "?"
+                            targs = fn.get("arguments") or tc.get("arguments") or ""
+                            tc_html += f'<div style="margin:4px 0;padding:6px;background:rgba(255,255,255,.05);border-left:2px solid var(--yellow);border-radius:3px"><b style="color:var(--yellow);font-size:11px">{html.escape(tname)}</b> <span style="color:var(--muted);font-size:10px">{html.escape(str(targs)[:200])}</span></div>'
+                        parts.append(f'<div style="color:var(--muted);font-size:11px;margin:4px 0">[工具调用]</div>{tc_html}')
+                    if not parts:
+                        parts.append('<span style="color:var(--muted);font-size:12px">(空)</span>')
+                    body = "\n".join(parts)
+                    color = "var(--purple)"
+                elif role == "tool":
+                    title = f"#{idx} tool ({html.escape(tool_call_id)})"
+                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(content[:5000])}{"..." if len(content) > 5000 else ""}</pre>'
+                    color = "var(--yellow)"
+                else:
+                    title = f"#{idx} {html.escape(role)}"
+                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(str(m)[:2000])}</pre>'
+                    color = "var(--muted)"
+                flow_items.append(f'<div style="margin:8px 0;padding:10px;border-left:3px solid {color};background:rgba(255,255,255,.03);border-radius:4px"><div style="font-size:12px;font-weight:bold;margin-bottom:4px">{title}</div>{body}</div>')
+            llm_flow_html = f'<div class="card" style="border-left:3px solid var(--purple)"><b>🧬 LLM 完整消息流（按 message 顺序）</b>{"".join(flow_items)}</div>'
+    except Exception as e:
+        _logger.warning("渲染 LLM 消息流失败: %s", e)
+    content += llm_flow_html
+
     # 截断显示，避免历史消息过多导致页面过长
     sp_display = html.escape(sp[:8000]) + ("\n\n... (truncated)" if len(sp) > 8000 else "")
     up_display = html.escape(up[:5000]) + ("\n\n... (中间省略) ...\n\n" + html.escape(up[-2000:]) if len(up) > 5000 else "")

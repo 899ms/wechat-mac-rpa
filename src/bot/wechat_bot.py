@@ -441,6 +441,32 @@ class WeChatBot:
                         data.append(d)
                     return _json.dumps(data, ensure_ascii=False, default=str)
 
+                # 序列化 LLM 完整消息流（含 system/user/assistant/tool/feedback/iterate）
+                def _serialize_llm_messages(msgs):
+                    data = []
+                    for m in msgs:
+                        d = dict(m)
+                        # 截断单条消息内容，避免单 tick 存储过大
+                        for key in ("content", "reasoning_content"):
+                            val = d.get(key)
+                            if isinstance(val, str) and len(val) > 12000:
+                                d[key] = val[:12000] + "\n\n... [truncated]"
+                        # tool_calls 参数可能很长，也做截断
+                        if d.get("tool_calls"):
+                            d["tool_calls"] = [
+                                {
+                                    "id": tc.get("id") or tc.get("tool_call_id"),
+                                    "type": tc.get("type", "function"),
+                                    "function": {
+                                        "name": tc.get("function", {}).get("name") if isinstance(tc.get("function"), dict) else tc.get("tool_name"),
+                                        "arguments": (tc.get("function", {}).get("arguments") if isinstance(tc.get("function"), dict) else tc.get("arguments", ""))[:2000],
+                                    },
+                                }
+                                for tc in d["tool_calls"]
+                            ]
+                        data.append(d)
+                    return _json.dumps(data, ensure_ascii=False, default=str)
+
                 conn.execute("""INSERT INTO tick_log
                     (session_id, tick_id, chat_name, is_group,
                      messages_count, new_messages_count,
@@ -449,8 +475,8 @@ class WeChatBot:
                      should_reply, replies_sent_json, screenshot_path,
                      self_refine_applied, feedback_decision, feedback_issues, iterate_count,
                      react_round_count, think_tool_called,
-                     feedback_raw_response, iterate_raw_response)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                     feedback_raw_response, iterate_raw_response, llm_messages_json)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
                     self.session_id,
                     tick_id, chat_name, 1 if is_group else 0,
                     len(all_messages) if all_messages else 0,
@@ -473,6 +499,7 @@ class WeChatBot:
                     1 if any(tc.get('tool_name') == 'think' for tc in getattr(self.generator, 'last_tool_calls', []) or []) else 0,
                     getattr(self.generator, 'last_feedback_raw', '') or '',
                     getattr(self.generator, 'last_iterate_raw', '') or '',
+                    _serialize_llm_messages(getattr(self.generator, 'last_llm_messages', []) or []),
                 ))
                 conn.commit()
             except Exception as e:

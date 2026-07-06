@@ -283,6 +283,9 @@ class ReplyGenerator:
             text = ""
         self.last_feedback_raw = text or ""
 
+        # 把 Feedback 阶段的 assistant 回复也追加到消息流，便于后续按顺序展示
+        feedback_messages.append({"role": "assistant", "content": text or ""})
+
         data = self._extract_json(text) or {}
         if not isinstance(data, dict):
             return "pass", None, feedback_messages, text or ""
@@ -318,6 +321,8 @@ class ReplyGenerator:
             text = ""
         self.last_iterate_raw = text or ""
 
+        # 把 Iterate 阶段的 assistant 回复也追加到消息流
+        iterate_messages.append({"role": "assistant", "content": text or ""})
         replies = self._parse_replies(text)
         return replies or [], iterate_messages, text or ""
 
