@@ -55,7 +55,9 @@ CREATE TABLE IF NOT EXISTS tick_log (
     feedback_issues TEXT DEFAULT '[]',
     iterate_count INTEGER DEFAULT 0,
     react_round_count INTEGER DEFAULT 0,
-    think_tool_called INTEGER DEFAULT 0
+    think_tool_called INTEGER DEFAULT 0,
+    feedback_raw_response TEXT DEFAULT '',
+    iterate_raw_response TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS cases (
@@ -281,6 +283,10 @@ class CaseDB:
                     conn.execute("ALTER TABLE tick_log ADD COLUMN react_round_count INTEGER DEFAULT 0")
                 if "think_tool_called" not in columns:
                     conn.execute("ALTER TABLE tick_log ADD COLUMN think_tool_called INTEGER DEFAULT 0")
+                if "feedback_raw_response" not in columns:
+                    conn.execute("ALTER TABLE tick_log ADD COLUMN feedback_raw_response TEXT DEFAULT ''")
+                if "iterate_raw_response" not in columns:
+                    conn.execute("ALTER TABLE tick_log ADD COLUMN iterate_raw_response TEXT DEFAULT ''")
                 conn.commit()
             except Exception as e:
                 _logger.warning("[CaseDB] 添加 messages_json 列失败: %s", e)

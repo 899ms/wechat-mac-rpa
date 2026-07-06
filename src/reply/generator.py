@@ -674,7 +674,8 @@ class ReplyGenerator:
 
         # 更新最终观测字段
         self.last_llm_messages = [dict(m) for m in final_messages]
-        self.last_raw_response = self.last_iterate_raw or self.last_feedback_raw or self.last_raw_response
+        # last_raw_response 保留原始 generation 的 raw_response，self-refine 的原文单独存
+        # 在 last_feedback_raw / last_iterate_raw 中
 
         t_total_ms = (time.time() - t_generate_start) * 1000
         _logger.info("[Perf][Generate] total=%.0fms replies=%d self_refine=%s decision=%s iterate=%d",
