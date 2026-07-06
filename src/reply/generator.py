@@ -372,7 +372,13 @@ class ReplyGenerator:
                     _logger.info("[LLM] attempt=%d round=%d force_no_tools=%s tools=%s timeout=%s msg_count=%d",
                                  attempt + 1, tool_round_count, force_no_tools, bool(actual_tools), llm_timeout, len(messages))
                     t_llm_start = time.time()
-                    raw = self.llm_client.chat(messages=messages, tools=actual_tools, max_tokens=10000, timeout=llm_timeout)
+                    # force_no_tools 阶段强制 JSON 输出模式，避免 LLM 输出非法 JSON
+                    response_format = {"type": "json_object"} if force_no_tools else None
+                    raw = self.llm_client.chat(
+                        messages=messages, tools=actual_tools,
+                        max_tokens=10000, timeout=llm_timeout,
+                        response_format=response_format,
+                    )
                     self.last_thinking = getattr(self.llm_client, "last_thinking", "") or ""
                     self.last_llm_messages = [dict(m) for m in messages]
                     t_llm_ms = (time.time() - t_llm_start) * 1000
