@@ -282,6 +282,32 @@ class TestQueueDetection:
         assert "group_banter" not in gen.last_loaded_skills
 
 
+class TestParseReplies:
+    """_parse_replies 方法的单元测试。"""
+
+    def test_valid_json_returns_replies(self, mock_llm):
+        gen = _make_generator(mock_llm, enable_self_refine=False)
+        result = gen._parse_replies('{"replies": ["hello", "world"]}')
+        assert result == ["hello", "world"]
+
+    def test_broken_json_returns_empty(self, mock_llm):
+        """不完整 JSON（如 {"replies": ["确实气人。"）→ 返回 []，不兜底输出原始串。"""
+        gen = _make_generator(mock_llm, enable_self_refine=False)
+        result = gen._parse_replies('{"replies": ["确实气人。"')
+        assert result == []
+
+    def test_plain_text_fallback(self, mock_llm):
+        """纯文本（无 JSON 特征）→ 正常文本切分回退。"""
+        gen = _make_generator(mock_llm, enable_self_refine=False)
+        result = gen._parse_replies("第一行\n\n第二行")
+        assert result == ["第一行", "第二行"]
+
+    def test_empty_text_returns_empty(self, mock_llm):
+        gen = _make_generator(mock_llm, enable_self_refine=False)
+        assert gen._parse_replies("") == []
+        assert gen._parse_replies("  ") == []
+
+
 class TestReActLoop:
     def test_max_tool_calls_limit(self, sample_message):
         """达到 MAX_TOOL_CALLS 后应强制禁用 tools 并返回 JSON，避免无限循环。"""

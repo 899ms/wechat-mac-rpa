@@ -770,7 +770,12 @@ class ReplyGenerator:
         if data is not None:
             replies = data.get("replies", [])
             return [str(r).strip() for r in replies if str(r).strip() not in ("收到", "好的", "嗯", "OK", "1")][:3]
-        # fallback: 按段落拆分，不再整段当一条发
+        # JSON 解析失败。如果文本含 { 或 "replies"，说明 LLM 尝试输出 JSON 但格式无效，
+        # 不做文本切分回退（防止不完整 JSON 串泄漏给用户），由上层按"不回复"处理。
+        stripped = text.strip()
+        if '{' in stripped or '"replies"' in stripped:
+            return []
+        # fallback: 按段落拆分（仅对纯文本生效，不含 JSON 特征）
         text = text.strip()
         for sep in ("\n\n", "\n"):
             parts = [p.strip().replace("\n", " ") for p in text.split(sep) if p.strip()]
