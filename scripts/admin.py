@@ -232,25 +232,25 @@ def tick_detail(id: int):
             flow_items = []
             for idx, m in enumerate(msgs, 1):
                 role = m.get("role", "?")
-                content = m.get("content") or ""
+                msg_content = m.get("content") or ""
                 reasoning = m.get("reasoning_content") or ""
                 tool_calls = m.get("tool_calls") or []
                 tool_call_id = m.get("tool_call_id") or ""
                 if role == "system":
                     title = f"#{idx} system"
-                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(content[:5000])}{"..." if len(content) > 5000 else ""}</pre>'
+                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content[:5000])}{"..." if len(msg_content) > 5000 else ""}</pre>'
                     color = "var(--blue)"
                 elif role == "user":
                     title = f"#{idx} user"
-                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(content[:5000])}{"..." if len(content) > 5000 else ""}</pre>'
+                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content[:5000])}{"..." if len(msg_content) > 5000 else ""}</pre>'
                     color = "var(--green)"
                 elif role == "assistant":
                     title = f"#{idx} assistant"
                     parts = []
                     if reasoning:
                         parts.append(f'<div style="color:var(--muted);font-size:11px;margin-bottom:4px">[思考过程]</div><pre style="font-size:10px;white-space:pre-wrap;background:rgba(0,0,0,.15);padding:6px;border-radius:4px">{html.escape(reasoning[:5000])}{"..." if len(reasoning) > 5000 else ""}</pre>')
-                    if content:
-                        parts.append(f'<div style="color:var(--muted);font-size:11px;margin:4px 0">[回复]</div><pre style="font-size:10px;white-space:pre-wrap">{html.escape(content[:5000])}{"..." if len(content) > 5000 else ""}</pre>')
+                    if msg_content:
+                        parts.append(f'<div style="color:var(--muted);font-size:11px;margin:4px 0">[回复]</div><pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content[:5000])}{"..." if len(msg_content) > 5000 else ""}</pre>')
                     if tool_calls:
                         tc_html = ""
                         for tc in tool_calls:
@@ -265,7 +265,7 @@ def tick_detail(id: int):
                     color = "var(--purple)"
                 elif role == "tool":
                     title = f"#{idx} tool ({html.escape(tool_call_id)})"
-                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(content[:5000])}{"..." if len(content) > 5000 else ""}</pre>'
+                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content[:5000])}{"..." if len(msg_content) > 5000 else ""}</pre>'
                     color = "var(--yellow)"
                 else:
                     title = f"#{idx} {html.escape(role)}"
