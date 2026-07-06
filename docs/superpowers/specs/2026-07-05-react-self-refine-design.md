@@ -4,7 +4,7 @@
 
 - 日期：2026-07-05
 - 作者：Kimi Code CLI
-- 状态：待实现
+- 状态：已实现（feat/react-self-refine 分支）
 - 关联 issue：回复质量 / 思考深度不足
 
 ## 背景
