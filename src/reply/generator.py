@@ -603,14 +603,12 @@ class ReplyGenerator:
         # 模型辅助路由：提前到 system prompt 之前，让 prompt 也能感知已加载 skill
         last_msg = unreplied[-1]
         route_text = last_msg.text or last_msg.image_description or ""
-        t_route_start = time.time()
         # 取最近消息作为路由上下文（含历史消息 + 同批次其它未读），帮助路由理解对话语境
         n_unreplied = len(unreplied)
         prior = list(all_messages[:-n_unreplied]) + list(unreplied[:-1])
         context_msgs = [(m.sender, m.text) for m in prior if m.text][-3:]
 
         matched_skills = self._route_skills(route_text, context_messages=context_msgs, is_group=is_group)
-        t_route_ms = (time.time() - t_route_start) * 1000
 
         # 队列模式检测：连续 3+ 条相同文本（非 bot 自身消息）→ 追加 group_banter
         if "group_banter" not in matched_skills:
@@ -635,24 +633,18 @@ class ReplyGenerator:
         self.last_loaded_skills = matched_skills
 
         # 模型选择：固定使用主 LLM（带 tools），让 LLM 自己决定是否需要工具。
-        active_llm = self.llm_client
         _logger.info(f"[ModelSelect] matched_skills={matched_skills} → active_llm=deepseek（tools 可用）")
         self.last_active_llm = "deepseek"
 
-        t_sp_start = time.time()
         system_prompt = self._system_prompt(
             enable_reply_restraint=enable_reply_restraint,
             unreplied=unreplied,
             all_messages=all_messages,
             is_group=is_group,
         )
-        t_sp_ms = (time.time() - t_sp_start) * 1000
 
-        t_tc_start = time.time()
         tools_context = self._build_tools_context(chat_name)
-        t_tc_ms = (time.time() - t_tc_start) * 1000
 
-        t_up_start = time.time()
         user_prompt = self._build_user_prompt(
             unreplied, all_messages, is_group,
             enable_time_awareness=enable_time_awareness,
@@ -660,7 +652,6 @@ class ReplyGenerator:
             enable_timestamps=enable_timestamps,
             tools_context=tools_context,
         )
-        t_up_ms = (time.time() - t_up_start) * 1000
 
         # Skill 兜底：明确场景未命中时，群聊默认 group_banter，私聊默认 casual_chat
         if not matched_skills:

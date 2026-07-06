@@ -4,7 +4,6 @@
 调用真实 LLM，观察"幽默技巧"段注入后的回复风格。
 """
 import os, sys, time
-import json
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
