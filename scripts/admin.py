@@ -278,38 +278,41 @@ def tick_detail(id: int):
     feedback_raw = d.get("feedback_raw_response") or ""
     iterate_raw = d.get("iterate_raw_response") or ""
     issues_display = ""
-    if sra:
-        try:
-            import json as _j_issues
-            issues_list = _j_issues.loads(fi) if fi else []
-            if issues_list:
-                issues_display = "".join(f'<li style="margin:2px 0">{html.escape(str(issue))}</li>' for issue in issues_list)
-                issues_display = f'<ul style="margin:4px 0;padding-left:16px;font-size:12px">{issues_display}</ul>'
-            else:
-                issues_display = '<span style="color:var(--muted);font-size:12px">无</span>'
-        except Exception as e:
-            _logger.debug("解析 feedback_issues 失败: %s", e)
-            issues_display = f'<pre style="font-size:11px">{html.escape(fi)}</pre>'
-        feedback_raw_display = html.escape(feedback_raw[:8000]) + ("\n\n... (truncated)" if len(feedback_raw) > 8000 else "")
-        iterate_raw_display = html.escape(iterate_raw[:8000]) + ("\n\n... (truncated)" if len(iterate_raw) > 8000 else "")
-        iterate_block = ""
-        if ic > 0:
-            iterate_block = f"""<div style="margin-top:8px"><span style="color:var(--muted);font-size:12px">Iterate 原文:</span><pre style="font-size:10px;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px">{iterate_raw_display or "(空)"}</pre></div>"""
-        content += f"""
-        <div class="card" style="border-left:3px solid var(--purple)">
-          <b>🧠 Self-Refine 过程</b>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0;font-size:12px">
-            <div><span style="color:var(--muted)">启用:</span> {'是' if sra else '否'}</div>
-            <div><span style="color:var(--muted)">Feedback:</span> {html.escape(fd) or '-'}</div>
-            <div><span style="color:var(--muted)">Iterate:</span> {ic}轮</div>
-            <div><span style="color:var(--muted)">ReAct轮数:</span> {rc}</div>
-            <div><span style="color:var(--muted)">think工具:</span> {'是' if ttc else '否'}</div>
-          </div>
-          <div><span style="color:var(--muted);font-size:12px">反馈问题:</span>{issues_display}</div>
-          <div style="margin-top:8px"><span style="color:var(--muted);font-size:12px">Feedback 原文:</span><pre style="font-size:10px;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px">{feedback_raw_display or "(空)"}</pre></div>
-          {iterate_block}
-        </div>
-        """
+    try:
+        import json as _j_issues
+        issues_list = _j_issues.loads(fi) if fi else []
+        if issues_list:
+            issues_display = "".join(f'<li style="margin:2px 0">{html.escape(str(issue))}</li>' for issue in issues_list)
+            issues_display = f'<ul style="margin:4px 0;padding-left:16px;font-size:12px">{issues_display}</ul>'
+        else:
+            issues_display = '<span style="color:var(--muted);font-size:12px">无</span>'
+    except Exception as e:
+        _logger.debug("解析 feedback_issues 失败: %s", e)
+        issues_display = f'<pre style="font-size:11px">{html.escape(fi)}</pre>'
+    feedback_raw_display = html.escape(feedback_raw[:8000]) + ("\n\n... (truncated)" if len(feedback_raw) > 8000 else "")
+    iterate_raw_display = html.escape(iterate_raw[:8000]) + ("\n\n... (truncated)" if len(iterate_raw) > 8000 else "")
+    iterate_block = ""
+    if ic > 0:
+        iterate_block = f"""<div style="margin-top:8px"><span style="color:var(--muted);font-size:12px">Iterate 原文:</span><pre style="font-size:10px;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px">{iterate_raw_display or "(空)"}</pre></div>"""
+    refine_note = ""
+    if not sra:
+        refine_note = '<div style="margin-top:6px;color:var(--muted);font-size:12px">Self-Refine 未触发（无生成回复或已禁用）</div>'
+    content += f"""
+    <div class="card" style="border-left:3px solid var(--purple)">
+      <b>🧠 Self-Refine 过程</b>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0;font-size:12px">
+        <div><span style="color:var(--muted)">启用:</span> {'是' if sra else '否'}</div>
+        <div><span style="color:var(--muted)">Feedback:</span> {html.escape(fd) or '-'}</div>
+        <div><span style="color:var(--muted)">Iterate:</span> {ic}轮</div>
+        <div><span style="color:var(--muted)">ReAct轮数:</span> {rc}</div>
+        <div><span style="color:var(--muted)">think工具:</span> {'是' if ttc else '否'}</div>
+      </div>
+      {refine_note}
+      <div><span style="color:var(--muted);font-size:12px">反馈问题:</span>{issues_display}</div>
+      <div style="margin-top:8px"><span style="color:var(--muted);font-size:12px">Feedback 原文:</span><pre style="font-size:10px;white-space:pre-wrap;background:rgba(0,0,0,.2);padding:8px;border-radius:4px">{feedback_raw_display or "(空)"}</pre></div>
+      {iterate_block}
+    </div>
+    """
 
     # 最终 Bot 回复（在 Self-Refine 之后）
     content += bot_reply_html
