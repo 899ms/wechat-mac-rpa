@@ -694,7 +694,20 @@ class ReplyGenerator:
 
         # Self-Refine：Feedback + Iterate
         if self.enable_self_refine and replies and deadline - time.time() >= 1.0:
-            decision, issues, feedback_messages, _ = self._self_refine(final_messages, deadline)
+            # 身份泄漏关键词预筛（零 LLM 成本，命中的直接走 iterate 不调 feedback）
+            IDENTITY_BREACH_PATTERNS = ["我是AI", "我是机器人", "作为AI", "语言模型", "芊小微"]
+            pre_issues = []
+            for r in replies:
+                for pat in IDENTITY_BREACH_PATTERNS:
+                    if pat in r:
+                        pre_issues.append(f"回复含身份泄漏关键词'{pat}'")
+                        break
+            if pre_issues:
+                _logger.warning("[SelfRefine] 关键词预筛命中: %s", pre_issues)
+                decision, issues = "fail", pre_issues
+                feedback_messages = final_messages
+            else:
+                decision, issues, feedback_messages, _ = self._self_refine(final_messages, deadline)
             self.last_self_refine_applied = True
             self.last_feedback_decision = decision
             self.last_feedback_issues = issues or []
