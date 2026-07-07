@@ -27,6 +27,9 @@ data/reports/
 
 # pytest
 .pytest_cache/
+# 环境变量（包含 API key）
+.env
+
 # 运行时生成的数据
 data/screenshots/
 data/global_state.json
