@@ -131,24 +131,39 @@ def tick_list(page: int = Query(1), filter: str = Query("all")):
     offset = (page - 1) * 20
     if filter == "skipped":
         rows = conn.execute(
-            "SELECT id, session_id, tick_id, chat_name, messages_count, new_messages_count, should_reply, skip_reason, judge_score, human_is_badcase, human_badcase_type, replies_sent_json, duration_ms, created_at FROM tick_log WHERE skip_reason IS NOT NULL ORDER BY created_at DESC, tick_id DESC LIMIT ? OFFSET ?",
+            "SELECT id, session_id, tick_id, chat_name, messages_count, new_messages_count, should_reply, send_success, skip_reason, judge_score, human_is_badcase, human_badcase_type, replies_sent_json, raw_response, duration_ms, created_at FROM tick_log WHERE skip_reason IS NOT NULL ORDER BY created_at DESC, tick_id DESC LIMIT ? OFFSET ?",
             (20, offset),
         ).fetchall()
     elif filter == "replied":
         rows = conn.execute(
-            "SELECT id, session_id, tick_id, chat_name, messages_count, new_messages_count, should_reply, skip_reason, judge_score, human_is_badcase, human_badcase_type, replies_sent_json, duration_ms, created_at FROM tick_log WHERE should_reply=1 ORDER BY created_at DESC, tick_id DESC LIMIT ? OFFSET ?",
+            "SELECT id, session_id, tick_id, chat_name, messages_count, new_messages_count, should_reply, send_success, skip_reason, judge_score, human_is_badcase, human_badcase_type, replies_sent_json, raw_response, duration_ms, created_at FROM tick_log WHERE should_reply=1 ORDER BY created_at DESC, tick_id DESC LIMIT ? OFFSET ?",
             (20, offset),
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT id, session_id, tick_id, chat_name, messages_count, new_messages_count, should_reply, skip_reason, judge_score, human_is_badcase, human_badcase_type, replies_sent_json, duration_ms, created_at FROM tick_log ORDER BY created_at DESC, tick_id DESC LIMIT ? OFFSET ?",
+            "SELECT id, session_id, tick_id, chat_name, messages_count, new_messages_count, should_reply, send_success, skip_reason, judge_score, human_is_badcase, human_badcase_type, replies_sent_json, raw_response, duration_ms, created_at FROM tick_log ORDER BY created_at DESC, tick_id DESC LIMIT ? OFFSET ?",
             (20, offset),
         ).fetchall()
     conn.close()
 
     rows_html = ""
     for r in rows:
-        status = "⏭️跳过" if r["skip_reason"] else "✅回复" if r["should_reply"] else "⏭️无消息"
+        rp_raw = r["raw_response"] or ""
+        if r["skip_reason"]:
+            status = "⏭️跳过"
+        elif r["send_success"]:
+            status = "✅已发送"
+        elif r["replies_sent_json"] and r["replies_sent_json"] not in ("[]", ""):
+            status = "⚠️未发送（有草稿）"
+        elif r["should_reply"]:
+            if rp_raw.startswith("[空回复"):
+                status = "⚠️模型空回复"
+            elif '"replies"' in rp_raw:
+                status = "⏭️决定不回复"
+            else:
+                status = "⚠️未生成回复"
+        else:
+            status = "⏭️无消息"
         llm_score = f'{r["judge_score"]:.0f}' if r['judge_score'] else "-"
         human = ""
         if r['human_is_badcase'] == 1:
@@ -214,14 +229,33 @@ def tick_detail(id: int):
 
     # 原有信息卡片
     ms = d.get("duration_ms",0) or 0
-    status = d.get("skip_reason") or ("已回复" if d.get("should_reply") else "无消息")
+    raw_response = d.get("raw_response") or ""
+    if d.get("skip_reason"):
+        status = "⏭️跳过"
+    elif d.get("send_success"):
+        status = "✅已发送"
+    elif d.get("replies_sent_json") and d.get("replies_sent_json") not in ("[]", ""):
+        status = "⚠️未发送（有草稿）"
+    elif d.get("should_reply"):
+        if raw_response.startswith("[空回复"):
+            status = "⚠️模型空回复"
+        elif '"replies"' in raw_response:
+            status = "⏭️决定不回复"
+        else:
+            status = "⚠️未生成回复"
+    else:
+        status = "⏭️无消息"
     content = f"""
     <div class="card"><b>{html.escape(d.get("session_id",""))}:#{d["tick_id"]}</b> — {html.escape(d.get("created_at",""))}</div>
     <div class="card"><b>聊天:</b> {html.escape(d.get("chat_name","?"))} {"(群)" if d.get("is_group") else "(私)"} | <b>状态:</b> {html.escape(status)} | <b>耗时:</b> {ms}ms</div>
     <div class="card"><b>消息:</b> 总{d.get("messages_count",0)}条 新{d.get("new_messages_count",0)}条 | <b>发送:</b> {"OK" if d.get("send_success") else "N/A"}</div>
     """
     # Bot 回复卡片（最终输出），按实际流程放在 Self-Refine 之后
-    bot_reply_html = f'<div class="card" style="border-left:3px solid var(--blue)"><b>🤖 Bot 回复:</b><br>{replies_display}</div>'
+    raw_response = d.get("raw_response") or ""
+    if (not replies_display or replies_display == "[]") and raw_response:
+        bot_reply_html = f'<div class="card" style="border-left:3px solid var(--blue)"><b>🤖 Bot 回复:</b><br>{replies_display}<div style="margin-top:8px;color:var(--muted);font-size:12px">原始输出摘要：<pre style="white-space:pre-wrap;font-size:10px">{html.escape(raw_response[:500])}</pre></div></div>'
+    else:
+        bot_reply_html = f'<div class="card" style="border-left:3px solid var(--blue)"><b>🤖 Bot 回复:</b><br>{replies_display}</div>'
 
     # 完整 LLM 消息流（按 message 顺序：system → user → assistant → tool → assistant(feedback) → ...）
     llm_messages_json = d.get("llm_messages_json") or "[]"
@@ -260,7 +294,7 @@ def tick_detail(id: int):
                             tc_html += f'<div style="margin:4px 0;padding:6px;background:rgba(255,255,255,.05);border-left:2px solid var(--yellow);border-radius:3px"><b style="color:var(--yellow);font-size:11px">{html.escape(tname)}</b> <span style="color:var(--muted);font-size:10px">{html.escape(str(targs)[:200])}</span></div>'
                         parts.append(f'<div style="color:var(--muted);font-size:11px;margin:4px 0">[工具调用]</div>{tc_html}')
                     if not parts:
-                        parts.append('<span style="color:var(--muted);font-size:12px">(空)</span>')
+                        parts.append('<span style="color:var(--muted);font-size:12px">(空：模型未返回 content / reasoning / tool_calls)</span>')
                     body = "\n".join(parts)
                     color = "var(--purple)"
                 elif role == "tool":

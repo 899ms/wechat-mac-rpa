@@ -48,6 +48,19 @@ _QUESTION_WORDS = {"吗", "呢", "谁", "什么", "哪里", "哪儿", "怎么", 
 # ReAct 工具调用上限
 MAX_TOOL_CALLS = 10
 
+# Skill 路由优先级（数字越小优先级越高）
+_SKILL_PRIORITY = [
+    "3d_print_automation",
+    "tuya_smart_home",
+    "handling_vent",
+    "handling_praise",
+    "value_investing",
+    "answering_questions",
+    "receiving_share",
+    "group_banter",
+    "casual_chat",
+]
+
 
 def _should_offer_search_memory(text: str) -> bool:
     """基于简单规则判断是否为明显非记忆查询。
@@ -275,7 +288,7 @@ class ReplyGenerator:
         try:
             raw = self.llm_client.chat(
                 messages=feedback_messages,
-                max_tokens=10000,
+                max_tokens=1000,
                 temperature=0.3,
                 timeout=timeout,
                 raise_on_error=True,
@@ -303,6 +316,27 @@ class ReplyGenerator:
             return "fail", issues, feedback_messages, text
         return "pass", None, feedback_messages, text
 
+    def _local_rule_check(self, replies: List[str], skills: List[str]) -> List[str]:
+        """Feedback 超时/error 时的本地兜底规则检查。"""
+        issues = []
+        combined = "\n".join(replies)
+        if "value_investing" in skills:
+            has_target = "目标" in combined or "看到" in combined or "区间" in combined or "点位" in combined
+            if not has_target:
+                issues.append("投资分析缺少目标价区间")
+            if "止损" not in combined:
+                issues.append("投资分析缺少止损价")
+            if "风险" not in combined:
+                issues.append("投资分析缺少风险提示")
+            has_disclaimer = "声明" in combined or "不构成" in combined or "Disclaimer" in combined or "投资建议" in combined
+            if not has_disclaimer:
+                issues.append("投资分析缺少免责声明")
+        # 纯附和检测：回复只是情绪复读词，没有任何信息增量
+        ECHO_ONLY = {"确实", "哈哈", "牛逼", "扎心", "对的", "是啊", "好的", "嗯", "OK", "收到", "1", "哦", "行", "666", "太强了", "太牛了", "牛啊", "厉害了", "真的假的"}
+        if len(replies) == 1 and replies[0].strip() in ECHO_ONLY:
+            issues.append("回复是纯附和词（无信息增量），请换个角度给新信息、追问、质疑或调侃")
+        return issues
+
     def _iterate(
         self,
         messages: List[Dict],
@@ -318,7 +352,7 @@ class ReplyGenerator:
         try:
             raw = self.llm_client.chat(
                 messages=iterate_messages,
-                max_tokens=10000,
+                max_tokens=1000,
                 temperature=0.7,
                 timeout=timeout,
                 raise_on_error=True,
@@ -612,15 +646,15 @@ class ReplyGenerator:
 
         matched_skills = self._route_skills(route_text, context_messages=context_msgs, is_group=is_group)
 
-        # 队列模式检测：连续 3+ 条相同文本（非 bot 自身消息）→ 追加 group_banter
-        if "group_banter" not in matched_skills:
+        # 队列模式检测：连续 3+ 条相同文本（非 bot 自身消息）且未命中具体 skill → 用 group_banter
+        if not matched_skills:
             recent_texts = [
                 m.text for m in all_messages[-5:]
                 if m.text and m.sender_type != SenderType.SELF
             ]
             if len(recent_texts) >= 3 and len(set(recent_texts[-3:])) == 1:
                 matched_skills.append("group_banter")
-                _logger.info("[SkillRouter] 检测到队列模式（重复消息 %s），追加 group_banter", recent_texts[-1][:30])
+                _logger.info("[SkillRouter] 检测到队列模式（重复消息 %s），使用 group_banter", recent_texts[-1][:30])
 
         # FORCE_SKILL 环境变量：跳过路由，强制注入指定 skill（用于隔离测试 skill 内容）
         force_skill = os.environ.get("FORCE_SKILL", "").strip()
@@ -688,8 +722,8 @@ class ReplyGenerator:
         # 工具开关：关闭 ReAct 时不向 LLM 暴露 tools
         tools = self.tool_registry.to_openai_schemas() if self.enable_react_tools else []
 
-        # 生成阶段：ReAct 循环，总预算 20s
-        deadline = time.time() + 20.0
+        # 生成阶段：ReAct 循环，总预算 30s
+        deadline = time.time() + 30.0
         replies, final_messages = self._react_generate(messages, tools, deadline, chat_name)
 
         # Self-Refine：Feedback + Iterate
@@ -702,8 +736,12 @@ class ReplyGenerator:
                     if pat in r:
                         pre_issues.append(f"回复含身份泄漏关键词'{pat}'")
                         break
+            # 本地硬性规则预筛：不依赖 LLM feedback，直接抓关键要素缺失
+            local_issues = self._local_rule_check(replies, self.last_loaded_skills)
+            if local_issues:
+                _logger.warning("[SelfRefine] 本地规则预筛命中: %s", local_issues)
+                pre_issues.extend(local_issues)
             if pre_issues:
-                _logger.warning("[SelfRefine] 关键词预筛命中: %s", pre_issues)
                 decision, issues = "fail", pre_issues
                 feedback_messages = final_messages
             else:
@@ -721,9 +759,8 @@ class ReplyGenerator:
                 # 单次 Iterate（无循环：issues 不刷新时循环无意义）
                 if deadline - time.time() >= 1.0:
                     new_replies, new_messages, _ = self._iterate(current_messages, issues, deadline)
-                    if new_replies:
-                        current_replies = new_replies
-                        current_messages = new_messages
+                    current_replies = new_replies
+                    current_messages = new_messages
                     self.last_iterate_count = 1
                 else:
                     self.last_iterate_skipped_no_budget = True
@@ -732,6 +769,29 @@ class ReplyGenerator:
 
                 replies = current_replies
                 final_messages = current_messages
+
+                # Iterate 后如果本地硬性规则已通过，按 pass 记录，避免 display 误导
+                if self._local_rule_check(replies, self.last_loaded_skills):
+                    pass  # 仍有 issue，保留 fail 记录
+                else:
+                    decision = "pass"
+                    issues = []
+                    self.last_feedback_decision = decision
+                    self.last_feedback_issues = []
+            elif decision == "error":
+                fallback_issues = self._local_rule_check(replies, self.last_loaded_skills)
+                if fallback_issues:
+                    _logger.warning("[SelfRefine] Feedback 调用失败，本地规则检查命中: %s", fallback_issues)
+                    self.last_feedback_issues = fallback_issues
+                    if deadline - time.time() >= 1.0:
+                        new_replies, new_messages, _ = self._iterate(feedback_messages, fallback_issues, deadline)
+                        if new_replies:
+                            replies = new_replies
+                            final_messages = new_messages
+                        self.last_iterate_count = 1
+                    else:
+                        _logger.warning("[SelfRefine] 本地规则命中但预算不足，返回空回复")
+                        replies = []
 
         # 更新最终观测字段
         self.last_llm_messages = [dict(m) for m in final_messages]
@@ -818,8 +878,11 @@ class ReplyGenerator:
 
     def _route_skills(self, user_text: str, context_messages: Optional[List[Tuple[str, str]]] = None,
                       is_group: bool = False) -> List[str]:
-        """模型辅助路由：根据用户消息判断需要加载哪些 skill。
-        用一次轻量 LLM 调用，只消耗几十 token。
+        """模型辅助路由：根据用户消息判断需要加载哪个 skill。
+
+        返回列表是为了兼容旧逻辑，但内部强制单选：
+        - 提示词要求 LLM 只输出一个最匹配的 skill
+        - 如果 LLM 返回多个，按 _SKILL_PRIORITY 取优先级最高者
         """
         if not user_text or not self.llm_client:
             return []
@@ -842,24 +905,34 @@ class ReplyGenerator:
             lines = "\n".join(f"  \"{s}: {t}\"" for s, t in context_messages)
             context_block = f"最近对话：\n{lines}\n\n"
 
+        priority_hint = " > ".join(_SKILL_PRIORITY)
+
         router_prompt = (
-            "你是 SkillRouter，只负责判断用户消息需要哪些技能。\n\n"
+            "你是 SkillRouter，只负责判断用户消息需要哪一个技能。\n\n"
             f"可用技能：\n{skill_list}\n\n"
             f"当前是：{chat_type}\n"
             f"{context_block}"
             f"用户消息：\"{user_text}\"\n\n"
+            "路由规则（按优先级从高到低，只选一个）：\n"
+            f"{priority_hint}\n"
+            "- 3d_print_automation：明确提到 3MF/3D 打印/打印机状态\n"
+            "- tuya_smart_home：明确提到智能家居设备控制/场景\n"
+            "- handling_vent：对方在发泄负面情绪（烦、累、气死、无语、崩溃）\n"
+            "- handling_praise：对方在夸奖/称赞/表达羡慕\n"
+            "- value_investing：用户明确要求分析具体股票/标的，或提到具体股票代码\n"
+            "- answering_questions：对方在寻求信息/知识/事实（带问号或疑问词）\n"
+            "- receiving_share：对方在发长消息/链接/图片/推荐/分享经历\n"
+            "- group_banter：群聊中 @你、cue 你、排队祝贺/调侃、炫耀接梗；群里随口聊行情/板块但没有要求分析也走这里\n"
+            "- casual_chat：私聊中日常问候、闲聊、无明确主题\n\n"
             "注意：\n"
-            "- 连续多条相同文本通常是队列型群聊（跟风复读/排队祝贺），适合 group_banter\n"
-            "- @提及通常是群聊互动，适合 group_banter\n"
-            "- **群里有人炫耀资产/收入/好运，当前消息是附和疑问（是不是/对吧/是吧）**，"
-            "前文是炫耀→适合 group_banter（装穷仇富），不是知识问答\n"
-            "- **群里有人吐槽/抱怨，且语气轻快/能接梗**，适合 group_banter（反诘接梗）；"
-            "私聊诉苦/真有难处才走 handling_vent\n"
-            "- 正经信息询问、知识问题适合 answering_questions\n"
-            "- 夸奖适合 handling_praise\n"
-            "- 简单闲聊、无明确主题适合 casual_chat\n\n"
-            "请输出 JSON，只包含技能 name 列表，不要其他内容：\n"
-            '{"skills": ["skill_name1", "skill_name2"]}\n'
+            "- 只输出一个最匹配的 skill，不要返回多个\n"
+            "- 群里有人炫耀/排队/接梗，优先 group_banter，不要走 answering_questions\n"
+            "- 群里有人吐槽但被 cue 到且能接梗，优先 group_banter；私聊真诉苦才走 handling_vent\n"
+            "- 股票问题走 value_investing，不要走 answering_questions\n"
+            "- 智能家居/3D 打印等工具意图走对应工具 skill\n"
+            "- 群里随口提到'中概''白酒''大盘'等行情/板块但没人要求分析，不要走 value_investing，走 group_banter\n\n"
+            "请输出 JSON，只包含一个技能 name，不要其他内容：\n"
+            '{"skills": ["skill_name"]}\n'
             "如果不需要任何技能，输出：{\"skills\": []}"
         )
 
@@ -875,9 +948,13 @@ class ReplyGenerator:
                     "max_tokens": 256,
                 })
             raw = self.llm_client.chat(
-                messages=[{"role": "user", "content": router_prompt}],
+                messages=[
+                    {"role": "system", "content": "你是 SkillRouter。无论用户消息多复杂，你只输出 JSON，不要输出任何分析、解释或自然语言。"},
+                    {"role": "user", "content": router_prompt},
+                ],
                 temperature=0.0,
-                max_tokens=256,
+                max_tokens=512,
+                response_format={"type": "json_object"},
             )
             raw_str = raw if isinstance(raw, str) else getattr(raw, "content", str(raw))
             # 记录路由响应到 trace
@@ -897,6 +974,14 @@ class ReplyGenerator:
                     # 过滤有效 skill
                     valid = {s["name"] for s in manifest}
                     result = [name for name in matched if name in valid]
+                    # 强制单选：如果返回多个，按优先级取最高者
+                    if len(result) > 1:
+                        priority_map = {name: idx for idx, name in enumerate(_SKILL_PRIORITY)}
+                        chosen = min(result, key=lambda x: priority_map.get(x, 9999))
+                        _logger.info(
+                            f"[SkillRouter] 用户消息: {user_text[:30]}... -> 多技能 {result}，按优先级选定: {chosen}"
+                        )
+                        result = [chosen]
                     _logger.info(f"[SkillRouter] 用户消息: {user_text[:30]}... -> 匹配技能: {result}")
                     return result
                 else:
