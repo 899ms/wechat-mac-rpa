@@ -775,7 +775,6 @@ class ReplyGenerator:
                     pass  # 仍有 issue，保留 fail 记录
                 else:
                     decision = "pass"
-                    issues = []
                     self.last_feedback_decision = decision
                     self.last_feedback_issues = []
             elif decision == "error":
