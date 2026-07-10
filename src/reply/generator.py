@@ -742,10 +742,12 @@ class ReplyGenerator:
                 _logger.warning("[SelfRefine] 本地规则预筛命中: %s", local_issues)
                 pre_issues.extend(local_issues)
             if pre_issues:
-                decision, issues = "fail", pre_issues
+                decision = "fail"
+                issues = pre_issues
                 feedback_messages = final_messages
             else:
-                decision, issues, feedback_messages, _ = self._self_refine(final_messages, deadline)
+                decision, raw_issues, feedback_messages, _ = self._self_refine(final_messages, deadline)
+                issues = raw_issues or []
             self.last_self_refine_applied = True
             self.last_feedback_decision = decision
             self.last_feedback_issues = issues or []
