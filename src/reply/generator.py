@@ -7,7 +7,7 @@ import re
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.models.base import MEDIA_MESSAGE_TYPES, ChatMessage, SenderType
 from src.reply.session_memory import SessionMemory, _extract_query_key
@@ -45,6 +45,22 @@ _QUESTION_MARKS = set("?？")
 _QUESTION_WORDS = {"吗", "呢", "谁", "什么", "哪里", "哪儿", "怎么", "多少", "哪些",
                    "几点", "干嘛", "干什么", "做什么", "住哪", "在哪", "是谁", "有谁"}
 
+# ReAct 工具调用上限
+MAX_TOOL_CALLS = 10
+
+# Skill 路由优先级（数字越小优先级越高）
+_SKILL_PRIORITY = [
+    "3d_print_automation",
+    "tuya_smart_home",
+    "handling_vent",
+    "handling_praise",
+    "value_investing",
+    "answering_questions",
+    "receiving_share",
+    "group_banter",
+    "casual_chat",
+]
+
 
 def _should_offer_search_memory(text: str) -> bool:
     """基于简单规则判断是否为明显非记忆查询。
@@ -67,7 +83,7 @@ def _should_offer_search_memory(text: str) -> bool:
 
 
 class ReplyGenerator:
-    def __init__(self, llm_client=None, complex_llm_client=None, memory_engine=None,
+    def __init__(self, llm_client=None, memory_engine=None,
                  tool_registry=None,
                  judge_worker=None,
                  enable_time_awareness: bool = True,
@@ -76,7 +92,6 @@ class ReplyGenerator:
                  enable_timestamps: bool = True,
                  enable_mode_detection: Optional[bool] = None):
         self.llm_client = llm_client
-        self.complex_llm_client = complex_llm_client
         self.memory_engine = memory_engine
         self.tool_registry = tool_registry or get_registry()
         self.judge_worker = judge_worker
@@ -87,7 +102,7 @@ class ReplyGenerator:
         if enable_mode_detection is None:
             enable_mode_detection = os.environ.get("WECHAT_MODE_DETECTION", "0").lower() in ("1", "true", "yes", "on")
         self.enable_mode_detection = enable_mode_detection
-        _logger.info(f"[Hermes] ReplyGenerator init: llm_client={type(llm_client).__name__ if llm_client else None}, complex_llm_client={type(complex_llm_client).__name__ if complex_llm_client else None}")
+        _logger.info(f"[ReplyGenerator] init: llm_client={type(llm_client).__name__ if llm_client else None}")
         # 最后一次调用的 prompt/response（供 debug 使用）
         self.last_system_prompt: str = ""
         self.last_tools_context: str = ""
@@ -101,11 +116,8 @@ class ReplyGenerator:
         # Skill 加载状态（供 debug 使用）
         self.last_loaded_skills: List[str] = []
         self.last_skill_injected_content: str = ""
-        # Hermes 联调专用 debug 字段
+        # 当前使用的模型名（供 debug 使用）
         self.last_active_llm: str = ""
-        self.last_hermes_fallback_triggered: bool = False
-        self.last_hermes_messages: List[Dict] = []
-        self.last_hermes_response: str = ""
         # 传给 Judge 的完整 LLM 上下文
         self.last_llm_messages: List[Dict] = []
         # 短期记忆（跨 tick 缓存工具结果）
@@ -181,6 +193,49 @@ class ReplyGenerator:
             else:
                 _logger.info("[MemoryTool] search_memory 已注册（仅 wiki，历史索引未就绪）")
 
+        # 注册 think 工具：让模型在回复前停下来深入思考，不获取新信息
+        self.tool_registry.register(
+            name="think",
+            description=(
+                "在回复前停下来深入思考。用于需要深度推理、权衡多因素、分析意图、"
+                "检查人设一致性的场景。此工具不获取新信息，只记录你的思考过程。"
+                "在想清楚之前随时可以调用，次数不限。"
+                "注意：思考时也必须守住王芊本人身份。不能把'承认是AI/机器人/语言模型'"
+                "当作可行方向——身份锚定适用于思考过程，不只最终回复。"
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "thought": {
+                        "type": "string",
+                        "description": "你的思考内容。尽情思考，越详细越好。"
+                    }
+                },
+                "required": ["thought"],
+            },
+            func=lambda thought: "思考已记录，继续生成回复。",
+        )
+
+        # 读取 Self-Refine prompt 文件
+        _prompt_dir = Path(__file__).parent.parent.parent / "prompts"
+        self._feedback_prompt = (_prompt_dir / "feedback.md").read_text(encoding="utf-8")
+        self._iterate_prompt = (_prompt_dir / "iterate.md").read_text(encoding="utf-8")
+
+        # Self-Refine 观测字段
+        self.last_self_refine_applied: bool = False
+        self.last_feedback_decision: str = ""
+        self.last_feedback_issues: List[str] = []
+        self.last_iterate_count: int = 0
+        self.last_feedback_raw: str = ""
+        self.last_iterate_raw: str = ""
+        self.last_iterate_skipped_no_budget: bool = False
+
+        # 开关（环境变量，默认启用）
+        self.enable_react_tools = os.environ.get("ENABLE_REACT_TOOLS", "1").lower() in ("1", "true", "yes", "on")
+        self.enable_self_refine = os.environ.get("ENABLE_SELF_REFINE", "1").lower() in ("1", "true", "yes", "on")
+        if self.enable_self_refine:
+            self.enable_react_tools = True
+
     def _submit_to_judge(self, tick_id: int, replies: List[str], unreplied: List[ChatMessage], all_messages: List[ChatMessage], is_group: bool):
         """把当前 tick 的数据提交给 JudgeWorker 异步判定"""
         import json
@@ -220,146 +275,147 @@ class ReplyGenerator:
         except Exception as e:
             _logger.debug("JudgeWorker submit failed: %s", e)
 
-    def generate(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage],
-                 is_group: bool = False, tick_id: int = 0,
-                 enable_time_awareness: Optional[bool] = None,
-                 enable_reply_restraint: Optional[bool] = None,
-                 enable_unread_dedup: Optional[bool] = None,
-                 enable_timestamps: Optional[bool] = None) -> List[str]:
-        """
-        生成回复内容，返回多条回复列表（最多3条）。
-        支持多轮工具调用，但总工具时间不超过 max_tool_seconds，超时后强制生成文本回复。
-        """
-        t_generate_start = time.time()
-        if not unreplied:
-            self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
-            return []
+    def _self_refine(
+        self,
+        messages: List[Dict],
+        deadline: float,
+    ) -> Tuple[str, Optional[List[str]], List[Dict], str]:
+        """Feedback 阶段。返回 decision, issues, updated_messages, raw_text。"""
+        feedback_messages = messages + [
+            {"role": "user", "content": self._feedback_prompt}
+        ]
+        timeout = max(1.0, deadline - time.time())
+        try:
+            raw = self.llm_client.chat(
+                messages=feedback_messages,
+                max_tokens=1000,
+                temperature=0.3,
+                timeout=timeout,
+                raise_on_error=True,
+            )
+            text = raw if isinstance(raw, str) else getattr(raw, "content", str(raw))
+        except Exception as e:
+            _logger.warning("[SelfRefine] Feedback 调用失败: %s", e)
+            text = ""
+        self.last_feedback_raw = text or ""
 
-        if self.llm_client is None:
-            self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
-            return []
+        # 空回复 → 调用失败，返回 error 而非 pass（避免管理端显示"Self-Refine: pass"误导）
+        if not text or not text.strip():
+            return "error", None, feedback_messages, ""
 
-        # 重置 debug 状态
-        self.last_system_prompt = ""
-        self.last_tools_context = ""
-        self.last_user_prompt = ""
-        self.last_raw_response = ""
-        self.last_llm_calls = []
-        self.last_tool_calls = []
-        self.last_generation_trace = []
-        self.last_loaded_skills = []
-        self.last_skill_injected_content = ""
-        self.last_hermes_fallback_triggered = False
-        self.last_hermes_messages = []
-        self.last_hermes_response = ""
-        self.last_llm_messages = []
+        # 把 Feedback 阶段的 assistant 回复也追加到消息流，便于后续按顺序展示
+        feedback_messages.append({"role": "assistant", "content": text})
 
-        chat_name = unreplied[-1].chat_name if unreplied else ""
+        data = self._extract_json(text) or {}
+        if not isinstance(data, dict):
+            return "pass", None, feedback_messages, text
 
-        # 模型辅助路由：提前到 system prompt 之前，让 prompt 也能感知已加载 skill
-        last_msg = unreplied[-1]
-        route_text = last_msg.text or last_msg.image_description or ""
-        t_route_start = time.time()
-        matched_skills = self._route_skills(route_text)
-        t_route_ms = (time.time() - t_route_start) * 1000
-        self.last_loaded_skills = matched_skills
+        decision = data.get("decision", "pass")
+        issues = data.get("issues", [])
+        if decision == "fail" and isinstance(issues, list) and issues:
+            return "fail", issues, feedback_messages, text
+        return "pass", None, feedback_messages, text
 
-        # 模型选择：默认走 deepseek（带 tools），让 LLM 自己决定是否需要工具。
-        # 只有 deepseek 显式输出 use_hermes 时，才 fallback 到 hermes。
-        # 这样可以保证 search_memory 等工具在 skill 匹配时仍然可用。
-        active_llm = self.llm_client
-        active_llm_name = "deepseek"
-        is_hermes = False
-        has_hermes = self.complex_llm_client is not None
-        _logger.info(f"[Hermes] matched_skills={matched_skills}, complex_llm_available={has_hermes} → active_llm=deepseek（tools 可用）")
-        self.last_active_llm = active_llm_name
+    def _local_rule_check(self, replies: List[str], skills: List[str]) -> List[str]:
+        """Feedback 超时/error 时的本地兜底规则检查。"""
+        issues = []
+        combined = "\n".join(replies)
+        if "value_investing" in skills:
+            has_target = "目标" in combined or "看到" in combined or "区间" in combined or "点位" in combined
+            if not has_target:
+                issues.append("投资分析缺少目标价区间")
+            if "止损" not in combined:
+                issues.append("投资分析缺少止损价")
+            if "风险" not in combined:
+                issues.append("投资分析缺少风险提示")
+            has_disclaimer = "声明" in combined or "不构成" in combined or "Disclaimer" in combined or "投资建议" in combined
+            if not has_disclaimer:
+                issues.append("投资分析缺少免责声明")
+        # 纯附和检测：回复只是情绪复读词，没有任何信息增量
+        ECHO_ONLY = {"确实", "哈哈", "牛逼", "扎心", "对的", "是啊", "好的", "嗯", "OK", "收到", "1", "哦", "行", "666", "太强了", "太牛了", "牛啊", "厉害了", "真的假的"}
+        if len(replies) == 1 and replies[0].strip() in ECHO_ONLY:
+            issues.append("回复是纯附和词（无信息增量），请换个角度给新信息、追问、质疑或调侃")
+        return issues
 
-        t_sp_start = time.time()
-        system_prompt = self._system_prompt(
-            enable_reply_restraint=enable_reply_restraint,
-            unreplied=unreplied,
-            all_messages=all_messages,
-            is_group=is_group,
-        )
-        t_sp_ms = (time.time() - t_sp_start) * 1000
+    def _iterate(
+        self,
+        messages: List[Dict],
+        issues: List[str],
+        deadline: float,
+    ) -> Tuple[List[str], List[Dict], str]:
+        """Iterate 阶段。返回 replies, updated_messages, raw_text。"""
+        issues_text = "\n".join(f"- {issue}" for issue in issues)
+        iterate_messages = messages + [
+            {"role": "user", "content": f"{self._iterate_prompt}\n\n反馈问题：\n{issues_text}"}
+        ]
+        timeout = max(1.0, deadline - time.time())
+        try:
+            raw = self.llm_client.chat(
+                messages=iterate_messages,
+                max_tokens=1000,
+                temperature=0.7,
+                timeout=timeout,
+                raise_on_error=True,
+            )
+            text = raw if isinstance(raw, str) else getattr(raw, "content", str(raw))
+        except Exception as e:
+            _logger.warning("[SelfRefine] Iterate 调用失败: %s", e)
+            text = ""
+        self.last_iterate_raw = text or ""
 
-        t_tc_start = time.time()
-        tools_context = self._build_tools_context(chat_name)
-        t_tc_ms = (time.time() - t_tc_start) * 1000
+        # 把 Iterate 阶段的 assistant 回复也追加到消息流
+        iterate_messages.append({"role": "assistant", "content": text or ""})
+        replies = self._parse_replies(text)
+        return replies or [], iterate_messages, text or ""
 
-        t_up_start = time.time()
-        user_prompt = self._build_user_prompt(
-            unreplied, all_messages, is_group,
-            enable_time_awareness=enable_time_awareness,
-            enable_unread_dedup=enable_unread_dedup,
-            enable_timestamps=enable_timestamps,
-            tools_context=tools_context,
-        )
-        t_up_ms = (time.time() - t_up_start) * 1000
-
-        # Skill 兜底：明确场景未命中时，群聊默认 group_banter，私聊默认 casual_chat
-        if not matched_skills:
-            matched_skills = ["group_banter"] if is_group else ["casual_chat"]
-            _logger.info(f"[SkillRouter] 未命中明确 skill，兜底: {matched_skills}")
-
-        # Skill 注入：只有 deepseek 才注入 Bot 的 skill，Hermes 用自己的 skill
-        skill_parts = []
-        if matched_skills and not is_hermes:
-            for skill_name in matched_skills:
-                content = self._load_skill_content(skill_name)
-                if content:
-                    skill_parts.append(f"【{skill_name} 技能指南】\n{content}")
-            if skill_parts:
-                user_prompt += "\n\n" + "\n\n".join(skill_parts)
-        self.last_skill_injected_content = "\n\n".join(skill_parts) if skill_parts else ""
-
-        self.last_system_prompt = system_prompt
-        self.last_tools_context = tools_context
-        self.last_user_prompt = user_prompt
-
-        tools = self.tool_registry.to_openai_schemas()
-        # search_memory 始终暴露给 LLM，由 tool 描述和 system prompt 约束使用时机
-
+    def _react_generate(
+        self,
+        messages: List[Dict],
+        tools: List[Dict],
+        deadline: float,
+        chat_name: str = "",
+    ) -> Tuple[List[str], List[Dict]]:
+        """ReAct 生成阶段。返回 replies, final_messages。"""
         llm_calls: List[Dict] = []
         tool_calls: List[Dict] = []
         trace: List[Dict] = []
-
         max_retries = 2
-        max_tool_seconds = 25.0  # 工具调用阶段最多 25 秒
-        max_total_seconds = 600.0 if is_hermes else 60.0  # deepseek 给 60 秒，给工具调用留余量
+        tool_round_count = 0
         overall_start_time = time.time()
-
-        # 构建 messages：system（人设）+ user（上下文含缓存）
-        messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
-        messages.append({"role": "user", "content": user_prompt})
-
-        # Hermes 走精简 system prompt，不传 tools
-        if is_hermes:
-            messages[0]["content"] = self._hermes_system_prompt()
-            _logger.info("[Hermes] 使用精简 system prompt，不传 tools")
-        tool_round_count = 0  # 已执行的 tool 轮数
 
         for attempt in range(max_retries + 1):
             start_time = time.time()
-
             try:
                 while True:
+                    # 剩余时间不足，直接结束
+                    remaining = deadline - time.time()
+                    if remaining < 1.0:
+                        _logger.warning("[ReactGenerate] 剩余时间不足，结束生成")
+                        self.last_llm_calls = llm_calls
+                        self.last_tool_calls = tool_calls
+                        self.last_generation_trace.extend(trace)
+                        return [], messages
+
                     elapsed = time.time() - start_time
                     total_elapsed = time.time() - overall_start_time
-                    force_no_tools = elapsed > max_tool_seconds
 
-                    # 总时间兜底
-                    if total_elapsed > max_total_seconds:
-                        force_no_tools = True
+                    # 时间或工具轮次达到上限后强制模型输出 JSON
+                    force_no_tools = (total_elapsed > (deadline - overall_start_time) or
+                                      tool_round_count >= MAX_TOOL_CALLS)
 
-                    # 调用 LLM（matched_skills 时走 active_llm=hermes）
-                    actual_tools = None if (force_no_tools or is_hermes) else (tools if tools else None)
-                    llm_timeout = 600 if is_hermes else 30
+                    actual_tools = None if force_no_tools else (tools if tools else None)
+                    llm_timeout = max(1.0, deadline - time.time())
                     _logger.info("[LLM] attempt=%d round=%d force_no_tools=%s tools=%s timeout=%s msg_count=%d",
                                  attempt + 1, tool_round_count, force_no_tools, bool(actual_tools), llm_timeout, len(messages))
                     t_llm_start = time.time()
-                    raw = active_llm.chat(messages=messages, tools=actual_tools, max_tokens=2000, timeout=llm_timeout)
-                    self.last_thinking = getattr(active_llm, "last_thinking", "") or ""
+                    # force_no_tools 阶段强制 JSON 输出模式，避免 LLM 输出非法 JSON
+                    response_format = {"type": "json_object"} if force_no_tools else None
+                    raw = self.llm_client.chat(
+                        messages=messages, tools=actual_tools,
+                        max_tokens=10000, timeout=llm_timeout,
+                        response_format=response_format,
+                    )
+                    self.last_thinking = getattr(self.llm_client, "last_thinking", "") or ""
                     self.last_llm_messages = [dict(m) for m in messages]
                     t_llm_ms = (time.time() - t_llm_start) * 1000
                     raw_content = raw if isinstance(raw, str) else getattr(raw, "content", str(raw))
@@ -425,6 +481,8 @@ class ReplyGenerator:
                         # DeepSeek thinking mode 需要回传 reasoning_content，否则 round 1 会空返
                         if hasattr(raw, "reasoning_content") and raw.reasoning_content:
                             assistant_msg["reasoning_content"] = raw.reasoning_content
+                        elif self.last_thinking:
+                            assistant_msg["reasoning_content"] = self.last_thinking
                         messages.append(assistant_msg)
 
                         for tc in raw_tool_calls:
@@ -432,7 +490,11 @@ class ReplyGenerator:
                             tool_args = tc.function.arguments
                             _logger.info("[Tool] 执行开始: %s(%s)", tool_name, tool_args[:100] if isinstance(tool_args, str) else str(tool_args)[:100])
                             t_tool_start = time.time()
-                            if self.tool_registry.has(tool_name):
+                            if tool_name == "think":
+                                # think 工具不调用外部服务，直接返回确认
+                                result = "思考已记录，继续生成回复。"
+                                _logger.info("[Tool] think 调用: %s", tool_args[:200] if isinstance(tool_args, str) else str(tool_args)[:200])
+                            elif self.tool_registry.has(tool_name):
                                 result = self.tool_registry.get(tool_name).execute(tool_args)
                             else:
                                 result = f"工具 {tool_name} 不存在"
@@ -479,94 +541,34 @@ class ReplyGenerator:
                     # 文本回复（或强制无 tools 后的回复）
                     text = raw_content
                     self.last_raw_response = text
+                    # 把 assistant 的回复追加到消息流，便于按顺序展示
+                    assistant_msg = {"role": "assistant", "content": text or ""}
+                    if self.last_thinking:
+                        assistant_msg["reasoning_content"] = self.last_thinking
+                    messages.append(assistant_msg)
                     t_parse_start = time.time()
                     replies = self._parse_replies(text)
                     t_parse_ms = (time.time() - t_parse_start) * 1000
                     if replies:
-                        model_name = "hermes" if active_llm is self.complex_llm_client else "deepseek"
-                        t_total_ms = (time.time() - t_generate_start) * 1000
-                        _logger.info(f"[Perf][Generate] total={t_total_ms:.0f}ms "
-                              f"sp={t_sp_ms:.0f}ms tc={t_tc_ms:.0f}ms up={t_up_ms:.0f}ms "
-                              f"route={t_route_ms:.0f}ms llm={sum(c.get('elapsed',0) for c in llm_calls)*1000:.0f}ms "
-                              f"parse={t_parse_ms:.0f}ms replies={len(replies)}")
-                        _logger.info(f"[Hermes] {model_name} 直接生成 replies={len(replies)} 条")
-                        # 直接走 Hermes 时也记录 hermes debug 字段
-                        if active_llm is self.complex_llm_client:
-                            self.last_hermes_messages = [dict(m) for m in messages]
-                            self.last_hermes_response = text or ""
-                        for r in replies:
-                            self.session_memory.add_reply(chat_name, r)
+                        _logger.info("[Generate] deepseek 直接生成 replies=%d 条", len(replies))
                         self.last_llm_calls = llm_calls
                         self.last_tool_calls = tool_calls
                         self.last_generation_trace.extend(trace)
-                        self._submit_to_judge(tick_id, replies, unreplied, all_messages, is_group)
-                        return replies
-
-                    # deepseek 请求切换 hermes → 保留 tool 结果上下文，只换 system prompt
-                    if text and '"use_hermes"' in text and self.complex_llm_client is not None:
-                        _logger.info("[Hermes] deepseek 输出 use_hermes → 切 Hermes 重新生成")
-                        self.last_hermes_fallback_triggered = True
-                        # 基于当前 messages（含 tool 调用结果），替换 system prompt
-                        hermes_system = self._hermes_system_prompt()
-                        hermes_messages = [dict(m) for m in messages]
-                        if hermes_messages and hermes_messages[0].get("role") == "system":
-                            hermes_messages[0]["content"] = hermes_system
-                        else:
-                            hermes_messages.insert(0, {"role": "system", "content": hermes_system})
-
-                        self.last_generation_trace.append({
-                            "round": len(trace) // 3 + 1,
-                            "type": "hermes_fallback_request",
-                            "timestamp": time.time(),
-                            "note": "deepseek 判定需复杂推理，切 hermes 重新生成",
-                            "messages_count": len(hermes_messages),
-                        })
-                        _logger.info(f"[Hermes] 请求: messages={len(hermes_messages)} 条, 含 tool={any(m.get('role')=='tool' for m in hermes_messages)}")
-                        hermes_raw = self.complex_llm_client.chat(messages=hermes_messages, tools=None, max_tokens=2000)
-                        self.last_llm_messages = [dict(m) for m in hermes_messages]
-                        hermes_text = hermes_raw if isinstance(hermes_raw, str) else getattr(hermes_raw, "content", str(hermes_raw))
-                        _logger.info(f"[Hermes] 响应预览: {hermes_text[:100] if hermes_text else '(空)'}...")
-                        self.last_hermes_messages = hermes_messages
-                        self.last_hermes_response = hermes_text or ""
-                        self.last_generation_trace.append({
-                            "round": len(trace) // 3 + 1,
-                            "type": "hermes_fallback_response",
-                            "timestamp": time.time(),
-                            "content": hermes_text[:2000] if hermes_text else "",
-                        })
-                        hermes_replies = self._parse_replies(hermes_text)
-                        if hermes_replies:
-                            _logger.info(f"[Hermes] 生成 replies={len(hermes_replies)} 条")
-                            for r in hermes_replies:
-                                self.session_memory.add_reply(chat_name, r)
-                            self.last_llm_calls = llm_calls
-                            self.last_tool_calls = tool_calls
-                            self.last_raw_response = hermes_text
-                            self.last_generation_trace.extend(trace)
-                            self._submit_to_judge(tick_id, hermes_replies, unreplied, all_messages, is_group)
-                            return hermes_replies
-                        # hermes 也返回空 → fallback 到不回复
-                        _logger.info("[Hermes] 返回空 replies")
-                        self.last_llm_calls = llm_calls
-                        self.last_tool_calls = tool_calls
-                        self.last_generation_trace.extend(trace)
-                        self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
-                        return []
+                        return replies, messages
 
                     # LLM 明确输出了 {"replies": []} → 正确决策（不想回复），不 retry
                     if text and '"replies"' in text:
-                        _logger.info("[Hermes] LLM 输出空 replies → 正确决策不回复")
+                        _logger.info("[Generate] LLM 输出空 replies → 正确决策不回复")
                         self.last_llm_calls = llm_calls
                         self.last_tool_calls = tool_calls
                         self.last_generation_trace.extend(trace)
-                        self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
-                        return []
+                        return [], messages
 
                     # 空回复处理（LLM 返回空字符串或无效内容）
                     if force_no_tools:
                         # 禁用 tools 后返回空，可能是 LLM 还在尝试调用工具
                         # 继续外层 retry，给 LLM 一次基于已有信息直接回复的机会
-                        _logger.info("[Hermes] force_no_tools 空回复，继续 retry")
+                        _logger.info("[Generate] force_no_tools 空回复，继续 retry")
                         self.last_raw_response = f"[空回复且已禁用tools，attempt={attempt+1}]"
                         break  # 跳出 while，进入下一次 retry
 
@@ -588,12 +590,221 @@ class ReplyGenerator:
                 if attempt < max_retries:
                     time.sleep(1)
 
-        _logger.info("[Hermes] generate 最终返回空 ( exhausted retries )")
+        _logger.info("[Generate] generate 最终返回空 ( exhausted retries )")
         self.last_llm_calls = llm_calls
         self.last_tool_calls = tool_calls
         self.last_generation_trace.extend(trace)
-        self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
-        return []
+        return [], messages
+
+    def generate(self, unreplied: List[ChatMessage], all_messages: List[ChatMessage],
+                 is_group: bool = False, tick_id: int = 0,
+                 enable_time_awareness: Optional[bool] = None,
+                 enable_reply_restraint: Optional[bool] = None,
+                 enable_unread_dedup: Optional[bool] = None,
+                 enable_timestamps: Optional[bool] = None) -> List[str]:
+        """
+        生成回复内容，返回多条回复列表（最多3条）。
+        支持 ReAct 多轮工具调用，总超时预算 20s；启用 Self-Refine 时生成后追加 Feedback + Iterate。
+        """
+        t_generate_start = time.time()
+        if not unreplied:
+            self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
+            return []
+
+        if self.llm_client is None:
+            self._submit_to_judge(tick_id, [], unreplied, all_messages, is_group)
+            return []
+
+        # 重置 debug 状态
+        self.last_system_prompt = ""
+        self.last_tools_context = ""
+        self.last_user_prompt = ""
+        self.last_raw_response = ""
+        self.last_llm_calls = []
+        self.last_tool_calls = []
+        self.last_generation_trace = []
+        self.last_loaded_skills = []
+        self.last_skill_injected_content = ""
+        self.last_llm_messages = []
+        self.last_self_refine_applied = False
+        self.last_feedback_decision = ""
+        self.last_feedback_issues = []
+        self.last_iterate_count = 0
+        self.last_feedback_raw = ""
+        self.last_iterate_raw = ""
+        self.last_iterate_skipped_no_budget = False
+
+        chat_name = unreplied[-1].chat_name if unreplied else ""
+
+        # 模型辅助路由：提前到 system prompt 之前，让 prompt 也能感知已加载 skill
+        last_msg = unreplied[-1]
+        route_text = last_msg.text or last_msg.image_description or ""
+        # 取最近消息作为路由上下文（含历史消息 + 同批次其它未读），帮助路由理解对话语境
+        n_unreplied = len(unreplied)
+        prior = list(all_messages[:-n_unreplied]) + list(unreplied[:-1])
+        context_msgs = [(m.sender, m.text) for m in prior if m.text][-3:]
+
+        matched_skills = self._route_skills(route_text, context_messages=context_msgs, is_group=is_group)
+
+        # 队列模式检测：连续 3+ 条相同文本（非 bot 自身消息）且未命中具体 skill → 用 group_banter
+        if not matched_skills:
+            recent_texts = [
+                m.text for m in all_messages[-5:]
+                if m.text and m.sender_type != SenderType.SELF
+            ]
+            if len(recent_texts) >= 3 and len(set(recent_texts[-3:])) == 1:
+                matched_skills.append("group_banter")
+                _logger.info("[SkillRouter] 检测到队列模式（重复消息 %s），使用 group_banter", recent_texts[-1][:30])
+
+        # FORCE_SKILL 环境变量：跳过路由，强制注入指定 skill（用于隔离测试 skill 内容）
+        force_skill = os.environ.get("FORCE_SKILL", "").strip()
+        if force_skill:
+            manifest_names = {s["name"] for s in self._load_skill_manifest()}
+            if force_skill not in manifest_names:
+                _logger.warning("[SkillRouter] FORCE_SKILL=%s 不在可用 skill 列表中，忽略", force_skill)
+            else:
+                matched_skills = [force_skill]
+                _logger.warning("[SkillRouter] FORCE_SKILL=%s，跳过路由（注意：这是调试覆写，勿留生产环境）", force_skill)
+
+        self.last_loaded_skills = matched_skills
+
+        # 模型选择：固定使用主 LLM（带 tools），让 LLM 自己决定是否需要工具。
+        _logger.info(f"[ModelSelect] matched_skills={matched_skills} → active_llm=deepseek（tools 可用）")
+        self.last_active_llm = "deepseek"
+
+        system_prompt = self._system_prompt(
+            enable_reply_restraint=enable_reply_restraint,
+            unreplied=unreplied,
+            all_messages=all_messages,
+            is_group=is_group,
+        )
+
+        tools_context = self._build_tools_context(chat_name)
+
+        user_prompt = self._build_user_prompt(
+            unreplied, all_messages, is_group,
+            enable_time_awareness=enable_time_awareness,
+            enable_unread_dedup=enable_unread_dedup,
+            enable_timestamps=enable_timestamps,
+            tools_context=tools_context,
+        )
+
+        # Skill 兜底：明确场景未命中时，群聊默认 group_banter，私聊默认 casual_chat
+        if not matched_skills:
+            matched_skills = ["group_banter"] if is_group else ["casual_chat"]
+            _logger.info(f"[SkillRouter] 未命中明确 skill，兜底: {matched_skills}")
+
+        # Skill 注入：根据路由结果注入 Bot 的 skill
+        skill_parts = []
+        if matched_skills:
+            for skill_name in matched_skills:
+                content = self._load_skill_content(skill_name)
+                if content:
+                    skill_parts.append(f"【{skill_name} 技能指南】\n{content}")
+            if skill_parts:
+                user_prompt += "\n\n" + "\n\n".join(skill_parts)
+        self.last_skill_injected_content = "\n\n".join(skill_parts) if skill_parts else ""
+
+        self.last_system_prompt = system_prompt
+        self.last_tools_context = tools_context
+
+        # 追加生成阶段格式指令
+        reply_format_path = Path(__file__).parent.parent.parent / "prompts" / "reply_format.txt"
+        if reply_format_path.exists():
+            user_prompt += "\n\n" + reply_format_path.read_text(encoding="utf-8")
+
+        self.last_user_prompt = user_prompt
+
+        # 构建 messages：system（人设）+ user（上下文含缓存）
+        messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+        messages.append({"role": "user", "content": user_prompt})
+
+        # 工具开关：关闭 ReAct 时不向 LLM 暴露 tools
+        tools = self.tool_registry.to_openai_schemas() if self.enable_react_tools else []
+
+        # 生成阶段：ReAct 循环，总预算 30s
+        deadline = time.time() + 30.0
+        replies, final_messages = self._react_generate(messages, tools, deadline, chat_name)
+
+        # Self-Refine：Feedback + Iterate
+        if self.enable_self_refine and replies and deadline - time.time() >= 1.0:
+            # 身份泄漏关键词预筛（零 LLM 成本，命中的直接走 iterate 不调 feedback）
+            IDENTITY_BREACH_PATTERNS = ["我是AI", "我是机器人", "作为AI", "语言模型", "芊小微"]
+            pre_issues = []
+            for r in replies:
+                for pat in IDENTITY_BREACH_PATTERNS:
+                    if pat in r:
+                        pre_issues.append(f"回复含身份泄漏关键词'{pat}'")
+                        break
+            # 本地硬性规则预筛：不依赖 LLM feedback，直接抓关键要素缺失
+            local_issues = self._local_rule_check(replies, self.last_loaded_skills)
+            if local_issues:
+                _logger.warning("[SelfRefine] 本地规则预筛命中: %s", local_issues)
+                pre_issues.extend(local_issues)
+            if pre_issues:
+                decision = "fail"
+                issues = pre_issues
+                feedback_messages = final_messages
+            else:
+                decision, raw_issues, feedback_messages, _ = self._self_refine(final_messages, deadline)
+                issues = raw_issues or []
+            self.last_self_refine_applied = True
+            self.last_feedback_decision = decision
+            self.last_feedback_issues = issues or []
+            # Feedback 阶段本身已经产生了一条 assistant 消息，统一用 feedback_messages 作为最终消息流
+            final_messages = feedback_messages
+
+            if decision == "fail" and issues:
+                current_replies = replies
+                current_messages = feedback_messages
+
+                # 单次 Iterate（无循环：issues 不刷新时循环无意义）
+                if deadline - time.time() >= 1.0:
+                    new_replies, new_messages, _ = self._iterate(current_messages, issues, deadline)
+                    current_replies = new_replies
+                    current_messages = new_messages
+                    self.last_iterate_count = 1
+                else:
+                    self.last_iterate_skipped_no_budget = True
+                    _logger.warning("[SelfRefine] Iterate 因预算不足跳过 (deadline=%.1fs)",
+                                    deadline - time.time())
+
+                replies = current_replies
+                final_messages = current_messages
+
+                # Iterate 后如果本地硬性规则已通过，按 pass 记录，避免 display 误导
+                if self._local_rule_check(replies, self.last_loaded_skills):
+                    pass  # 仍有 issue，保留 fail 记录
+                else:
+                    decision = "pass"
+                    self.last_feedback_decision = decision
+                    self.last_feedback_issues = []
+            elif decision == "error":
+                fallback_issues = self._local_rule_check(replies, self.last_loaded_skills)
+                if fallback_issues:
+                    _logger.warning("[SelfRefine] Feedback 调用失败，本地规则检查命中: %s", fallback_issues)
+                    self.last_feedback_issues = fallback_issues
+                    if deadline - time.time() >= 1.0:
+                        new_replies, new_messages, _ = self._iterate(feedback_messages, fallback_issues, deadline)
+                        if new_replies:
+                            replies = new_replies
+                            final_messages = new_messages
+                        self.last_iterate_count = 1
+                    else:
+                        _logger.warning("[SelfRefine] 本地规则命中但预算不足，返回空回复")
+                        replies = []
+
+        # 更新最终观测字段
+        self.last_llm_messages = [dict(m) for m in final_messages]
+        # last_raw_response 保留原始 generation 的 raw_response，self-refine 的原文单独存
+        # 在 last_feedback_raw / last_iterate_raw 中
+
+        t_total_ms = (time.time() - t_generate_start) * 1000
+        _logger.info("[Perf][Generate] total=%.0fms replies=%d self_refine=%s decision=%s iterate=%d",
+                     t_total_ms, len(replies), self.last_self_refine_applied,
+                     self.last_feedback_decision, self.last_iterate_count)
+        self._submit_to_judge(tick_id, replies, unreplied, all_messages, is_group)
+        return replies
 
     def _truncate_messages(self, messages: List[Dict]) -> List[Dict]:
         """截断 OpenAI message 数组，防止 debug JSON 过大。
@@ -626,7 +837,12 @@ class ReplyGenerator:
         if data is not None:
             replies = data.get("replies", [])
             return [str(r).strip() for r in replies if str(r).strip() not in ("收到", "好的", "嗯", "OK", "1")][:3]
-        # fallback: 按段落拆分，不再整段当一条发
+        # JSON 解析失败。如果文本含 { 或 "replies"，说明 LLM 尝试输出 JSON 但格式无效，
+        # 不做文本切分回退（防止不完整 JSON 串泄漏给用户），由上层按"不回复"处理。
+        stripped = text.strip()
+        if '{' in stripped or '"replies"' in stripped:
+            return []
+        # fallback: 按段落拆分（仅对纯文本生效，不含 JSON 特征）
         text = text.strip()
         for sep in ("\n\n", "\n"):
             parts = [p.strip().replace("\n", " ") for p in text.split(sep) if p.strip()]
@@ -661,9 +877,13 @@ class ReplyGenerator:
             return md_file.read_text(encoding="utf-8").strip()
         return ""
 
-    def _route_skills(self, user_text: str) -> List[str]:
-        """模型辅助路由：根据用户消息判断需要加载哪些 skill。
-        用一次轻量 LLM 调用，只消耗几十 token。
+    def _route_skills(self, user_text: str, context_messages: Optional[List[Tuple[str, str]]] = None,
+                      is_group: bool = False) -> List[str]:
+        """模型辅助路由：根据用户消息判断需要加载哪个 skill。
+
+        返回列表是为了兼容旧逻辑，但内部强制单选：
+        - 提示词要求 LLM 只输出一个最匹配的 skill
+        - 如果 LLM 返回多个，按 _SKILL_PRIORITY 取优先级最高者
         """
         if not user_text or not self.llm_client:
             return []
@@ -677,12 +897,43 @@ class ReplyGenerator:
             f"{i+1}. {s['name']}：{s['description']}"
             for i, s in enumerate(manifest)
         )
+
+        chat_type = "群聊" if is_group else "私聊"
+
+        # 上下文块
+        context_block = ""
+        if context_messages:
+            lines = "\n".join(f"  \"{s}: {t}\"" for s, t in context_messages)
+            context_block = f"最近对话：\n{lines}\n\n"
+
+        priority_hint = " > ".join(_SKILL_PRIORITY)
+
         router_prompt = (
-            "你是 SkillRouter，只负责判断用户消息需要哪些技能。\n\n"
+            "你是 SkillRouter，只负责判断用户消息需要哪一个技能。\n\n"
             f"可用技能：\n{skill_list}\n\n"
+            f"当前是：{chat_type}\n"
+            f"{context_block}"
             f"用户消息：\"{user_text}\"\n\n"
-            "请输出 JSON，只包含技能 name 列表，不要其他内容：\n"
-            '{"skills": ["skill_name1", "skill_name2"]}\n'
+            "路由规则（按优先级从高到低，只选一个）：\n"
+            f"{priority_hint}\n"
+            "- 3d_print_automation：明确提到 3MF/3D 打印/打印机状态\n"
+            "- tuya_smart_home：明确提到智能家居设备控制/场景\n"
+            "- handling_vent：对方在发泄负面情绪（烦、累、气死、无语、崩溃）\n"
+            "- handling_praise：对方在夸奖/称赞/表达羡慕\n"
+            "- value_investing：用户明确要求分析具体股票/标的，或提到具体股票代码\n"
+            "- answering_questions：对方在寻求信息/知识/事实（带问号或疑问词）\n"
+            "- receiving_share：对方在发长消息/链接/图片/推荐/分享经历\n"
+            "- group_banter：群聊中 @你、cue 你、排队祝贺/调侃、炫耀接梗；群里随口聊行情/板块但没有要求分析也走这里\n"
+            "- casual_chat：私聊中日常问候、闲聊、无明确主题\n\n"
+            "注意：\n"
+            "- 只输出一个最匹配的 skill，不要返回多个\n"
+            "- 群里有人炫耀/排队/接梗，优先 group_banter，不要走 answering_questions\n"
+            "- 群里有人吐槽但被 cue 到且能接梗，优先 group_banter；私聊真诉苦才走 handling_vent\n"
+            "- 股票问题走 value_investing，不要走 answering_questions\n"
+            "- 智能家居/3D 打印等工具意图走对应工具 skill\n"
+            "- 群里随口提到'中概''白酒''大盘'等行情/板块但没人要求分析，不要走 value_investing，走 group_banter\n\n"
+            "请输出 JSON，只包含一个技能 name，不要其他内容：\n"
+            '{"skills": ["skill_name"]}\n'
             "如果不需要任何技能，输出：{\"skills\": []}"
         )
 
@@ -698,9 +949,13 @@ class ReplyGenerator:
                     "max_tokens": 256,
                 })
             raw = self.llm_client.chat(
-                messages=[{"role": "user", "content": router_prompt}],
+                messages=[
+                    {"role": "system", "content": "你是 SkillRouter。无论用户消息多复杂，你只输出 JSON，不要输出任何分析、解释或自然语言。"},
+                    {"role": "user", "content": router_prompt},
+                ],
                 temperature=0.0,
-                max_tokens=256,
+                max_tokens=512,
+                response_format={"type": "json_object"},
             )
             raw_str = raw if isinstance(raw, str) else getattr(raw, "content", str(raw))
             # 记录路由响应到 trace
@@ -720,6 +975,14 @@ class ReplyGenerator:
                     # 过滤有效 skill
                     valid = {s["name"] for s in manifest}
                     result = [name for name in matched if name in valid]
+                    # 强制单选：如果返回多个，按优先级取最高者
+                    if len(result) > 1:
+                        priority_map = {name: idx for idx, name in enumerate(_SKILL_PRIORITY)}
+                        chosen = min(result, key=lambda x: priority_map.get(x, 9999))
+                        _logger.info(
+                            f"[SkillRouter] 用户消息: {user_text[:30]}... -> 多技能 {result}，按优先级选定: {chosen}"
+                        )
+                        result = [chosen]
                     _logger.info(f"[SkillRouter] 用户消息: {user_text[:30]}... -> 匹配技能: {result}")
                     return result
                 else:
@@ -780,32 +1043,6 @@ class ReplyGenerator:
         if parts:
             return "\n可用技能（系统会根据对话内容自动下发详细框架）：\n" + "\n".join(parts) + "\n"
         return ""
-
-    def _hermes_system_prompt(self) -> str:
-        """hermes 专用 system prompt：不含 tool 列表，只保留风格+格式。"""
-        return (
-            "核心人设与风格\n"
-            "你没有固定人设。参照对方的说话风格自然融入对话。\n"
-            '风格：casual，不用"您"，略带傲娇，适当幽默反转。\n'
-            '口头禅：对方炫富/晒成就时可用"羡慕你们这些有钱人"、"被你装到了"等。\n'
-            "不要重复自己之前说过的梗，每次回复都是新的。\n"
-            "\n"
-            "你可以使用 skills_list 查看可用技能，用 skill_view 加载需要的技能。"
-            "遇到专业领域的问题，先加载对应 skill 再回答。"
-            "回复开头请用【Skill: xxx】标注使用了哪些 skill。"
-            "\n\n"
-            "输出格式\n"
-            "直接输出 JSON（不要 markdown 代码块）：\n"
-            '{"replies": ["回复内容1", "回复内容2"]}\n'
-            "replies 数组包含 0-5 条，不需要回复时为空数组 []。\n"
-            "绝对不要输出思考过程。\n"
-            "\n"
-            "规则\n"
-            "1. 每条回复简洁自然，不超过300字\n"
-            "2. 不懂、不确定的话题，输出空 replies []\n"
-            "3. 禁止敷衍词：收到、好的、嗯、OK、1\n"
-            "4. 参照对方语气回复，不要延续自己的风格\n"
-        )
 
     def _system_prompt(self, enable_reply_restraint: Optional[bool] = None,
                        unreplied: Optional[List[ChatMessage]] = None,

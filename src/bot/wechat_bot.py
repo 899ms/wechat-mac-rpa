@@ -42,7 +42,7 @@ def _try_create_openclaw_client():
 
 class WeChatBot:
     def __init__(self, profile=None, on_message: Optional[Callable] = None, llm_client=None,
-                 complex_llm_client=None, debug_mode: bool = False, use_openclaw: bool = True, perception=None,
+                 debug_mode: bool = False, use_openclaw: bool = True, perception=None,
                  enable_chat_switch: bool = True):
         # 先初始化 logger，后续各步骤都可能需要记录日志
         self.logger: BotLogger = get_logger()
@@ -82,7 +82,6 @@ class WeChatBot:
             self.logger.info("JudgeWorker 已禁用（ENABLE_JUDGE_WORKER 未设置），跳过 badcase 审计以节省 deepseek token")
         self.generator = ReplyGenerator(
             llm_client=actual_llm,
-            complex_llm_client=complex_llm_client,
             memory_engine=self.memory_engine,
             tool_registry=registry,
             judge_worker=judge_worker,
@@ -442,13 +441,42 @@ class WeChatBot:
                         data.append(d)
                     return _json.dumps(data, ensure_ascii=False, default=str)
 
+                # 序列化 LLM 完整消息流（含 system/user/assistant/tool/feedback/iterate）
+                def _serialize_llm_messages(msgs):
+                    data = []
+                    for m in msgs:
+                        d = dict(m)
+                        # 截断单条消息内容，避免单 tick 存储过大
+                        for key in ("content", "reasoning_content"):
+                            val = d.get(key)
+                            if isinstance(val, str) and len(val) > 12000:
+                                d[key] = val[:12000] + "\n\n... [truncated]"
+                        # tool_calls 参数可能很长，也做截断
+                        if d.get("tool_calls"):
+                            d["tool_calls"] = [
+                                {
+                                    "id": tc.get("id") or tc.get("tool_call_id"),
+                                    "type": tc.get("type", "function"),
+                                    "function": {
+                                        "name": tc.get("function", {}).get("name") if isinstance(tc.get("function"), dict) else tc.get("tool_name"),
+                                        "arguments": (tc.get("function", {}).get("arguments") if isinstance(tc.get("function"), dict) else tc.get("arguments", ""))[:2000],
+                                    },
+                                }
+                                for tc in d["tool_calls"]
+                            ]
+                        data.append(d)
+                    return _json.dumps(data, ensure_ascii=False, default=str)
+
                 conn.execute("""INSERT INTO tick_log
                     (session_id, tick_id, chat_name, is_group,
                      messages_count, new_messages_count,
                      system_prompt, user_prompt, raw_response, tool_calls_json, tool_results_json,
                      session_input_messages_json, session_output_unreplied_json,
-                     should_reply, replies_sent_json, screenshot_path)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                     should_reply, replies_sent_json, screenshot_path,
+                     self_refine_applied, feedback_decision, feedback_issues, iterate_count,
+                     react_round_count, think_tool_called,
+                     feedback_raw_response, iterate_raw_response, llm_messages_json)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
                     self.session_id,
                     tick_id, chat_name, 1 if is_group else 0,
                     len(all_messages) if all_messages else 0,
@@ -463,6 +491,15 @@ class WeChatBot:
                     1,
                     _json.dumps(replies, ensure_ascii=False),
                     result.screenshot_path or '',
+                    1 if getattr(self.generator, 'last_self_refine_applied', False) else 0,
+                    getattr(self.generator, 'last_feedback_decision', '') or '',
+                    _json.dumps(getattr(self.generator, 'last_feedback_issues', []) or [], ensure_ascii=False),
+                    getattr(self.generator, 'last_iterate_count', 0) or 0,
+                    len(getattr(self.generator, 'last_tool_calls', []) or []),
+                    1 if any(tc.get('tool_name') == 'think' for tc in getattr(self.generator, 'last_tool_calls', []) or []) else 0,
+                    getattr(self.generator, 'last_feedback_raw', '') or '',
+                    getattr(self.generator, 'last_iterate_raw', '') or '',
+                    _serialize_llm_messages(getattr(self.generator, 'last_llm_messages', []) or []),
                 ))
                 conn.commit()
             except Exception as e:
@@ -490,9 +527,6 @@ class WeChatBot:
                     loaded_skills=getattr(self.generator, 'last_loaded_skills', []),
                     skill_injected_content=getattr(self.generator, 'last_skill_injected_content', ''),
                     active_llm=getattr(self.generator, 'last_active_llm', ''),
-                    hermes_fallback_triggered=getattr(self.generator, 'last_hermes_fallback_triggered', False),
-                    hermes_messages=getattr(self.generator, 'last_hermes_messages', []),
-                    hermes_response=getattr(self.generator, 'last_hermes_response', ''),
                 )
             self.debug_logger.log_bot_decision(
                 chat_name=chat_name,
@@ -563,12 +597,19 @@ class WeChatBot:
                 if i < len(replies) - 1:
                     time.sleep(1.5)
 
-            # 只在发送成功或静默跳过时标记 to_reply 为已回复。
+            # 只在发送成功或静默跳过时标记本轮 unreplied 为已处理。
             # 真实发送失败不 mark_replied，否则对方消息被永久跳过。
             # 静默跳过 mark_replied：本就不打算发，不卡循环让 bot 能轮到其他聊天。
+            # 注意：这里标记的是本轮所有 unreplied（不只是 to_reply），
+            # 因为 bot 已经看过并决策过，不需要反复处理。
             if not send_failed:
-                for msg in to_reply:
-                    self.global_store.mark_replied(chat_name, msg, reply_text)
+                to_reply_set = set(id(m) for m in to_reply)
+                for msg in unreplied:
+                    # 实际回复的消息用真实 reply_text，选择不回复的消息用空字符串标记为已处理
+                    self.global_store.mark_replied(
+                        chat_name, msg,
+                        reply_text if id(msg) in to_reply_set else ""
+                    )
                 if send_skipped:
                     self.logger.info("[Bot] 静默跳过已 mark_replied，下轮不再重试 %s", chat_name)
             else:
