@@ -9,6 +9,8 @@
 ![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
 ![macOS](https://img.shields.io/badge/macOS-12+-000000?logo=apple)
 
+**中文** | [English](README_EN.md)
+
 让 AI 像人一样"看"着微信界面，自动回复消息。**不碰协议，不读数据库，不注入代码**——微信更新 UI 也不影响运行。
 
 基于**多模态视觉感知**与**LLM Agent**的 macOS 微信自动化框架。不是协议逆向，不是 Hook，不碰微信数据库——我们把微信当作纯黑盒 GUI 应用，用计算机视觉读取界面，用大语言模型理解对话，用系统级自动化操作界面。微信更新 UI 只是换了一套视觉输入，不需要追着协议跑。
@@ -192,7 +194,7 @@ Prompt = 工作记忆（最近对话原文） + 会话记忆（人物 / 关系 /
 **索引构建**
 
 ```bash
-# 首次全量构建（约 1 小时，78 万条）
+# 首次全量构建（约 1 小时）
 python3 scripts/update_history_index.py
 
 # 后续单条增量（管理工具）
@@ -525,7 +527,7 @@ erDiagram
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=wq19901103wq/wechat-mac-rpa&type=Date)](https://star-history.com/#wq19901103wq/wechat-mac-rpa&Date)
+![Star History](https://raw.githubusercontent.com/wq19901103wq/wechat-mac-rpa/star-tracker-data/charts/star-history.svg)
 
 ---
 

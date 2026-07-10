@@ -61,8 +61,23 @@ src/tests/fixtures/judge_quality/cache/
 src/tests/fixtures/judge_quality_v2/cache/
 src/tests/fixtures/reply_stability/cache/
 
+# 含真实个人数据的 fixtures（已清理，禁止重新添加）
+tests_integration/fixtures/
+src/tests/fixtures/unread_false_positive/
+src/tests/fixtures/unread_badge/
+src/tests/fixtures/reply_quality/
+src/tests/fixtures/tool_decision/
+
+# 含真实个人数据的测试代码（本地保留，禁止提交）
+src/tests/test_chat_list_unread.py
+src/tests/test_chat_list_unread_integration.py
+src/tests/test_*_benchmark.py
+tests_integration/test_full_pipeline_real_screenshots.py
+src/tests/test_memory_search_regression.py
+
 # 内部提示词与纪律守则
 AGENTS.md
 prompts/
+!prompts/persona.md.example
 backups/
 bandit-report.json
