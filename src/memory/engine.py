@@ -221,6 +221,7 @@ class MemoryEngine:
         # 异步更新队列
         self._update_queue: List[dict] = []
         self._queue_lock = threading.Lock()
+        self._queue_condition = threading.Condition(self._queue_lock)
         self._aliases_lock = threading.Lock()
         self._worker_thread: Optional[threading.Thread] = None
         self._shutdown = False
@@ -372,7 +373,7 @@ class MemoryEngine:
             _logger.warning(f"非法用户名，跳过 wiki 更新: {user_name}")
             return
         resolved = self._resolve_alias(user_name)
-        with self._queue_lock:
+        with self._queue_condition:
             self._update_queue.append({
                 "type": "user",
                 "user_name": resolved,  # 用主用户名更新
@@ -381,6 +382,7 @@ class MemoryEngine:
                 "bot_replies": bot_replies,
                 "timestamp": time.time(),
             })
+            self._queue_condition.notify()
 
     def update_group_wiki(self, group_name: str, chat_name: str,
                           messages: List, bot_replies: List[str]) -> None:
@@ -394,7 +396,7 @@ class MemoryEngine:
         if any(p.search(group_name) for p in _AD_GROUP_PATTERNS):
             _logger.debug("广告群跳过 wiki 生成: %s", group_name)
             return
-        with self._queue_lock:
+        with self._queue_condition:
             self._update_queue.append({
                 "type": "group",
                 "group_name": group_name,
@@ -403,12 +405,15 @@ class MemoryEngine:
                 "bot_replies": bot_replies,
                 "timestamp": time.time(),
             })
+            self._queue_condition.notify()
 
     def shutdown(self) -> None:
         """关闭 worker 线程，等待队列清空。"""
-        self._shutdown = True
+        with self._queue_condition:
+            self._shutdown = True
+            self._queue_condition.notify_all()
         if self._worker_thread and self._worker_thread.is_alive():
-            self._worker_thread.join(timeout=10)
+            self._worker_thread.join()
 
     # ── 内部方法 ──
 
@@ -1359,19 +1364,26 @@ class MemoryEngine:
     def _start_worker(self) -> None:
         """启动后台 worker 线程，定期处理更新队列。"""
         def _worker():
-            while not self._shutdown:
-                time.sleep(5)
+            while True:
                 batch = []
-                with self._queue_lock:
-                    if len(self._update_queue) >= 3:
+                with self._queue_condition:
+                    if self._shutdown:
+                        batch = self._update_queue[:]
+                        self._update_queue.clear()
+                        if not batch:
+                            return
+                    elif len(self._update_queue) >= 3:
                         batch = self._update_queue[:3]
-                        self._update_queue = self._update_queue[3:]
+                        del self._update_queue[:3]
                     elif self._update_queue:
                         now = time.time()
                         cutoff = [i for i, t in enumerate(self._update_queue) if now - t["timestamp"] > 300]
                         if cutoff:
                             batch = self._update_queue[:cutoff[-1] + 1]
-                            self._update_queue = self._update_queue[len(batch):]
+                            del self._update_queue[:len(batch)]
+                    if not batch:
+                        self._queue_condition.wait(timeout=5)
+                        continue
                 for task in batch:
                     try:
                         self._do_update(task)

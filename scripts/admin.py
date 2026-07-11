@@ -131,24 +131,39 @@ def tick_list(page: int = Query(1), filter: str = Query("all")):
     offset = (page - 1) * 20
     if filter == "skipped":
         rows = conn.execute(
-            "SELECT id, session_id, tick_id, chat_name, messages_count, new_messages_count, should_reply, skip_reason, judge_score, human_is_badcase, human_badcase_type, replies_sent_json, duration_ms, created_at FROM tick_log WHERE skip_reason IS NOT NULL ORDER BY created_at DESC, tick_id DESC LIMIT ? OFFSET ?",
+            "SELECT id, session_id, tick_id, chat_name, messages_count, new_messages_count, should_reply, send_success, skip_reason, judge_score, human_is_badcase, human_badcase_type, replies_sent_json, raw_response, duration_ms, created_at FROM tick_log WHERE skip_reason IS NOT NULL ORDER BY created_at DESC, tick_id DESC LIMIT ? OFFSET ?",
             (20, offset),
         ).fetchall()
     elif filter == "replied":
         rows = conn.execute(
-            "SELECT id, session_id, tick_id, chat_name, messages_count, new_messages_count, should_reply, skip_reason, judge_score, human_is_badcase, human_badcase_type, replies_sent_json, duration_ms, created_at FROM tick_log WHERE should_reply=1 ORDER BY created_at DESC, tick_id DESC LIMIT ? OFFSET ?",
+            "SELECT id, session_id, tick_id, chat_name, messages_count, new_messages_count, should_reply, send_success, skip_reason, judge_score, human_is_badcase, human_badcase_type, replies_sent_json, raw_response, duration_ms, created_at FROM tick_log WHERE should_reply=1 ORDER BY created_at DESC, tick_id DESC LIMIT ? OFFSET ?",
             (20, offset),
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT id, session_id, tick_id, chat_name, messages_count, new_messages_count, should_reply, skip_reason, judge_score, human_is_badcase, human_badcase_type, replies_sent_json, duration_ms, created_at FROM tick_log ORDER BY created_at DESC, tick_id DESC LIMIT ? OFFSET ?",
+            "SELECT id, session_id, tick_id, chat_name, messages_count, new_messages_count, should_reply, send_success, skip_reason, judge_score, human_is_badcase, human_badcase_type, replies_sent_json, raw_response, duration_ms, created_at FROM tick_log ORDER BY created_at DESC, tick_id DESC LIMIT ? OFFSET ?",
             (20, offset),
         ).fetchall()
     conn.close()
 
     rows_html = ""
     for r in rows:
-        status = "⏭️跳过" if r["skip_reason"] else "✅回复" if r["should_reply"] else "⏭️无消息"
+        rp_raw = r["raw_response"] or ""
+        if r["skip_reason"]:
+            status = "⏭️跳过"
+        elif r["send_success"]:
+            status = "✅已发送"
+        elif r["replies_sent_json"] and r["replies_sent_json"] not in ("[]", ""):
+            status = "⚠️未发送（有草稿）"
+        elif r["should_reply"]:
+            if rp_raw.startswith("[空回复"):
+                status = "⚠️模型空回复"
+            elif '"replies"' in rp_raw:
+                status = "⏭️决定不回复"
+            else:
+                status = "⚠️未生成回复"
+        else:
+            status = "⏭️无消息"
         llm_score = f'{r["judge_score"]:.0f}' if r['judge_score'] else "-"
         human = ""
         if r['human_is_badcase'] == 1:
@@ -214,51 +229,91 @@ def tick_detail(id: int):
 
     # 原有信息卡片
     ms = d.get("duration_ms",0) or 0
-    status = d.get("skip_reason") or ("已回复" if d.get("should_reply") else "无消息")
+    raw_response = d.get("raw_response") or ""
+    if d.get("skip_reason"):
+        status = "⏭️跳过"
+    elif d.get("send_success"):
+        status = "✅已发送"
+    elif d.get("replies_sent_json") and d.get("replies_sent_json") not in ("[]", ""):
+        status = "⚠️未发送（有草稿）"
+    elif d.get("should_reply"):
+        if raw_response.startswith("[空回复"):
+            status = "⚠️模型空回复"
+        elif '"replies"' in raw_response:
+            status = "⏭️决定不回复"
+        else:
+            status = "⚠️未生成回复"
+    else:
+        status = "⏭️无消息"
     content = f"""
     <div class="card"><b>{html.escape(d.get("session_id",""))}:#{d["tick_id"]}</b> — {html.escape(d.get("created_at",""))}</div>
     <div class="card"><b>聊天:</b> {html.escape(d.get("chat_name","?"))} {"(群)" if d.get("is_group") else "(私)"} | <b>状态:</b> {html.escape(status)} | <b>耗时:</b> {ms}ms</div>
     <div class="card"><b>消息:</b> 总{d.get("messages_count",0)}条 新{d.get("new_messages_count",0)}条 | <b>发送:</b> {"OK" if d.get("send_success") else "N/A"}</div>
-    <div class="card"><b>Bot 回复:</b><br>{replies_display}</div>
-    <div class="card" style="border-left:3px solid var(--blue)"><b>📝 System Prompt ({len(sp)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{html.escape(sp)}</pre></div>
-    <div class="card" style="border-left:3px solid var(--green)"><b>📝 User Prompt ({len(up)}字)</b><pre style="font-size:10px;white-space:pre-wrap">{html.escape(up)}</pre></div>
-    <div class="card" style="border-left:3px solid var(--muted)"><b>📝 Raw Response</b><pre style="font-size:10px;white-space:pre-wrap">{html.escape(raw)}</pre></div>
     """
-    # 工具调用 + 结果（合并 tool_calls_json 和 tool_results_json）
+    # Bot 回复卡片（最终输出），按实际流程放在 Self-Refine 之后
+    raw_response = d.get("raw_response") or ""
+    if (not replies_display or replies_display == "[]") and raw_response:
+        bot_reply_html = f'<div class="card" style="border-left:3px solid var(--blue)"><b>🤖 Bot 回复:</b><br>{replies_display}<div style="margin-top:8px;color:var(--muted);font-size:12px">原始输出摘要：<pre style="white-space:pre-wrap;font-size:10px">{html.escape(raw_response[:500])}</pre></div></div>'
+    else:
+        bot_reply_html = f'<div class="card" style="border-left:3px solid var(--blue)"><b>🤖 Bot 回复:</b><br>{replies_display}</div>'
+
+    # 完整 LLM 消息流（按 message 顺序：system → user → assistant → tool → assistant(feedback) → ...）
+    llm_messages_json = d.get("llm_messages_json") or "[]"
+    llm_flow_html = ""
     try:
-        import json as _j3
-        tc_list = _j3.loads(tools) if tools else []
-        tr_list = _j3.loads(tool_results) if tool_results else []
-        # 合并：优先用 tool_results_json 的完整结果，没有的话 fallback 到 result_preview
-        all_tools = []
-        seen = set()
-        for tr in tr_list:
-            name = tr.get("tool", "?")
-            seen.add(name)
-            all_tools.append({"tool_name": name, "arguments": tr.get("args", ""), "result_preview": tr.get("result", "")})
-        for t in tc_list:
-            name = t.get('tool_name', '?')
-            if name not in seen:
-                all_tools.append(t)  # 保持原始 result_preview（500字）
-        if all_tools:
-            tools_html = ""
-            for t in all_tools:
-                tname = t.get('tool_name', '?')
-                targs = t.get('arguments', '') or ''
-                tresult = t.get('result_preview', '') or ''
-                # Parse args if JSON string
-                try:
-                    args_obj = _j3.loads(targs) if isinstance(targs, str) else targs
-                    targs = ' '.join(f'{k}={v}' for k,v in (args_obj.items() if isinstance(args_obj, dict) else []))
-                except Exception as e:
-                    _logger.debug("解析工具参数失败: %s", e)
-                tools_html += f"""<div style="margin:8px 0;padding:10px;background:rgba(255,255,255,.03);border-left:3px solid var(--yellow);border-radius:4px">
-                  <div style="font-size:12px;margin-bottom:4px"><b style="color:var(--yellow)">{html.escape(tname)}</b> <span style="color:var(--muted);font-size:10px">{html.escape(targs)}</span></div>
-                  <pre style="font-size:11px;max-height:250px;overflow:auto;white-space:pre-wrap;background:rgba(0,0,0,.3);padding:8px;border-radius:4px;margin:0">{html.escape(tresult)}</pre>
-                </div>"""
-            content += f"""<div class="card" style="border-left:3px solid var(--yellow)"><b>🔧 工具调用 & 结果 ({len(all_tools)}项)</b>{tools_html}</div>"""
+        msgs = _json.loads(llm_messages_json) if llm_messages_json else []
+        if msgs:
+            flow_items = []
+            for idx, m in enumerate(msgs, 1):
+                role = m.get("role", "?")
+                msg_content = m.get("content") or ""
+                reasoning = m.get("reasoning_content") or ""
+                tool_calls = m.get("tool_calls") or []
+                tool_call_id = m.get("tool_call_id") or ""
+                if role == "system":
+                    title = f"#{idx} system"
+                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content)}</pre>'
+                    color = "var(--blue)"
+                elif role == "user":
+                    title = f"#{idx} user"
+                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content)}</pre>'
+                    color = "var(--green)"
+                elif role == "assistant":
+                    title = f"#{idx} assistant"
+                    parts = []
+                    if reasoning:
+                        parts.append(f'<div style="color:var(--muted);font-size:11px;margin-bottom:4px">[思考过程]</div><pre style="font-size:10px;white-space:pre-wrap;background:rgba(0,0,0,.15);padding:6px;border-radius:4px">{html.escape(reasoning)}</pre>')
+                    if msg_content:
+                        parts.append(f'<div style="color:var(--muted);font-size:11px;margin:4px 0">[回复]</div><pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content)}</pre>')
+                    if tool_calls:
+                        tc_html = ""
+                        for tc in tool_calls:
+                            fn = tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}
+                            tname = fn.get("name") or tc.get("tool_name") or "?"
+                            targs = fn.get("arguments") or tc.get("arguments") or ""
+                            tc_html += f'<div style="margin:4px 0;padding:6px;background:rgba(255,255,255,.05);border-left:2px solid var(--yellow);border-radius:3px"><b style="color:var(--yellow);font-size:11px">{html.escape(tname)}</b> <span style="color:var(--muted);font-size:10px">{html.escape(str(targs)[:200])}</span></div>'
+                        parts.append(f'<div style="color:var(--muted);font-size:11px;margin:4px 0">[工具调用]</div>{tc_html}')
+                    if not parts:
+                        parts.append('<span style="color:var(--muted);font-size:12px">(空：模型未返回 content / reasoning / tool_calls)</span>')
+                    body = "\n".join(parts)
+                    color = "var(--purple)"
+                elif role == "tool":
+                    title = f"#{idx} tool ({html.escape(tool_call_id)})"
+                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(msg_content)}</pre>'
+                    color = "var(--yellow)"
+                else:
+                    title = f"#{idx} {html.escape(role)}"
+                    body = f'<pre style="font-size:10px;white-space:pre-wrap">{html.escape(str(m)[:2000])}</pre>'
+                    color = "var(--muted)"
+                flow_items.append(f'<div style="margin:8px 0;padding:10px;border-left:3px solid {color};background:rgba(255,255,255,.03);border-radius:4px"><div style="font-size:12px;font-weight:bold;margin-bottom:4px">{title}</div>{body}</div>')
+            llm_flow_html = f'<div class="card" style="border-left:3px solid var(--purple)"><b>🧬 LLM 完整消息流（按 message 顺序）</b>{"".join(flow_items)}</div>'
     except Exception as e:
-        _logger.warning("渲染工具调用失败: %s", e)
+        _logger.warning("渲染 LLM 消息流失败: %s", e)
+    content += llm_flow_html
+
+    # Bot 最终回复（作为消息流之后的摘要）
+    content += bot_reply_html
+
     # === 新增：Judge 评分 ===
     judge_dims = ""
     if d.get("judge_dimensions_json"):

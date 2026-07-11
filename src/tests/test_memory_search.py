@@ -369,6 +369,21 @@ class TestLintMemory:
         assert engine._update_queue == []
 
 
+def test_shutdown_drains_pending_updates(tmp_path):
+    """退出时即使队列不足批量阈值，也必须处理完已有任务。"""
+    engine = MemoryEngine(llm_client=object())
+    engine.wiki_dir = tmp_path
+    processed = []
+    engine._do_update = processed.append
+
+    engine.update_user_wiki("测试用户", "测试会话", [], [])
+    engine.shutdown()
+
+    assert len(processed) == 1
+    assert processed[0]["user_name"] == "测试用户"
+    assert engine._update_queue == []
+
+
 class TestLLMRerank:
     """LLM rerank：BM25 候选用 LLM 按语义相关性重排 + 降级。"""
 

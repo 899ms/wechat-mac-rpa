@@ -12,7 +12,10 @@ from src.utils.qwen_client import QwenClient
 
 class TestQwenClientInit:
     def test_dashscope_default(self):
-        with patch.dict(os.environ, {"DASHSCOPE_API_KEY": "test-key"}, clear=True):
+        with patch.dict(os.environ, {
+            "DEEPSEEK_API_KEY": "test-key",
+            "LLM_BASE_URL": "https://dashscope.aliyuncs.com/v1",
+        }, clear=True):
             client = QwenClient()
             assert client.model == "deepseek-v4-flash"
             assert not client.is_deepseek_official
@@ -43,7 +46,7 @@ class TestQwenClientChat:
         mock_response.choices = [MagicMock(message=MagicMock(content="hello", tool_calls=None))]
         mock_client.chat.completions.create.return_value = mock_response
 
-        with patch.dict(os.environ, {"DASHSCOPE_API_KEY": "key"}, clear=True):
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "key"}, clear=True):
             client = QwenClient()
             result = client.chat(messages=[{"role": "user", "content": "hi"}], temperature=0.3, max_tokens=500)
             assert result == "hello"
@@ -61,7 +64,7 @@ class TestQwenClientChat:
         mock_response.choices = [MagicMock(message=mock_msg)]
         mock_client.chat.completions.create.return_value = mock_response
 
-        with patch.dict(os.environ, {"DASHSCOPE_API_KEY": "key"}, clear=True):
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "key"}, clear=True):
             client = QwenClient()
             result = client.chat(messages=[{"role": "user", "content": "hi"}], tools=[{"type": "function"}])
             assert result == mock_msg
@@ -72,10 +75,22 @@ class TestQwenClientChat:
         mock_openai_cls.return_value = mock_client
         mock_client.chat.completions.create.side_effect = Exception("API Error")
 
-        with patch.dict(os.environ, {"DASHSCOPE_API_KEY": "key"}, clear=True):
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "key"}, clear=True):
             client = QwenClient()
             result = client.chat(messages=[{"role": "user", "content": "hi"}])
             assert result == ""
+
+    @patch("src.utils.qwen_client.OpenAI")
+    def test_chat_error_raise_on_error(self, mock_openai_cls):
+        """raise_on_error=True 时应向上抛异常，而非返回空串。"""
+        mock_client = MagicMock()
+        mock_openai_cls.return_value = mock_client
+        mock_client.chat.completions.create.side_effect = Exception("API Error")
+
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "key"}, clear=True):
+            client = QwenClient()
+            with pytest.raises(Exception, match="API Error"):
+                client.chat(messages=[{"role": "user", "content": "hi"}], raise_on_error=True)
 
     @patch("src.utils.qwen_client.OpenAI")
     def test_deepseek_thinking_enabled(self, mock_openai_cls):
@@ -102,7 +117,7 @@ class TestQwenClientChat:
         mock_response.choices = [MagicMock(message=MagicMock(content="legacy reply", tool_calls=None))]
         mock_client.chat.completions.create.return_value = mock_response
 
-        with patch.dict(os.environ, {"DASHSCOPE_API_KEY": "key"}, clear=True):
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "key"}, clear=True):
             client = QwenClient()
             result = client.chat(user_id="u1", message="hello", system_prompt="sys")
             assert result == "legacy reply"
