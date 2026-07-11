@@ -154,11 +154,18 @@ class _QwenAPIClient:
             raise RuntimeError("DASHSCOPE_API_KEY not set")
         try:
             from openai import OpenAI
-        except ImportError:
-            raise RuntimeError("openai package required: pip install openai")
+            import httpx
+        except ImportError as e:
+            raise RuntimeError(f"package required: {e}")
+        # 明确禁用代理：DashScope workspace endpoint 走本地代理会 hang
+        http_client = httpx.Client(
+            transport=httpx.HTTPTransport(proxy=None),
+            timeout=60,
+        )
         self._client = OpenAI(
             api_key=self.api_key,
             base_url=os.environ.get("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+            http_client=http_client,
         )
 
     def recognize(self, image_path: str) -> dict:
