@@ -15,7 +15,7 @@ import logging
 _logger = logging.getLogger(__name__)
 
 DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY")
-client = OpenAI(api_key=DASHSCOPE_API_KEY, base_url=os.environ.get("DASHSCOPE_BASE_URL", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"))
+client = OpenAI(api_key=DASHSCOPE_API_KEY, base_url=os.environ.get("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"))
 
 store = GlobalStore()
 target_name = next((n for n in store.chats if "共同富裕" in n), None)

@@ -25,7 +25,7 @@ config = {
         "config": {
             "model": "deepseek-v4-flash",
             "api_key": DASHSCOPE_API_KEY,
-            "openai_base_url": os.environ.get("DASHSCOPE_BASE_URL", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"),
+            "openai_base_url": os.environ.get("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
         }
     },
     "embedder": {
@@ -33,7 +33,7 @@ config = {
         "config": {
             "model": "text-embedding-v3",
             "api_key": DASHSCOPE_API_KEY,
-            "openai_base_url": os.environ.get("DASHSCOPE_BASE_URL", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"),
+            "openai_base_url": os.environ.get("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
         }
     },
     "vector_store": {

@@ -25,7 +25,7 @@ config = {
         "config": {
             "model": "deepseek-v4-flash",
             "api_key": DASHSCOPE_API_KEY,
-            "openai_base_url": os.environ.get("DASHSCOPE_BASE_URL", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"),
+            "openai_base_url": os.environ.get("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
         }
     },
     "embedder": {
@@ -33,7 +33,7 @@ config = {
         "config": {
             "model": "text-embedding-v3",
             "api_key": DASHSCOPE_API_KEY,
-            "openai_base_url": os.environ.get("DASHSCOPE_BASE_URL", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"),
+            "openai_base_url": os.environ.get("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
         }
     },
     "vector_store": {
@@ -82,7 +82,7 @@ prompt = f"""从以下微信聊天记录中提取所有关键事实。
 
 print("\nLLM 提取事实...")
 import openai
-client = openai.OpenAI(api_key=DASHSCOPE_API_KEY, base_url=os.environ.get("DASHSCOPE_BASE_URL", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"))
+client = openai.OpenAI(api_key=DASHSCOPE_API_KEY, base_url=os.environ.get("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"))
 resp = client.chat.completions.create(
     model="deepseek-v4-flash",
     messages=[{"role": "user", "content": prompt}],
