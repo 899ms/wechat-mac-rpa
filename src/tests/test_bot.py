@@ -137,3 +137,18 @@ class TestWeChatBot:
 
         assert result.success is True
         bot.sender.send.assert_called_once_with("hello", chat_name="测试群")
+
+    def test_run_auto_keeps_fixed_interval(self, monkeypatch):
+        """tick 耗时应从轮询间隔中扣除，避免周期持续漂移。"""
+        bot = WeChatBot.__new__(WeChatBot)
+        bot._tick_id = 1
+        bot.logger = Mock()
+        bot.tick = Mock(side_effect=lambda: setattr(bot, "running", False))
+        monotonic = Mock(side_effect=[10.0, 12.0])
+        sleep = Mock()
+        monkeypatch.setattr("src.bot.wechat_bot.time.monotonic", monotonic)
+        monkeypatch.setattr("src.bot.wechat_bot.time.sleep", sleep)
+
+        bot.run_auto(interval=5.0)
+
+        sleep.assert_called_once_with(3.0)

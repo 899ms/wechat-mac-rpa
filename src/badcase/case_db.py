@@ -49,7 +49,16 @@ CREATE TABLE IF NOT EXISTS tick_log (
     judge_score REAL, judge_is_badcase INTEGER, judge_dimensions_json TEXT,
     human_is_badcase INTEGER, human_badcase_type TEXT, human_notes TEXT,
     tokens_estimated INTEGER DEFAULT 0, duration_ms INTEGER,
-    human_labeled_at TEXT, judge_badcase_type TEXT, judge_reason TEXT
+    human_labeled_at TEXT, judge_badcase_type TEXT, judge_reason TEXT,
+    self_refine_applied INTEGER DEFAULT 0,
+    feedback_decision TEXT DEFAULT '',
+    feedback_issues TEXT DEFAULT '[]',
+    iterate_count INTEGER DEFAULT 0,
+    react_round_count INTEGER DEFAULT 0,
+    think_tool_called INTEGER DEFAULT 0,
+    feedback_raw_response TEXT DEFAULT '',
+    iterate_raw_response TEXT DEFAULT '',
+    llm_messages_json TEXT DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS cases (
@@ -229,7 +238,13 @@ class CaseDB:
                             judge_score REAL, judge_is_badcase INTEGER, judge_dimensions_json TEXT,
                             human_is_badcase INTEGER, human_badcase_type TEXT, human_notes TEXT,
                             tokens_estimated INTEGER DEFAULT 0, duration_ms INTEGER,
-                            human_labeled_at TEXT, judge_badcase_type TEXT, judge_reason TEXT
+                            human_labeled_at TEXT, judge_badcase_type TEXT, judge_reason TEXT,
+                            self_refine_applied INTEGER DEFAULT 0,
+                            feedback_decision TEXT DEFAULT '',
+                            feedback_issues TEXT DEFAULT '[]',
+                            iterate_count INTEGER DEFAULT 0,
+                            react_round_count INTEGER DEFAULT 0,
+                            think_tool_called INTEGER DEFAULT 0
                         );
                         INSERT INTO tick_log_new SELECT id, '', tick_id, created_at, skip_reason,
                             chat_name, is_group, screenshot_path, messages_count, new_messages_count,
@@ -237,7 +252,8 @@ class CaseDB:
                             should_reply, replies_sent_json, send_success, send_duration_ms,
                             judge_score, judge_is_badcase, judge_dimensions_json,
                             human_is_badcase, human_badcase_type, human_notes,
-                            tokens_estimated, duration_ms, human_labeled_at, judge_badcase_type, judge_reason
+                            tokens_estimated, duration_ms, human_labeled_at, judge_badcase_type, judge_reason,
+                            0, '', '[]', 0, 0, 0
                             FROM tick_log;
                         DROP TABLE tick_log;
                         ALTER TABLE tick_log_new RENAME TO tick_log;
@@ -256,6 +272,24 @@ class CaseDB:
                     conn.execute("ALTER TABLE tick_log ADD COLUMN session_output_unreplied_json TEXT")
                 if "judge_raw_response" not in columns:
                     conn.execute("ALTER TABLE tick_log ADD COLUMN judge_raw_response TEXT")
+                if "self_refine_applied" not in columns:
+                    conn.execute("ALTER TABLE tick_log ADD COLUMN self_refine_applied INTEGER DEFAULT 0")
+                if "feedback_decision" not in columns:
+                    conn.execute("ALTER TABLE tick_log ADD COLUMN feedback_decision TEXT DEFAULT ''")
+                if "feedback_issues" not in columns:
+                    conn.execute("ALTER TABLE tick_log ADD COLUMN feedback_issues TEXT DEFAULT '[]'")
+                if "iterate_count" not in columns:
+                    conn.execute("ALTER TABLE tick_log ADD COLUMN iterate_count INTEGER DEFAULT 0")
+                if "react_round_count" not in columns:
+                    conn.execute("ALTER TABLE tick_log ADD COLUMN react_round_count INTEGER DEFAULT 0")
+                if "think_tool_called" not in columns:
+                    conn.execute("ALTER TABLE tick_log ADD COLUMN think_tool_called INTEGER DEFAULT 0")
+                if "feedback_raw_response" not in columns:
+                    conn.execute("ALTER TABLE tick_log ADD COLUMN feedback_raw_response TEXT DEFAULT ''")
+                if "iterate_raw_response" not in columns:
+                    conn.execute("ALTER TABLE tick_log ADD COLUMN iterate_raw_response TEXT DEFAULT ''")
+                if "llm_messages_json" not in columns:
+                    conn.execute("ALTER TABLE tick_log ADD COLUMN llm_messages_json TEXT DEFAULT '[]'")
                 conn.commit()
             except Exception as e:
                 _logger.warning("[CaseDB] 添加 messages_json 列失败: %s", e)

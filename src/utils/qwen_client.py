@@ -60,7 +60,7 @@ class QwenClient:
                 model, s["calls"], s["prompt"], s["completion"], s["total"]
             )
 
-    def chat(self, messages=None, user_id=None, message=None, system_prompt=None, tools=None, temperature=None, max_tokens=None, timeout=None, response_format=None) -> str:
+    def chat(self, messages=None, user_id=None, message=None, system_prompt=None, tools=None, temperature=None, max_tokens=None, timeout=None, response_format=None, raise_on_error=False) -> str:
         """生成回复，支持 tools（function calling）
 
         支持两种调用方式：
@@ -68,10 +68,10 @@ class QwenClient:
         2. 旧接口: chat(user_id="xxx", message="...", system_prompt="...")
         """
         if messages is not None:
-            return self._chat_with_messages(messages, tools=tools, temperature=temperature, max_tokens=max_tokens, timeout=timeout, response_format=response_format)
+            return self._chat_with_messages(messages, tools=tools, temperature=temperature, max_tokens=max_tokens, timeout=timeout, response_format=response_format, raise_on_error=raise_on_error)
         return self._chat_with_user_id(user_id, message, system_prompt)
 
-    def _chat_with_messages(self, messages: List[dict], tools=None, temperature=None, max_tokens=None, timeout=None, response_format=None) -> str:
+    def _chat_with_messages(self, messages: List[dict], tools=None, temperature=None, max_tokens=None, timeout=None, response_format=None, raise_on_error=False) -> str:
         """直接透传 messages 列表调用大模型，支持 tools 和自定义参数"""
         try:
             kwargs = {
@@ -85,7 +85,13 @@ class QwenClient:
                 kwargs["tools"] = tools
             if response_format:
                 kwargs["response_format"] = response_format
-            # DeepSeek 官方平台：thinking 仅 reasoner 支持，flash/pro 开了会空回复
+            # DeepSeek 官方端点显示启用 thinking 可提升 reasoning_content 质量
+            # JSON 模式/路由等需要稳定输出格式时，关闭 thinking 避免模型输出分析性文字
+            if self.is_deepseek_official and "deepseek" in self.model.lower():
+                is_json_mode = isinstance(response_format, dict) and response_format.get("type") == "json_object"
+                if not is_json_mode:
+                    kwargs["extra_body"] = {"thinking": {"type": "enabled"}}
+            # DeepSeek v4-flash 实测已支持 reasoning_content，默认就会输出 thinking
             _logger = logging.getLogger("src.llm.qwen")
             _logger.info("[Qwen] request start: model=%s tools=%s timeout=%s",
                          kwargs.get("model"), bool(kwargs.get("tools")), kwargs.get("timeout"))
@@ -126,9 +132,13 @@ class QwenClient:
             # DeepSeek 某些模型（如 v4-pro）在长 prompt 下会把输出放在 reasoning_content 而非 content
             if not text and reasoning:
                 text = reasoning
+            if not text and not reasoning and not getattr(msg, "tool_calls", None):
+                _logger.warning("[Qwen] 模型返回空 content 且空 reasoning_content，可能为 endpoint 异常或内容过滤，msg=%s", msg)
             return text
         except Exception as e:
-            print(f"Qwen LLM 错误: {e}")
+            _logger.warning("Qwen LLM 错误: %s", e, exc_info=True)
+            if raise_on_error:
+                raise
             return ""
 
     def _chat_with_user_id(self, user_id: str, message: str, system_prompt: Optional[str] = None) -> str:
