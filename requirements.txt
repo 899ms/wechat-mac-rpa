@@ -5,7 +5,7 @@ numpy==1.24.3
 sqlalchemy>=2.0.0,<3.0.0
 scikit-learn==1.2.1
 scipy>=1.10.0,<1.16
-Pillow>=12.2.0
+Pillow>=10.0.0,<12.0.0
 requests>=2.34.2
 httpx>=0.28.1
 beautifulsoup4>=4.11.0
@@ -30,13 +30,3 @@ uvicorn>=0.23.0
 # 索引/模型路径见 src/memory/history_search.py 顶部默认值与环境变量。
 tokenizers>=0.23.1
 onnxruntime>=1.16.0
-
-# 测试依赖
-pytest>=7.0.0
-pytest-asyncio>=1.4.0
-pytest-cov>=7.1.0
-
-# 代码质量 / CI
-ruff>=0.15.20
-mypy>=2.1.0
-bandit>=1.8.0
