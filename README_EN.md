@@ -95,7 +95,7 @@ Calibrate an LLM-as-Judge with a small amount of human annotation. Once the Judg
 - **Config**: Copy `.env.example` to `.env`, fill in API keys
 - **Permissions**: Enable Screen Recording and Accessibility for your terminal (System Settings → Privacy & Security)
 - **Run**: `python3 run_bot.py`
-- **Test**: `python3 -m pytest src/tests/test_*_benchmark.py -v`
+- **Test**: Install development dependencies with `pip install -r requirements-dev.txt`, then run `python3 -m pytest src/tests -v`
 
 For detailed setup, see `docs/01-quickstart/AI_QUICKSTART.md`.
 

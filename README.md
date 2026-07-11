@@ -11,9 +11,9 @@
 
 **中文** | [English](README_EN.md)
 
-让 AI 像人一样"看"着微信界面，自动回复消息。**不碰协议，不读数据库，不注入代码**——微信更新 UI 也不影响运行。
+让 AI 像人一样"看"着微信界面，自动回复消息。默认 OCR / SmartPipeline 模式**不碰协议、不读数据库、不注入代码**；可选 WeFlow 模式会读取用户授权的本地数据库副本，用于初始化历史记忆。
 
-基于**多模态视觉感知**与**LLM Agent**的 macOS 微信自动化框架。不是协议逆向，不是 Hook，不碰微信数据库——我们把微信当作纯黑盒 GUI 应用，用计算机视觉读取界面，用大语言模型理解对话，用系统级自动化操作界面。微信更新 UI 只是换了一套视觉输入，不需要追着协议跑。
+基于**多模态视觉感知**与**LLM Agent**的 macOS 微信自动化框架。默认模式不是协议逆向或 Hook，而是把微信当作纯黑盒 GUI 应用：用计算机视觉读取界面，用大语言模型理解对话，用系统级自动化操作界面。
 
 核心设计：**感知 → 推理 → 行动 → 记忆 → 数据飞轮**，五个子系统构成完整的认知闭环。每一次认知循环的完整链路都被结构化日志逐条记录，形成**可追溯、可回归、可量化**的生产质量资产。
 
@@ -39,8 +39,8 @@
   - 停止服务：`launchctl bootout gui/$(id -u)/com.wechat-mac-rpa.admin`
   - 日志：`tail -f logs/admin-launchd.log logs/admin.log`
   - 前台调试用：`python3 scripts/admin.py`
-- **测试**：`python3 -m pytest src/tests/test_*_benchmark.py -v`
-- **OCR Benchmark**：`python3 src/tests/test_ocr_quality_benchmark.py`
+- **测试**：开发环境先执行 `pip install -r requirements-dev.txt`，再运行 `python3 -m pytest src/tests -v`
+- **OCR Benchmark**：`python3 scripts/benchmark_qwen_vl_ocr.py`
 - **生成报告**：`python3 scripts/generate_ocr_benchmark_report.py`
 
 详细安装与配置指南见 `docs/01-quickstart/AI_QUICKSTART.md`。
