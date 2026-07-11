@@ -73,19 +73,9 @@ jobs:
         with:
           python-version: "3.10"
           cache: "pip"
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements-dev.txt
       - run: |
-          pytest \
-            src/tests/test_reply.py \
-            src/tests/test_debug_logger.py \
-            src/tests/test_layout_profile.py \
-            src/tests/test_message_extractor.py \
-            src/tests/test_session_memory.py \
-            src/tests/test_message_sender.py \
-            src/tests/test_login_recovery.py \
-            src/tests/test_window_capture.py \
-            src/tests/test_window_capture_recovery.py \
-            --cov=src --cov-report=xml --cov-report=term
+          pytest src/tests --cov=src --cov-report=xml --cov-report=term
       - uses: actions/upload-artifact@v7
         if: always()
         with:

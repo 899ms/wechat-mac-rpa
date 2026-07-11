@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.models.base import MEDIA_MESSAGE_TYPES, ChatMessage, SenderType
+from src.reply.few_shot import PersonaFewShotRetriever
 from src.reply.session_memory import SessionMemory, _extract_query_key
 from src.tools import get_registry
 
@@ -47,6 +48,13 @@ _QUESTION_WORDS = {"吗", "呢", "谁", "什么", "哪里", "哪儿", "怎么", 
 
 # ReAct 工具调用上限
 MAX_TOOL_CALLS = 10
+
+
+def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        return max(minimum, min(maximum, int(os.environ.get(name, str(default)))))
+    except ValueError:
+        return default
 
 # Skill 路由优先级（数字越小优先级越高）
 _SKILL_PRIORITY = [
@@ -102,6 +110,15 @@ class ReplyGenerator:
         if enable_mode_detection is None:
             enable_mode_detection = os.environ.get("WECHAT_MODE_DETECTION", "0").lower() in ("1", "true", "yes", "on")
         self.enable_mode_detection = enable_mode_detection
+        project_root = Path(__file__).parent.parent.parent
+        few_shot_path = Path(os.environ.get(
+            "PERSONA_FEW_SHOT_PATH",
+            str(project_root / "data" / "few_shot" / "persona_examples.jsonl"),
+        ))
+        self.enable_persona_few_shots = os.environ.get("ENABLE_PERSONA_FEW_SHOTS", "1").lower() in ("1", "true", "yes", "on")
+        self.persona_few_shot_count = _env_int("PERSONA_FEW_SHOT_COUNT", 8, 0, 12)
+        self.persona_few_shot_max_chars = _env_int("PERSONA_FEW_SHOT_MAX_CHARS", 2500, 500, 5000)
+        self.persona_few_shot_retriever = PersonaFewShotRetriever(few_shot_path)
         _logger.info(f"[ReplyGenerator] init: llm_client={type(llm_client).__name__ if llm_client else None}")
         # 最后一次调用的 prompt/response（供 debug 使用）
         self.last_system_prompt: str = ""
@@ -116,6 +133,8 @@ class ReplyGenerator:
         # Skill 加载状态（供 debug 使用）
         self.last_loaded_skills: List[str] = []
         self.last_skill_injected_content: str = ""
+        self.last_few_shot_ids: List[str] = []
+        self.last_few_shot_content: str = ""
         # 当前使用的模型名（供 debug 使用）
         self.last_active_llm: str = ""
         # 传给 Judge 的完整 LLM 上下文
@@ -625,6 +644,8 @@ class ReplyGenerator:
         self.last_generation_trace = []
         self.last_loaded_skills = []
         self.last_skill_injected_content = ""
+        self.last_few_shot_ids = []
+        self.last_few_shot_content = ""
         self.last_llm_messages = []
         self.last_self_refine_applied = False
         self.last_feedback_decision = ""
@@ -705,6 +726,29 @@ class ReplyGenerator:
                 user_prompt += "\n\n" + "\n\n".join(skill_parts)
         self.last_skill_injected_content = "\n\n".join(skill_parts) if skill_parts else ""
 
+        if self.enable_persona_few_shots and self.persona_few_shot_count:
+            few_shot_rows = self.persona_few_shot_retriever.retrieve(
+                query=route_text,
+                chat_name=chat_name,
+                is_group=is_group,
+                limit=self.persona_few_shot_count,
+            )
+            few_shot_content, few_shot_ids = self.persona_few_shot_retriever.render(
+                few_shot_rows,
+                max_chars=self.persona_few_shot_max_chars,
+            )
+            if few_shot_content:
+                user_prompt += "\n\n" + few_shot_content
+                self.last_few_shot_content = few_shot_content
+                self.last_few_shot_ids = few_shot_ids
+                self.last_generation_trace.append({
+                    "round": 0,
+                    "type": "persona_few_shot",
+                    "timestamp": time.time(),
+                    "ids": few_shot_ids,
+                })
+                _logger.info("[PersonaFewShot] chat=%s ids=%s", chat_name, few_shot_ids)
+
         self.last_system_prompt = system_prompt
         self.last_tools_context = tools_context
 
@@ -772,13 +816,6 @@ class ReplyGenerator:
                 replies = current_replies
                 final_messages = current_messages
 
-                # Iterate 后如果本地硬性规则已通过，按 pass 记录，避免 display 误导
-                if self._local_rule_check(replies, self.last_loaded_skills):
-                    pass  # 仍有 issue，保留 fail 记录
-                else:
-                    decision = "pass"
-                    self.last_feedback_decision = decision
-                    self.last_feedback_issues = []
             elif decision == "error":
                 fallback_issues = self._local_rule_check(replies, self.last_loaded_skills)
                 if fallback_issues:

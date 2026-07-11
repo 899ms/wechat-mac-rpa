@@ -672,6 +672,7 @@ class WeChatBot:
         self.running = True
         self._interval = interval
         while self.running:
+            tick_started = time.monotonic()
             try:
                 self.tick()
             except Exception as e:
@@ -680,7 +681,7 @@ class WeChatBot:
             if self._tick_id > 0 and self._tick_id % 60 == 0:
                 from src.utils.qwen_client import QwenClient
                 QwenClient.log_token_stats(self.logger.runtime_logger)
-            time.sleep(interval)
+            time.sleep(max(0.0, interval - (time.monotonic() - tick_started)))
 
     _SERVICE_ACCOUNT_NAMES = {"服务号", "订阅号", "公众号"}
 
