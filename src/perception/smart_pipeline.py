@@ -158,7 +158,7 @@ class _QwenAPIClient:
             raise RuntimeError("openai package required: pip install openai")
         self._client = OpenAI(
             api_key=self.api_key,
-            base_url=os.environ.get("DASHSCOPE_BASE_URL", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"),
+            base_url=os.environ.get("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
         )
 
     def recognize(self, image_path: str) -> dict:
