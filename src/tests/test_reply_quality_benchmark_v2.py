@@ -49,7 +49,12 @@ class ReplyBenchmarkCase:
 
 def load_cases() -> List[ReplyBenchmarkCase]:
     """从 tick_log 读取所有人工标注的 tick。"""
-    conn = sqlite3.connect(str(DB_PATH))
+    if not DB_PATH.exists():
+        return []
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+    except sqlite3.OperationalError:
+        return []
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
         "SELECT * FROM tick_log WHERE human_is_badcase IS NOT NULL ORDER BY id"

@@ -48,7 +48,6 @@ class SessionSnapshot:
     is_group: bool = False
     last_active: float = field(default_factory=time.time)
     tool_cache: List[CachedToolResult] = field(default_factory=list)
-    bot_replies: List[str] = field(default_factory=list)
 
     def add_tool_result(self, tool_name: str, query: str, result: str, ttl: int):
         # 去重：同 tool + 同 query 覆盖旧结果
@@ -85,16 +84,6 @@ class SessionSnapshot:
             if not c.expired or (now - c.timestamp) < c.ttl_seconds * 2
         ]
 
-    def add_reply(self, reply: str):
-        self.bot_replies.append(reply)
-        self.last_active = time.time()
-        # 只保留最近 10 条
-        if len(self.bot_replies) > 10:
-            self.bot_replies = self.bot_replies[-10:]
-
-    def get_recent_replies(self, n: int = 5) -> List[str]:
-        return self.bot_replies[-n:]
-
 
 class SessionMemory:
     """管理所有聊天的短期记忆，按 chat_name 隔离."""
@@ -128,10 +117,6 @@ class SessionMemory:
             return
         session = self.get_or_create(chat_name)
         session.add_tool_result(tool_name, query, result, ttl)
-
-    def add_reply(self, chat_name: str, reply: str):
-        session = self.get_or_create(chat_name)
-        session.add_reply(reply)
 
     def get_cache_lines(self, chat_name: str, include_expired: bool = False) -> List[str]:
         """获取格式化的缓存行列表（用于 prompt 注入）."""
