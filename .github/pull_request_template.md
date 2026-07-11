@@ -1,37 +1,25 @@
-## 变更摘要
+## Description
 
-<!-- 用 1-3 句话说明这个 PR 做了什么 -->
+Brief description of what this PR does.
 
-## 变更类型
+## Type of Change
 
-<!-- 在相关选项前打 [x] -->
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] New Skill plugin
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+- [ ] Code refactoring
 
-- [ ] Bug 修复
-- [ ] 新功能
-- [ ] 性能优化
-- [ ] 重构
-- [ ] 文档更新
-- [ ] 测试相关
-- [ ] 其他：
+## Testing
 
-## 测试情况
+Describe how you tested your changes.
 
-<!-- 说明跑了哪些测试，结果如何 -->
+## Checklist
 
-- [ ] 已运行 `pytest src/tests/test_reply.py -v`
-- [ ] 已运行扩展单元测试
-- [ ] 已验证 bot 能正常启动
-- [ ] 已在真实场景验证回复效果
-
-## 是否修改了 prompt
-
-<!-- 如果修改了 prompts/ 或 skills/ 下的文件，请勾选并说明验证方式 -->
-
-- [ ] 是
-- [ ] 否
-
-## 检查清单
-
-- [ ] 代码可以正常 `python3 -m py_compile` 通过
-- [ ] 没有引入与变更无关的修改
-- [ ] 已更新相关文档（如 AGENTS.md、README.md）
+- [ ] My code follows the project's style guidelines
+- [ ] I have performed a self-review of my code
+- [ ] I have commented my code, particularly in hard-to-understand areas
+- [ ] I have updated the documentation accordingly
+- [ ] My changes generate no new warnings
+- [ ] I have added tests that prove my fix is effective or my feature works

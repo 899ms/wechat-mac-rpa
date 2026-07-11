@@ -422,9 +422,12 @@ class GlobalStore:
             self._dirty.add(chat_name)
 
         # 收集所有未回复的消息（按时间顺序）
+        # 防御：历史数据导入时可能把 self 消息标成 other，用 sender 兜底排除
         unreplied = [
             msg for msg in state.messages
-            if not msg.replied and msg.sender_type != SenderType.SELF
+            if not msg.replied
+            and msg.sender_type != SenderType.SELF
+            and msg.sender != "自己"
         ]
 
         return state, unreplied
