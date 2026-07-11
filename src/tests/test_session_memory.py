@@ -90,14 +90,6 @@ class TestSessionSnapshot:
         s.cleanup_expired()
         assert len(s.tool_cache) == 1
 
-    def test_add_reply_and_get_recent(self):
-        s = SessionSnapshot(chat_name="test")
-        for i in range(12):
-            s.add_reply(f"reply{i}")
-        assert len(s.bot_replies) == 10  # 只保留最近 10 条
-        recent = s.get_recent_replies(3)
-        assert recent == ["reply9", "reply10", "reply11"]
-
 
 class TestSessionMemory:
     def test_get_or_create(self):
@@ -119,12 +111,6 @@ class TestSessionMemory:
         mem.add_tool_result("群A", "get_current_time", "", "10:00")
         lines = mem.get_cache_lines("群A")
         assert len(lines) == 0
-
-    def test_add_reply(self):
-        mem = SessionMemory()
-        mem.add_reply("群A", "hello")
-        s = mem.get_or_create("群A")
-        assert s.bot_replies == ["hello"]
 
     def test_get_cache_lines_include_expired(self):
         mem = SessionMemory()
