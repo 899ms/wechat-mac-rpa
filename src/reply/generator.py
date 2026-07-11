@@ -212,29 +212,6 @@ class ReplyGenerator:
             else:
                 _logger.info("[MemoryTool] search_memory 已注册（仅 wiki，历史索引未就绪）")
 
-        # 注册 think 工具：让模型在回复前停下来深入思考，不获取新信息
-        self.tool_registry.register(
-            name="think",
-            description=(
-                "在回复前停下来深入思考。用于需要深度推理、权衡多因素、分析意图、"
-                "检查人设一致性的场景。此工具不获取新信息，只记录你的思考过程。"
-                "在想清楚之前随时可以调用，次数不限。"
-                "注意：思考时也必须守住王芊本人身份。不能把'承认是AI/机器人/语言模型'"
-                "当作可行方向——身份锚定适用于思考过程，不只最终回复。"
-            ),
-            parameters={
-                "type": "object",
-                "properties": {
-                    "thought": {
-                        "type": "string",
-                        "description": "你的思考内容。尽情思考，越详细越好。"
-                    }
-                },
-                "required": ["thought"],
-            },
-            func=lambda thought: "思考已记录，继续生成回复。",
-        )
-
         # 读取 Self-Refine prompt 文件
         _prompt_dir = Path(__file__).parent.parent.parent / "prompts"
         self._feedback_prompt = (_prompt_dir / "feedback.md").read_text(encoding="utf-8")
@@ -509,11 +486,7 @@ class ReplyGenerator:
                             tool_args = tc.function.arguments
                             _logger.info("[Tool] 执行开始: %s(%s)", tool_name, tool_args[:100] if isinstance(tool_args, str) else str(tool_args)[:100])
                             t_tool_start = time.time()
-                            if tool_name == "think":
-                                # think 工具不调用外部服务，直接返回确认
-                                result = "思考已记录，继续生成回复。"
-                                _logger.info("[Tool] think 调用: %s", tool_args[:200] if isinstance(tool_args, str) else str(tool_args)[:200])
-                            elif self.tool_registry.has(tool_name):
+                            if self.tool_registry.has(tool_name):
                                 result = self.tool_registry.get(tool_name).execute(tool_args)
                             else:
                                 result = f"工具 {tool_name} 不存在"
