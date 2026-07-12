@@ -88,6 +88,10 @@ class WeChatMessageSender(MessageSender):
                     return True
         return False
 
+    def in_silent_whitelist(self, chat_name: str) -> bool:
+        """公开方法：判断 chat_name 是否在静默白名单内。"""
+        return self._in_silent_whitelist(chat_name)
+
     # ------------------------------------------------------------------
     # 原子操作辅助方法
     # ------------------------------------------------------------------

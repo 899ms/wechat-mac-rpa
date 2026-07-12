@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ReAct + Self-Refine 单元测试。
 
-仅验证 ReplyGenerator 内部的 ReAct 循环、think 工具注册与执行、
+仅验证 ReplyGenerator 内部的 ReAct 循环、
 Self-Refine（Feedback + Iterate）开关及 max_tool_calls 降级逻辑，
 不调用真实 LLM API。
 """
@@ -97,18 +97,6 @@ def _make_generator(mock_llm_instance, enable_self_refine: bool = True) -> Reply
     gen.enable_self_refine = enable_self_refine
     gen.enable_react_tools = True
     return gen
-
-
-class TestThinkTool:
-    def test_think_tool_registered(self):
-        gen = ReplyGenerator(llm_client=MockLLM())
-        assert gen.tool_registry.has("think")
-
-    def test_think_tool_returns_confirmation(self):
-        gen = ReplyGenerator(llm_client=MockLLM())
-        tool = gen.tool_registry.get("think")
-        result = tool.execute('{"thought": "test"}')
-        assert "思考已记录" in result
 
 
 class TestSelfRefine:
@@ -320,12 +308,12 @@ class TestReActLoop:
                 # skill router
                 return MockResponse(content='{"skills": []}')
             if tools:
-                # 持续返回 think 工具调用，迫使进入下一轮 ReAct
+                # 持续返回 dummy 工具调用，迫使进入下一轮 ReAct
                 return MockResponse(
                     tool_calls=[
                         MockToolCall(
-                            name="think",
-                            arguments='{"thought": "thinking"}',
+                            name="dummy_loop",
+                            arguments='{"query": "loop"}',
                             id=f"tc_{call_count}",
                         )
                     ]
@@ -335,6 +323,13 @@ class TestReActLoop:
 
         mock_llm = MockLLM(response_func=_response_func)
         gen = _make_generator(mock_llm, enable_self_refine=False)
+        # 注册一个 dummy 工具用于测试循环
+        gen.tool_registry.register(
+            name="dummy_loop",
+            description="测试用循环工具",
+            parameters={"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
+            func=lambda query: "ok",
+        )
         replies = gen.generate([sample_message], [sample_message])
 
         assert replies == ["forced final"]
@@ -342,5 +337,5 @@ class TestReActLoop:
         # 调用次数应为：1 次 skill router + MAX_TOOL_CALLS 次 tool 调用 + 1 次强制 JSON
         assert call_count == 1 + MAX_TOOL_CALLS + 1
 
-        # 验证确实存在 think 工具调用记录
-        assert any(tc["tool_name"] == "think" for tc in gen.last_tool_calls)
+        # 验证确实存在 dummy_loop 工具调用记录
+        assert any(tc["tool_name"] == "dummy_loop" for tc in gen.last_tool_calls)

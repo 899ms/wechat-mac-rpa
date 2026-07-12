@@ -408,6 +408,23 @@ class WeChatBot:
                 self.debug_logger.log_action("none", action_input="", success=False, error=skip_reason)
                 return
 
+            # 静默模式：非白名单聊天直接跳过 LLM，不生成回复
+            if self.sender.silent_mode and not self.sender.in_silent_whitelist(chat_name):
+                skip_reason = f"静默模式非白名单，跳过 LLM: {chat_name}"
+                self.logger.log_decision(
+                    tick_id, should_reply=False, reason=skip_reason,
+                    latest_text=unreplied[-1].text if unreplied else "",
+                )
+                self.debug_logger.log_action("none", action_input="", success=False, error=skip_reason)
+                # 标记为已处理，避免反复重试占满轮询
+                for msg in unreplied:
+                    self.global_store.mark_replied(chat_name, msg, "")
+                # 尝试切换到其他未读聊天（可能是白名单）
+                switch_target = self._try_switch_to_unread_chat(result)
+                if switch_target:
+                    self.debug_logger.log_action("switch", action_input=switch_target, success=True)
+                return
+
             # 传递完整消息上下文 + 所有未读消息，让 AI 生成多条回复
             all_messages = getattr(state, "messages", [])
             if not isinstance(all_messages, list):
@@ -677,7 +694,7 @@ class WeChatBot:
                 self.tick()
             except Exception as e:
                 self.logger.error(f"Tick #{self._tick_id} 未捕获异常: {e}", exc_info=True)
-            # 每 60 个 tick（约 5 分钟，按 5s 间隔）输出一次 DeepSeek token 统计
+            # 每 60 个 tick（约 15 分钟，按 15s 间隔）输出一次 DeepSeek token 统计
             if self._tick_id > 0 and self._tick_id % 60 == 0:
                 from src.utils.qwen_client import QwenClient
                 QwenClient.log_token_stats(self.logger.runtime_logger)
