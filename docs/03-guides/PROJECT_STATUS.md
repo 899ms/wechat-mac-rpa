@@ -3,6 +3,8 @@
 ## 更新时间
 2026-05-15
 
+> 本文主体是 2026-05 的历史状态记录，不应作为当前 benchmark 数值来源。当前口径以 README 的“Benchmark 快照”和私有自动报告为准。
+
 ## 当前状态
 - ✅ 项目架构：双感知管道（SmartPerceptionPipeline 主力 + VisionPipeline 备用）
 - ✅ 微信运行（版本 4.1.8）
@@ -72,7 +74,7 @@
   - 规则 8: 承认错误优先于调侃（correction case 通过）
   - 规则 12: 禁止编造具体事实（self_msg_hallucination/unknown_info 通过）
 - **删除审计 case**: 移除 7 个 audit_* 历史审计 case，只测当前系统实时表现
-- **全量真实 API 重跑**: 清除缓存后重新调用，Reply Quality 100%，Tool Decision 81.5%
+- **当时的全量真实 API 重跑**: 曾记录 Reply Quality 24/24、Tool Decision 混合集 22/27；这两项均为历史口径，不作为当前状态
 - **新增 OCR Quality Benchmark**: 33 个 case（10 现有 + 23 legacy），覆盖 sender/text/chat_name/chat_list
 - **Judge 缓存重建**: Reply Quality 24/24 通过，Tool Decision 对抗性 case Judge 评估已缓存
 
@@ -84,22 +86,22 @@
 
 | Benchmark | Cases | 通过 | 准确率 | 核心指标 |
 |-----------|-------|------|--------|----------|
-| **Reply Quality** | 24 | **24/24** | **100%** | Rubric 评估（18 个自定义 rubric） |
+| **Reply Quality** | 24 | **22/24** | — | 2026-05-23 私有历史快照；更早报告为 24/24，待统一版本重跑 |
 | **Reply Quality v2** | — | — | — | 回复质量多维度评估（test_reply_quality_benchmark_v2） |
 | **Reply Stability** | — | — | — | 回复稳定性一致性（test_reply_stability_benchmark） |
-| **Tool Decision** | 27 | **22/27** | **81.5%** | Precision 70.6% / Recall 100% |
-| **Memory Search** | 29 | **28/29** | **96.6%** | Precision/Recall/F1 |
-| **Chat List Unread** | 23 | **23/23** | **100%** | Precision/Recall |
-| **OCR Quality** | 33 | **8/33** | **24.2%** | Sender/ChatName/Text/Count |
-| **Judge Quality** | 18 | — | — | Judge 判定质量（test_judge_quality_benchmark） |
-| **Judge Quality v2** | — | — | — | Judge 质量多维度 Rubric 评估（test_judge_quality_benchmark_v2） |
+| **Tool Decision** | 27 | 常规 **22/22**；对抗 **0/5** | — | 2026-05-23 私有历史快照，不合并为单一准确率 |
+| **Memory Search** | 29 | **28/29** | — | 2026-05-23 私有历史快照 |
+| **Chat List Unread** | 23 | — | — | 留存报告冲突，待重跑 |
+| **OCR Quality** | 33 | 代表性 **27/29**；回归挑战 **0/4** | — | 私有缓存快照；严格整 case 口径 |
+| **Judge Quality（旧版）** | 23 | **15/23** | — | 2026-05-23 历史快照，旧数据集不可完整复现 |
+| **Judge Quality v2** | 15 | 缓存 **0/15** | — | 人工 GT 已迁移到私有目录，需当前 Judge 重新评分 |
 
 ### 评估模式
 - **LLM-as-a-Judge**: Reply Quality + Tool Decision 对抗性 case 使用 deepseek-v4-pro 做 Rubric 评估
 - **结构化 Rubric**: 18 个自定义 rubric 覆盖 24 个 case（basic 12 + correction 6 + tool 4 + group 2）
 - **缓存策略**: Judge 结果按内容哈希缓存，`judge_{hash}.json`
 
-### 活跃问题
+### 当时记录的问题（2026-05，非当前状态）
 
 #### 1. Tool Decision - 对抗性 case 条件反射（🔴 P0）
 - **症状**: 5/5 对抗性 case 因"看到人名/关键词就查 wiki"失败

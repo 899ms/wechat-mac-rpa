@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Judge LLM 质量 Benchmark — 基于生产环境人工标注的真实 tick
+Judge LLM 质量 Benchmark — 基于私有人工标注的真实 tick
 
-从 tick_log 读取所有有人工标注 (human_is_badcase) 的 tick，
+从私有固定 case 和 tick_log 中读取人工标注，
 用 JudgeWorker._judge() 重新评分，对比人工 GT 计算准确率。
 
 用法:
-    python -m pytest src/tests/test_judge_quality_benchmark_v2.py -v --run-api --n-runs 3
-    python -m pytest src/tests/test_judge_quality_benchmark_v2.py -v       # 缓存回归
+    RUN_PRODUCTION_BENCHMARKS=1 python -m pytest src/tests/test_judge_quality_benchmark_v2.py -v --run-api --n-runs 3
+    RUN_PRODUCTION_BENCHMARKS=1 python -m pytest src/tests/test_judge_quality_benchmark_v2.py -v  # 缓存回归
 """
 
 import argparse
@@ -21,7 +21,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-import pytest
+try:
+    import pytest
+except ModuleNotFoundError:  # daily benchmark 运行环境不要求安装测试依赖
+    pytest = None
+
+if pytest is not None and __name__ != "__main__" and os.environ.get("RUN_PRODUCTION_BENCHMARKS") != "1":
+    pytest.skip("生产数据 benchmark 默认不参与单元测试", allow_module_level=True)
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -36,8 +42,9 @@ if env_file.exists():
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip())
 
-FIXTURE_DIR = Path(__file__).parent / "fixtures" / "judge_quality_v2"
-CACHE_DIR = FIXTURE_DIR / "cache"
+PRIVATE_DIR = PROJECT_ROOT / "data" / "private_benchmarks" / "judge"
+PRIVATE_CASES_PATH = PRIVATE_DIR / "cases.json"
+CACHE_DIR = PRIVATE_DIR / "cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH = PROJECT_ROOT / "data" / "cases.db"
@@ -84,8 +91,36 @@ class JudgeBenchmarkResult:
 # Case 加载器
 # =============================================================================
 
-def _load_gt_cases() -> List[JudgeBenchmarkCase]:
-    """从 tick_log 读取所有人工标注的 tick，构建 benchmark cases。"""
+def _load_private_gt_cases() -> List[JudgeBenchmarkCase]:
+    """读取被 Git 忽略的固定人工 GT。"""
+    if not PRIVATE_CASES_PATH.exists():
+        return []
+    try:
+        payload = json.loads(PRIVATE_CASES_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        _logger.warning("load private judge cases failed: %s", e)
+        return []
+
+    rows = payload.get("cases", []) if isinstance(payload, dict) else payload
+    cases = []
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("tick_data"), dict):
+            continue
+        cases.append(JudgeBenchmarkCase(
+            case_name=str(row.get("case_name", "")),
+            tick_data=row["tick_data"],
+            ground_truth_is_badcase=bool(row.get("ground_truth_is_badcase")),
+            ground_truth_type=str(row.get("ground_truth_type") or "none"),
+            notes=str(row.get("notes") or "")[:200],
+            session_id=str(row.get("session_id") or ""),
+            tick_id=int(row.get("tick_id") or row["tick_data"].get("tick_id") or 0),
+            chat_name=str(row.get("chat_name") or row["tick_data"].get("chat_name") or ""),
+        ))
+    return cases
+
+
+def _load_db_gt_cases() -> List[JudgeBenchmarkCase]:
+    """从 tick_log 读取新增人工标注，构建 benchmark cases。"""
     if not DB_PATH.exists():
         return []
     try:
@@ -201,6 +236,16 @@ def _load_gt_cases() -> List[JudgeBenchmarkCase]:
     return cases
 
 
+def _load_gt_cases() -> List[JudgeBenchmarkCase]:
+    """合并固定私有 GT 与数据库新增标签。"""
+    cases = _load_private_gt_cases() + _load_db_gt_cases()
+    unique = {}
+    for case in cases:
+        if case.case_name:
+            unique[case.case_name] = case
+    return list(unique.values())
+
+
 # =============================================================================
 # Judge 调用
 # =============================================================================
@@ -260,6 +305,57 @@ def _compute_metrics(results: List[JudgeBenchmarkResult]) -> dict:
 BENCHMARK_CASES = _load_gt_cases()
 
 
+def run_benchmark(use_api: bool = False, n_runs: int = 3) -> List[JudgeBenchmarkResult]:
+    """批量运行 Judge v2；缓存缺失的 case 在缓存模式下跳过。"""
+    benchmark_results = []
+    for case in BENCHMARK_CASES:
+        cache_key = hashlib.md5(
+            json.dumps(case.tick_data, sort_keys=True, default=str).encode(),
+            usedforsecurity=False,
+        ).hexdigest()[:16]
+        cache_path = CACHE_DIR / f"{case.case_name}_{cache_key}.json"
+
+        if use_api:
+            runs = _run_judge_n_times(case.tick_data, n_runs)
+            cache_path.write_text(
+                json.dumps({"runs": runs, "case_name": case.case_name}, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        elif cache_path.exists():
+            cached = json.loads(cache_path.read_text(encoding="utf-8"))
+            runs = cached.get("runs", [])[:n_runs]
+            if len(runs) < n_runs:
+                continue
+        else:
+            continue
+
+        badcase_votes = sum(1 for result in runs if result.get("is_badcase"))
+        predicted_is_badcase = badcase_votes > n_runs / 2
+        predicted_types = [
+            result.get("badcase_type", "none")
+            for result in runs
+            if result.get("is_badcase")
+        ]
+        predicted_type = (
+            max(set(predicted_types), key=predicted_types.count)
+            if predicted_types else "none"
+        )
+        benchmark_results.append(JudgeBenchmarkResult(
+            case_name=case.case_name,
+            ground_truth_is_badcase=case.ground_truth_is_badcase,
+            ground_truth_type=case.ground_truth_type,
+            predicted_is_badcase=predicted_is_badcase,
+            predicted_type=predicted_type,
+            predicted_confidence=sum(result.get("confidence", 0) for result in runs) / n_runs,
+            passed=predicted_is_badcase == case.ground_truth_is_badcase,
+            overall_score=sum(result.get("overall_score", 0) for result in runs) / n_runs,
+            n_runs=n_runs,
+            badcase_votes=badcase_votes,
+            notes=case.notes,
+        ))
+    return benchmark_results
+
+
 # =============================================================================
 # Test Runner
 # =============================================================================
@@ -268,7 +364,13 @@ def _pytest_id(case: JudgeBenchmarkCase) -> str:
     return case.case_name
 
 
-@pytest.mark.parametrize("case", BENCHMARK_CASES, ids=_pytest_id)
+_parametrize_cases = (
+    pytest.mark.parametrize("case", BENCHMARK_CASES, ids=_pytest_id)
+    if pytest is not None else lambda func: func
+)
+
+
+@_parametrize_cases
 def test_judge_quality(case: JudgeBenchmarkCase, request):
     """每个 case 跑 N 次 Judge，多数投票判定是否通过。"""
     n_runs = request.config.getoption("--n-runs", default=3)
@@ -349,7 +451,7 @@ def main():
 
     cases = _load_gt_cases()
     if not cases:
-        print("❌ 没有找到人工标注的 tick。请先在 /ticks 页面完成 GT 标注。")
+        print("❌ 没有找到私有人工 GT。请迁移固定 case 或在 /ticks 页面完成标注。")
         return
 
     print(f"📊 Judge Quality Benchmark v2 — 基于 {len(cases)} 个生产人工标注")
