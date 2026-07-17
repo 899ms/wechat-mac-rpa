@@ -71,7 +71,7 @@ def _text_matches(expected: str, actual: str, mode: str = "similarity") -> bool:
 
 def load_cases(fixture_dir: Path = FIXTURE_DIR) -> list[OCRBenchmarkCase]:
     """加载 Git 忽略目录中的真实截图与同名 Ground Truth JSON。"""
-    cases = []
+    cases: list[OCRBenchmarkCase] = []
     if not fixture_dir.exists():
         return cases
     metadata_paths = list(fixture_dir.glob("*.json"))
@@ -229,6 +229,7 @@ def run_benchmark(
     for case in selected_cases:
         cache_path = _cache_path(case, model)
         if use_api:
+            assert client is not None
             try:
                 api_result = client.recognize(str(case.screenshot_path))
                 cache_path.parent.mkdir(parents=True, exist_ok=True)
@@ -278,7 +279,7 @@ def compute_metrics(results: list[OCRBenchmarkResult]) -> dict[str, Any]:
         return {
             "total": 0,
             "passed": 0,
-            "pass_rate": None,
+            "pass_rate": None,  # nosec B105 - metric value, not a credential
             "chat_name_accuracy": None,
             "message_count_accuracy": None,
             "sender_accuracy": None,

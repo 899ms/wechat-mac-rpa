@@ -5,8 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import sqlite3
-import subprocess
+import subprocess  # nosec B404 - fixed git commands only
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -31,16 +32,19 @@ def _fingerprint(value: Any) -> str:
 
 
 def _git_state() -> dict[str, Any]:
+    git_path = shutil.which("git")
+    if not git_path:
+        return {"commit": "", "dirty": None}
     try:
-        commit = subprocess.run(
-            ["git", "-C", str(PROJECT_ROOT), "rev-parse", "HEAD"],
+        commit = subprocess.run(  # nosec B603 - executable and arguments are trusted
+            [git_path, "-C", str(PROJECT_ROOT), "rev-parse", "HEAD"],
             capture_output=True,
             check=True,
             text=True,
             timeout=5,
         ).stdout.strip()
-        dirty = bool(subprocess.run(
-            ["git", "-C", str(PROJECT_ROOT), "status", "--porcelain"],
+        dirty = bool(subprocess.run(  # nosec B603 - executable and arguments are trusted
+            [git_path, "-C", str(PROJECT_ROOT), "status", "--porcelain"],
             capture_output=True,
             check=True,
             text=True,
