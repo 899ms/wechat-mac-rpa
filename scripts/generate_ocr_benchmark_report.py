@@ -1,192 +1,98 @@
 #!/usr/bin/env python3
-"""
-生成 OCR Benchmark 可视化报告 HTML
-"""
+"""生成私有真实 OCR benchmark 报告。"""
+
+import argparse
+import html
 import sys
+from datetime import datetime
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.tests.test_ocr_quality_benchmark import run_benchmark, compute_metrics
+from src.benchmarks.ocr_quality import build_summary, load_cases, run_benchmark
 
 
-def _esc(text: str) -> str:
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+def _rate(value: float | None) -> str:
+    return "—" if value is None else f"{value:.1%}"
 
 
-def generate_html(output_path: str = "data/reports/ocr_benchmark_report.html") -> None:
-    results = run_benchmark(use_api=False)
-    metrics = compute_metrics(results)
+def generate_html(
+    output_path: Path = PROJECT_ROOT / "data" / "reports" / "ocr_benchmark_report.html",
+    use_api: bool = False,
+) -> dict:
+    cases = load_cases()
+    results, missing_cache = run_benchmark(use_api=use_api, cases=cases)
+    summary = build_summary(cases, results, missing_cache)
+    representative = summary["cohorts"]["representative"]
+    regression = summary["cohorts"]["regression"]
+    fields = summary["field_metrics_all"]
 
-    categories = {}
-    for r in results:
-        categories.setdefault(r.category, []).append(r)
+    rows = []
+    for result in sorted(results, key=lambda item: (item.cohort, item.case_name)):
+        rows.append(
+            "<tr>"
+            f"<td>{html.escape(result.case_name)}</td>"
+            f"<td>{html.escape(result.cohort)}</td>"
+            f"<td>{'PASS' if result.passed else 'FAIL'}</td>"
+            f"<td>{'✓' if result.chat_name_match else '✗'}</td>"
+            f"<td>{'✓' if result.message_count_match else '✗'}</td>"
+            f"<td>{result.sender_accuracy:.0%}</td>"
+            f"<td>{result.text_accuracy:.0%}</td>"
+            "</tr>"
+        )
 
-    total = metrics["total"]
-    passed = metrics["passed"]
-    pass_rate = metrics["pass_rate"]
+    unavailable = ""
+    if summary["status"] != "available":
+        unavailable = (
+            '<div class="warning">当前结果不可完整报告：'
+            f'{len(results)}/{len(cases)} cases 有缓存。'
+            '使用 <code>--run-api</code> 生成缺失缓存。</div>'
+        )
 
-    # 颜色判定
-    def rate_color(v):
-        return "green" if v >= 0.7 else "yellow" if v >= 0.4 else "red"
+    document = f"""<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Private OCR Benchmark</title>
+<style>
+body{{font-family:-apple-system,sans-serif;max-width:1100px;margin:32px auto;padding:0 20px;color:#202124}}
+.note,.warning{{padding:12px 16px;border-radius:8px;margin:16px 0}}.note{{background:#eef6ff}}.warning{{background:#fff4e5}}
+.cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:20px 0}}
+.card{{border:1px solid #ddd;border-radius:10px;padding:16px}}.value{{font-size:28px;font-weight:700;margin-top:8px}}
+table{{border-collapse:collapse;width:100%}}th,td{{padding:8px;border-bottom:1px solid #ddd;text-align:left}}
+code{{background:#f3f3f3;padding:2px 5px;border-radius:4px}}
+</style></head><body>
+<h1>私有真实 OCR Benchmark</h1>
+<p>生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} · 状态：{summary['status']}</p>
+{unavailable}
+<div class="note"><strong>指标解释：</strong>代表性场景和回归挑战场景分开统计。严格整 case 通过要求聊天名正确、消息数正确、sender 全部正确、text 正确率至少 80%。任何通过率都不是“文字 OCR 准确率”。真实截图、GT、缓存和本报告均位于 Git 忽略目录。</div>
+<div class="cards">
+<div class="card">代表性场景严格通过率<div class="value">{_rate(representative['pass_rate'])}</div><small>{representative['passed']}/{representative['total']}</small></div>
+<div class="card">回归挑战恢复率<div class="value">{_rate(regression['pass_rate'])}</div><small>{regression['passed']}/{regression['total']}</small></div>
+<div class="card">Chat Name<div class="value">{_rate(fields['chat_name_accuracy'])}</div></div>
+<div class="card">Message Count<div class="value">{_rate(fields['message_count_accuracy'])}</div></div>
+<div class="card">Sender 平均<div class="value">{_rate(fields['sender_accuracy'])}</div></div>
+<div class="card">Text 平均<div class="value">{_rate(fields['text_accuracy'])}</div></div>
+</div>
+<h2>逐 case 结果</h2>
+<table><thead><tr><th>Case</th><th>分层</th><th>严格结果</th><th>名称</th><th>数量</th><th>Sender</th><th>Text</th></tr></thead>
+<tbody>{''.join(rows)}</tbody></table>
+</body></html>"""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(document, encoding="utf-8")
+    print(f"报告已生成: {output_path}")
+    return summary
 
-    # 汇总卡片数据
-    cards = [
-        ("通过率", f"{pass_rate:.1%}", rate_color(pass_rate), f"{passed}/{total}"),
-        ("Chat Name", f"{metrics.get('chat_name_accuracy', 0):.1%}", rate_color(metrics.get('chat_name_accuracy', 0)), ""),
-        ("Message Count", f"{metrics.get('message_count_accuracy', 0):.1%}", rate_color(metrics.get('message_count_accuracy', 0)), ""),
-        ("Sender 平均", f"{metrics.get('sender_accuracy', 0):.1%}", rate_color(metrics.get('sender_accuracy', 0)), ""),
-        ("Sender 100%", f"{metrics.get('sender_perfect_rate', 0):.1%}", rate_color(metrics.get('sender_perfect_rate', 0)), ""),
-        ("Text 平均", f"{metrics.get('text_accuracy', 0):.1%}", rate_color(metrics.get('text_accuracy', 0)), ""),
-    ]
 
-    parts = []
-    parts.append('<!DOCTYPE html>')
-    parts.append('<html lang="zh-CN"><head><meta charset="UTF-8">')
-    parts.append('<meta name="viewport" content="width=device-width, initial-scale=1.0">')
-    parts.append('<title>OCR Benchmark 报告</title>')
-    parts.append('<style>')
-    parts.append(':root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#c9d1d9;--muted:#8b949e;--green:#3fb950;--red:#f85149;--yellow:#d29922}')
-    parts.append('*{margin:0;padding:0;box-sizing:border-box}')
-    parts.append('body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);padding:24px;max-width:1400px;margin:0 auto}')
-    parts.append('h1{text-align:center;margin-bottom:8px}')
-    parts.append('.subtitle{text-align:center;color:var(--muted);margin-bottom:24px;font-size:14px}')
-    parts.append('.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:28px}')
-    parts.append('.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center}')
-    parts.append('.card h3{font-size:12px;color:var(--muted);margin-bottom:8px;text-transform:uppercase}')
-    parts.append('.card .value{font-size:32px;font-weight:700}')
-    parts.append('.card .value.green{color:var(--green)}.card .value.red{color:var(--red)}.card .value.yellow{color:var(--yellow)}')
-    parts.append('.card .detail{font-size:12px;color:var(--muted);margin-top:4px}')
-    parts.append('.category{margin-bottom:24px}')
-    parts.append('.category h2{font-size:18px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}')
-    parts.append('.case-row{background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden}')
-    parts.append('.case-header{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer}')
-    parts.append('.case-header:hover{background:rgba(255,255,255,.03)}')
-    parts.append('.case-header .badge{font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600}')
-    parts.append('.badge-pass{background:rgba(63,185,80,.15);color:var(--green)}.badge-fail{background:rgba(248,81,73,.15);color:var(--red)}')
-    parts.append('.case-header .name{font-weight:600;flex:1;font-size:14px}')
-    parts.append('.case-header .mini-stats{display:flex;gap:16px;font-size:13px;color:var(--muted)}')
-    parts.append('.case-body{display:none;padding:16px;border-top:1px solid var(--border)}')
-    parts.append('.case-body.open{display:block}')
-    parts.append('.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}')
-    parts.append('@media(max-width:900px){.two-col{grid-template-columns:1fr}}')
-    parts.append('.img-box{background:#000;border-radius:6px;overflow:hidden;text-align:center}')
-    parts.append('.img-box img{max-width:100%;max-height:420px;display:block;margin:0 auto}')
-    parts.append('.msg-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}')
-    parts.append('.msg-table th{text-align:left;padding:6px 8px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-size:12px}')
-    parts.append('.msg-table td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top}')
-    parts.append('.msg-table tr.ok td{color:var(--green)}')
-    parts.append('.msg-table tr.err td{color:var(--red)}')
-    parts.append('.msg-table .tag{font-size:10px;padding:1px 5px;border-radius:3px;margin-left:4px}')
-    parts.append('.tag-ok{background:rgba(63,185,80,.15);color:var(--green)}.tag-err{background:rgba(248,81,73,.15);color:var(--red)}')
-    parts.append('pre{margin:0;white-space:pre-wrap;word-break:break-all;font-family:monospace;font-size:12px;color:var(--muted);background:rgba(0,0,0,.2);padding:8px;border-radius:4px}')
-    parts.append('.info-row{display:flex;gap:24px;font-size:13px;margin-bottom:8px;flex-wrap:wrap}')
-    parts.append('.info-row .label{color:var(--muted)}.info-row .val{font-weight:600}')
-    parts.append('.missing-msg{color:var(--red);font-size:12px;margin-top:4px}')
-    parts.append('.screenshot-not-found{padding:40px;color:var(--muted);text-align:center}')
-    parts.append('</style></head><body>')
-    parts.append(f'<h1>📊 OCR Benchmark 报告</h1>')
-    parts.append(f'<div class="subtitle">qwen3.6-flash + thinking mode · 共 {total} 个 case</div>')
-
-    # 汇总卡片
-    parts.append('<div class="summary">')
-    for title, val, color, detail in cards:
-        parts.append(f'<div class="card"><h3>{title}</h3><div class="value {color}">{val}</div>')
-        if detail:
-            parts.append(f'<div class="detail">{detail}</div>')
-        parts.append('</div>')
-    parts.append('</div>')
-
-    # 按类别
-    for cat in sorted(categories.keys()):
-        cases = categories[cat]
-        cat_passed = sum(1 for c in cases if c.passed)
-        parts.append(f'<div class="category"><h2>{cat} <span style="color:var(--muted);font-size:14px;font-weight:400">({cat_passed}/{len(cases)} passed)</span></h2>')
-
-        for r in cases:
-            badge = '<span class="badge badge-pass">PASS</span>' if r.passed else '<span class="badge badge-fail">FAIL</span>'
-            name_color = 'color:var(--green)' if r.passed else 'color:var(--red)'
-
-            # 找截图
-            fixture_dir = PROJECT_ROOT / "tests_integration" / "fixtures"
-            screenshot = fixture_dir / f"{r.case_name}.png"
-            if not screenshot.exists():
-                screenshot = fixture_dir / "legacy" / "errors" / f"{r.case_name}.png"
-
-            if screenshot.exists():
-                rel = str(screenshot.relative_to(PROJECT_ROOT))
-                img_html = f'<img src="{rel}" alt="{_esc(r.case_name)}">'
-            else:
-                img_html = '<div class="screenshot-not-found">截图未找到</div>'
-
-            # 消息对比行
-            msg_rows = []
-            for d in r.message_details:
-                ok_cls = "ok" if (d["sender_ok"] and d["text_ok"]) else "err"
-                s_tag = '<span class="tag tag-ok">s✓</span>' if d["sender_ok"] else '<span class="tag tag-err">s✗</span>'
-                t_tag = '<span class="tag tag-ok">t✓</span>' if d["text_ok"] else '<span class="tag tag-err">t✗</span>'
-                msg_rows.append(
-                    f'<tr class="{ok_cls}">'
-                    f'<td>{d["index"]}</td>'
-                    f'<td>{_esc(d["expected_sender"])}{s_tag}</td>'
-                    f'<td><pre>{_esc(d["expected_text"][:200])}</pre></td>'
-                    f'<td>{_esc(d["actual_sender"])}{s_tag}</td>'
-                    f'<td><pre>{_esc(d["actual_text"][:200])}</pre></td>'
-                    f'<td>{t_tag}</td>'
-                    f'</tr>'
-                )
-
-            missing = r.expected_message_count - r.actual_message_count
-            extra = r.actual_message_count - r.expected_message_count
-            count_note = ""
-            if missing > 0:
-                count_note = f'<div class="missing-msg">⚠️ 缺失 {missing} 条消息（API 未识别出来）</div>'
-            elif extra > 0:
-                count_note = f'<div class="missing-msg">⚠️ 多出 {extra} 条消息（API 多识别了）</div>'
-
-            parts.append(f'''
-<div class="case-row">
-    <div class="case-header" onclick="this.nextElementSibling.classList.toggle('open')">
-        {badge}
-        <span class="name" style="{name_color}">{_esc(r.case_name)}</span>
-        <div class="mini-stats">
-            <span>name:{'✅' if r.chat_name_match else '❌'}</span>
-            <span>count:{'✅' if r.message_count_match else '❌'}</span>
-            <span>sender:{r.sender_accuracy:.0%}</span>
-            <span>text:{r.text_accuracy:.0%}</span>
-        </div>
-    </div>
-    <div class="case-body">
-        <div class="info-row">
-            <div><span class="label">chat_name:</span> <span class="val">{'✅' if r.chat_name_match else '❌'}</span> 预期=<code>{_esc(r.expected_chat_name)}</code> 实际=<code>{_esc(r.actual_chat_name)}</code></div>
-            <div><span class="label">message_count:</span> <span class="val">{'✅' if r.message_count_match else '❌'}</span> 预期={r.expected_message_count} 实际={r.actual_message_count}</div>
-        </div>
-        {count_note}
-        <div class="two-col">
-            <div>
-                <div style="font-size:12px;color:var(--muted);margin-bottom:6px">截图</div>
-                <div class="img-box">{img_html}</div>
-            </div>
-            <div>
-                <div style="font-size:12px;color:var(--muted);margin-bottom:6px">消息对比（s=sender, t=text）</div>
-                <table class="msg-table">
-                    <tr><th>#</th><th>预期Sender</th><th>预期Text</th><th>实际Sender</th><th>实际Text</th><th>Text</th></tr>
-                    {''.join(msg_rows)}
-                </table>
-            </div>
-        </div>
-    </div>
-</div>''')
-        parts.append('</div>')
-
-    parts.append('</body></html>')
-
-    out = PROJECT_ROOT / output_path
-    out.write_text('\n'.join(parts), encoding='utf-8')
-    print(f"报告已生成: {out}")
-    print(f"用浏览器打开: file://{out.absolute()}")
+def main() -> None:
+    parser = argparse.ArgumentParser(description="私有真实 OCR benchmark 报告")
+    parser.add_argument("--run-api", action="store_true", help="调用真实 API 并刷新缓存")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=PROJECT_ROOT / "data" / "reports" / "ocr_benchmark_report.html",
+    )
+    args = parser.parse_args()
+    generate_html(args.output, use_api=args.run_api)
 
 
 if __name__ == "__main__":
-    generate_html()
+    main()

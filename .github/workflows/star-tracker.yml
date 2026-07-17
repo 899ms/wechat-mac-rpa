@@ -7,12 +7,46 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   track:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      - uses: fbuireu/github-star-tracker@v1
-        with:
-          github-token: ${{ secrets.STAR_TRACKER_TOKEN }}
+      - name: Fetch star history
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate --slurp \
+            -H 'Accept: application/vnd.github.star+json' \
+            "repos/${GITHUB_REPOSITORY}/stargazers?per_page=100" \
+            > "${RUNNER_TEMP}/stargazers.json"
+          gh api "repos/${GITHUB_REPOSITORY}" > "${RUNNER_TEMP}/repository.json"
+      - name: Generate chart
+        run: |
+          python3 scripts/generate_star_history.py \
+            --stargazers "${RUNNER_TEMP}/stargazers.json" \
+            --repository "${RUNNER_TEMP}/repository.json" \
+            --output docs/assets/star-history.svg
+      - name: Publish updated chart
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- docs/assets/star-history.svg; then
+            echo 'Star history is unchanged.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c automation/star-history
+          git add docs/assets/star-history.svg
+          git commit -m 'chore: update star history chart'
+          git push --force origin HEAD:automation/star-history
+          if ! gh pr list --head automation/star-history --state open --json number --jq 'length > 0' | grep -q true; then
+            gh pr create \
+              --base main \
+              --head automation/star-history \
+              --title 'chore: update star history chart' \
+              --body 'Automated update generated from GitHub stargazer timestamps.'
+          fi
