@@ -240,15 +240,16 @@
 > 注：`src/storage/chat_history.py` 在 ARCHITECTURE.md 中标注为"待拆分/尚未创建"，当前持久化职责由 `src/session/global_store.py` 承担。
 
 ### Benchmark 测试文件
-- `src/tests/test_ocr_quality_benchmark.py` — OCR 质量评估（33 cases）
+- `src/benchmarks/ocr_quality.py` — 私有 OCR 质量评估核心（代表性/回归分层）
+- `src/benchmarks/private_runner.py` — 私有 benchmark 编排、版本留痕和机器候选筛选
+- `scripts/run_private_benchmarks.py` — 缓存优先的统一命令入口与报告
 - `src/tests/test_reply_quality_benchmark.py` — 回复质量评估（24 cases）
 - `src/tests/test_reply_quality_benchmark_v2.py` — 回复质量多维度评估
 - `src/tests/test_reply_stability_benchmark.py` — 回复稳定性一致性
 - `src/tests/test_tool_decision_benchmark.py` — 工具决策评估（27 cases）
 - `src/tests/test_memory_search_benchmark.py` — 记忆搜索评估（29 cases）
 - `src/tests/test_chat_list_unread_benchmark.py` — 未读角标评估（23 cases）
-- `src/tests/test_judge_quality_benchmark.py` — Judge 判定质量评估（18 cases）
-- `src/tests/test_judge_quality_benchmark_v2.py` — Judge 质量多维度 Rubric 评估
+- `src/tests/test_judge_quality_benchmark_v2.py` — 私有固定 GT + 数据库新增标签的 Judge 质量评估（多轮多数投票）
 
 ---
 
