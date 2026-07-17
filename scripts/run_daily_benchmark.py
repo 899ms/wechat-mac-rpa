@@ -18,11 +18,12 @@ Cron 示例（每天凌晨 3:17）:
 
 import argparse
 import json
+import logging
+import os
 import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-import logging
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -173,15 +174,33 @@ def _run_unread_badge(use_api: bool = False) -> dict:
 
 
 def _run_judge_quality(use_api: bool = False) -> dict:
-    """Meta: Judge 质量 benchmark"""
+    """Meta: Judge 质量 benchmark v2。"""
     try:
-        from src.tests.test_judge_quality_benchmark import run_benchmark, compute_judge_metrics, BENCHMARK_CASES
+        os.environ["RUN_PRODUCTION_BENCHMARKS"] = "1"
+        from src.tests.test_judge_quality_benchmark_v2 import (
+            BENCHMARK_CASES,
+            _compute_metrics,
+            run_benchmark,
+        )
+        case_count = len(BENCHMARK_CASES)
+        if case_count == 0:
+            return {
+                "error": "Judge Quality v2 不可运行：没有私有固定 GT 或数据库人工标签",
+                "case_count": 0,
+                "status": "unavailable",
+            }
         results = run_benchmark(use_api=use_api)
-        metrics = compute_judge_metrics(results)
+        if len(results) != case_count:
+            return {
+                "error": f"Judge Quality v2 缓存不完整：{len(results)}/{case_count} cases 可用，请使用 --run-api 生成缓存",
+                "case_count": case_count,
+                "status": "unavailable",
+            }
+        metrics = _compute_metrics(results)
         passed = sum(1 for r in results if r.passed)
         total = len([r for r in results if not r.error])
         return {
-            "case_count": len(BENCHMARK_CASES),
+            "case_count": case_count,
             "precision": round(metrics["precision"], 3),
             "recall": round(metrics["recall"], 3),
             "f1": round(metrics["f1"], 3),
@@ -195,24 +214,39 @@ def _run_judge_quality(use_api: bool = False) -> dict:
 
 
 def _run_ocr_quality(use_api: bool = False) -> dict:
-    """P1: OCR 质量 benchmark"""
+    """P1: 私有真实 OCR 质量 benchmark。"""
     try:
-        from src.tests.test_ocr_quality_benchmark import _load_all_cases, run_benchmark
-        cases = _load_all_cases()
-        results = run_benchmark(use_api=use_api)
-        passed = sum(1 for r in results if r.passed)
-        total = len(results)
-        # 计算平均 sender/text accuracy
-        sender_cases = [r for r in results if r.sender_total > 0]
-        sender_acc = round(
-            sum(r.sender_accuracy for r in sender_cases) / len(sender_cases), 3
-        ) if sender_cases else 0
+        from src.benchmarks.ocr_quality import build_summary, load_cases, run_benchmark
+
+        cases = load_cases()
+        if not cases:
+            return {
+                "error": "私有 OCR benchmark 不可运行：data/private_benchmarks/ocr/fixtures 中没有 case",
+                "case_count": 0,
+                "status": "unavailable",
+            }
+        results, missing_cache = run_benchmark(use_api=use_api)
+        summary = build_summary(cases, results, missing_cache)
+        if summary["status"] != "available":
+            return {
+                "error": f"私有 OCR benchmark 缓存不完整：{len(results)}/{len(cases)} cases 可用",
+                "case_count": len(cases),
+                "status": "unavailable",
+            }
+        representative = summary["cohorts"]["representative"]
+        regression = summary["cohorts"]["regression"]
+        fields = summary["field_metrics_all"]
         return {
             "case_count": len(cases),
-            "passed": passed,
-            "total": total,
-            "pass_rate": round(passed / total, 3) if total > 0 else 0,
-            "sender_accuracy": sender_acc,
+            "representative_cases": representative["total"],
+            "representative_pass_rate": round(representative["pass_rate"], 3),
+            "regression_cases": regression["total"],
+            "regression_pass_rate": round(regression["pass_rate"], 3),
+            "chat_name_accuracy": round(fields["chat_name_accuracy"], 3),
+            "message_count_accuracy": round(fields["message_count_accuracy"], 3),
+            "sender_accuracy": round(fields["sender_accuracy"], 3),
+            "text_accuracy": round(fields["text_accuracy"], 3),
+            "private_benchmark": True,
         }
     except Exception as e:
         return {"error": str(e), "case_count": 0}
@@ -384,6 +418,12 @@ def _print_single(name: str, bench: dict):
         parts.append(f"F1={bench['f1']:.3f}")
     if "sender_accuracy" in bench:
         parts.append(f"Sender={bench['sender_accuracy']:.1%}")
+    if "text_accuracy" in bench:
+        parts.append(f"Text={bench['text_accuracy']:.1%}")
+    if "representative_pass_rate" in bench:
+        parts.append(f"Representative={bench['representative_pass_rate']:.1%}")
+    if "regression_pass_rate" in bench:
+        parts.append(f"Regression={bench['regression_pass_rate']:.1%}")
 
     status = "✅" if bench.get("error") is None else "⚠️"
     print(f"  {status} {bench.get('case_count', '?')} cases | {'  '.join(parts)}")

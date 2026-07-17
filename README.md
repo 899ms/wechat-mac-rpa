@@ -216,7 +216,7 @@ python3 scripts/update_history_index.py --remove-one "MSG_ID"
 
 **人工 Overrides**：通过外挂 JSON 实现任意字段覆写，LLM 更新时不会破坏人工修改。
 
-所有数据本地存储，不上传云端。
+聊天记录、记忆索引等持久化数据保存在本地。启用外部 LLM / 多模态 API 时，完成推理所需的对话 Prompt 或微信截图会发送给所配置的 API 服务商。
 
 ```mermaid
 graph TB
@@ -352,23 +352,33 @@ Judge 一旦可信，回路二就可以大规模自动化运转，**人工不再
 
 ---
 
-## Benchmark 状态
+## Benchmark 快照
 
 **任何 prompt 修改、模型切换、感知层逻辑变更，必须先跑 benchmark 验证，禁止直接上生产。**
 
-现有 9 个 benchmark，覆盖核心链路：
+现有 9 个 benchmark 定义，真实 case、人工 GT 和 API 缓存均保存在私有目录。下表是可追溯快照，不代表当前生产端到端准确率：
 
-| Benchmark | Cases | 评估方式 | 当前状态 |
-|-----------|-------|---------|---------|
-| **Reply Quality** | 24 | LLM-as-a-Judge + 自定义 Rubric | ✅ 100% |
-| **Reply Stability** | — | 多轮重复一致性检验 | — |
-| **Tool Decision** | 27 | Binary + Judge Rubric（对抗性 case） | 🟡 81.5% |
-| **Memory Search** | 29 | Precision / Recall / F1 | 🟡 96.6% |
-| **Chat List Unread** | 23 | Precision / Recall | ✅ 100% |
-| **OCR Quality** | 33 | Sender / Text / ChatName / Count | 🟡 81.8% |
-| **Judge Quality** | 18 | Meta-benchmark：评估 Judge LLM 自身准确率 | — |
-| **Judge Quality v2** | — | 多维度 Rubric 评估 | — |
-| **Reply Quality v2** | — | 回复质量多维度评估 | — |
+| Benchmark | 主场景 / 常规集 | 专项挑战集 | 数据状态 |
+|-----------|----------------|-----------|---------|
+| **Reply Quality** | 22/24 | — | 私有历史快照（2026-05-23）；更早报告为 24/24，需统一版本后重跑 |
+| **Reply Stability** | — | — | 尚未产出可报告结果 |
+| **Tool Decision** | 22/22 常规 case | 0/5 对抗 case | 私有历史快照（2026-05-23）；不再合并展示为 81.5% |
+| **Memory Search** | 28/29 | — | 私有历史快照（2026-05-23） |
+| **Chat List Unread** | — | — | 留存报告相互冲突，当前不展示百分比，待重跑 |
+| **OCR Quality** | 27/29 代表性 case | 0/4 已知回归挑战 | 私有缓存快照；严格整 case 通过，不等于 OCR 文字识别率 |
+| **Judge Quality（旧版）** | 15/23 | — | 私有历史快照（2026-05-23），旧数据集已不可完整复现 |
+| **Judge Quality v2** | 15 条已迁移人工 GT | 当前 Judge 缓存 0/15 | 私有真实 case；需显式调用 API 重新评分后才能报告准确率 |
+| **Reply Quality v2** | — | — | 尚未产出可报告结果 |
+
+> OCR 私有快照的字段级结果约为 Chat Name 93.9%、Count 93.9%、Sender 89.1%、Text 90.9%。这些字段指标与“整条 case 是否全部达标”是两种口径，不能混用。
+
+私有自动报告默认只读取已有缓存，同时完成版本留痕、OCR 失败归因和高价值 tick 筛选：
+
+```bash
+python3 scripts/run_private_benchmarks.py
+```
+
+只有需要刷新真实 API 结果时才显式使用 `--refresh ocr`、`--refresh judge` 或 `--refresh all`。报告保存在 Git 忽略的 `data/private_benchmarks/reports/`。
 
 开发流程：
 
@@ -481,7 +491,7 @@ erDiagram
 
 | 术语 | 说明 |
 |------|------|
-| **Tick** | Bot 主循环的一次迭代（默认 5 秒），包含 感知 → 去重 → 决策 → 回复 |
+| **Tick** | Bot 主循环的一次迭代（当前启动入口间隔 15 秒；底层方法默认参数 5 秒），包含 感知 → 去重 → 决策 → 回复 |
 | **Perception** | 感知层，将微信窗口截图转换为结构化数据（聊天名、消息列表、未读数等） |
 | **Layout** | 布局解析，把 OCR 文字元素按 UI 区域分组（聊天列表、标题栏、消息区等） |
 | **SmartPipeline** | 感知层实现之一：OCR + 视觉模型 API，带像素 diff 缓存，降低 API 调用频率 |
@@ -517,7 +527,7 @@ erDiagram
 
 - **OCR / SmartPipeline 模式**：Bot 仅通过 macOS 公开 API 截取微信窗口画面，不读取微信本地数据库。
 - **WeFlow 模式**：可选启用，用于首次启动时全量导出历史消息以初始化记忆。该导出基于用户已授权的本地 WeChat 数据库副本，Bot 不会修改或上传原始数据库。
-- 所有 API Key、聊天记录、记忆数据均保存在本地 `.env`、`data/` 目录，不上传至项目服务器。
+- API Key、原始数据库、聊天记录和记忆索引保存在本地 `.env`、`data/` 目录，不上传至本项目自建服务器。启用外部 LLM / 多模态 API 时，相关 Prompt 或截图会按功能需要发送给所配置的 API 服务商，请同时遵守服务商的数据政策。
 
 ## 免责声明
 
@@ -527,7 +537,7 @@ erDiagram
 
 ## Star History
 
-![Star History](https://raw.githubusercontent.com/wq19901103wq/wechat-mac-rpa/star-tracker-data/charts/star-history.svg)
+[![Star History](docs/assets/star-history.svg)](https://github.com/wq19901103wq/wechat-mac-rpa/stargazers)
 
 ---
 

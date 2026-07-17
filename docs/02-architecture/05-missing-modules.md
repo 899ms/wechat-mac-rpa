@@ -45,7 +45,8 @@
 | Benchmark - Tool Decision | `src/tests/test_tool_decision_benchmark.py` | ✅ | 27 cases |
 | Benchmark - Memory Search | `src/tests/test_memory_search_benchmark.py` | ✅ | 29 cases |
 | Benchmark - Chat List Unread | `src/tests/test_chat_list_unread_benchmark.py` | ✅ | 23 cases |
-| Benchmark - OCR Quality | `src/tests/test_ocr_quality_benchmark.py` | ✅ | 33 cases |
+| Benchmark - OCR Quality | `src/benchmarks/ocr_quality.py` | ✅ | 33 个私有真实 cases，代表性/回归分层 |
+| Private Benchmark Runner | `src/benchmarks/private_runner.py` | ✅ | 来源留痕、失败归因、机器候选筛选 |
 
 ---
 
