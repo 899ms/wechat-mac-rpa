@@ -13,17 +13,17 @@ python3 -m pytest src/tests/ -v
 
 ### 运行 OCR 质量 Benchmark（推荐）
 ```bash
-# 使用缓存（快速回归，不调用 API）
-python3 src/tests/test_ocr_quality_benchmark.py
+# 使用私有缓存（不调用 API）
+python3 scripts/run_private_benchmarks.py
 
-# 调用真实 API（建立/更新缓存）
-python3 src/tests/test_ocr_quality_benchmark.py --run-api
+# 显式刷新 OCR API 缓存
+python3 scripts/run_private_benchmarks.py --refresh ocr
 ```
 
 ### 生成可视化报告
 ```bash
 python3 scripts/generate_ocr_benchmark_report.py
-# 输出: ocr_benchmark_report.html
+# 输出: data/reports/ocr_benchmark_report.html
 ```
 
 ### 运行集成测试
@@ -37,45 +37,35 @@ python3 tests_integration/test_integration.py
 - `{name}.png` - 微信截图
 - `{name}.json` - 预期 OCR 结果（Ground Truth）
 
-Fixture 存放在 `tests_integration/fixtures/` 下：
-- `tests_integration/fixtures/` — 实时截图用例
-- `tests_integration/fixtures/legacy/errors/` — 历史错误回归用例
+真实 Fixture 存放在 Git 忽略的 `data/private_benchmarks/ocr/fixtures/`，不会进入公开仓库。
 
 ## 当前测试用例
 
 | 测试套件 | 位置 | 数量 | 说明 |
 |---------|------|------|------|
 | 内部单元测试 | `src/tests/` | 148+ | 模块化架构各层单元测试 |
-| OCR 质量 Benchmark | `src/tests/test_ocr_quality_benchmark.py` | 33 | qwen3.6-flash API 精度验证 |
+| OCR 质量 Benchmark | `src/benchmarks/ocr_quality.py` | 33 | 私有真实截图与缓存评估 |
 | 真实场景回归 | `tests_integration/test_real_scene_extraction.py` | - | 基于真实截图的回归验证 |
 
-## 最新 Benchmark 指标（qwen3.6-flash + thinking）
+## 当前私有缓存快照
 
 | 指标 | 数值 |
 |------|------|
-| **通过率** | **81.8%** (27/33) |
+| **代表性场景严格通过** | **27/29** |
+| **已知回归挑战恢复** | **0/4** |
 | Chat Name 准确率 | 93.9% |
 | Message Count 准确率 | 93.9% |
-| Sender 平均准确率 | 88.7% |
-| Sender 100%正确率 | 84.4% |
-| Text 平均准确率 | 90.2% |
+| Sender 平均准确率 | 89.1% |
+| Text 平均准确率 | 90.9% |
 
-### 按类别
-
-| 类别 | 通过 | 说明 |
-|------|------|------|
-| group_chat | 3/4 | 实时群聊截图 |
-| legacy_group | 7/7 | 历史群聊回归用例 |
-| legacy_private | 15/16 | 历史私聊回归用例 |
-| private_chat | 2/2 | 实时私聊截图 |
-| regression | 0/4 | 已知问题回归（API 侧待优化） |
+严格整 case 通过要求聊天名、消息数、全部 sender 均正确，且 text 正确率至少 80%；它不等于文字 OCR 准确率。代表性场景与已知回归挑战不合并展示。
 
 ## 添加回归测试
 
 发现新的识别错误时：
-1. 保存错误截图到 `tests_integration/fixtures/`
+1. 保存错误截图到 `data/private_benchmarks/ocr/fixtures/`
 2. 编写同名 `.json` 描述预期结果
-3. 运行 `python3 src/tests/test_ocr_quality_benchmark.py --run-api` 生成缓存
+3. 运行 `python3 scripts/run_private_benchmarks.py --refresh ocr` 生成缓存
 4. 重新生成报告验证
 
 ## 测试标准
@@ -88,14 +78,10 @@ Fixture 存放在 `tests_integration/fixtures/` 下：
 ## 文件位置
 
 ```
-tests_integration/
-├── README.md              # 本文件
-├── test_integration.py    # 集成测试入口
-├── test_real_scene_extraction.py  # 真实场景回归测试
-├── fixtures/              # 测试用例目录
-│   ├── *.png / *.json     # 实时截图用例
-│   └── legacy/errors/     # 历史错误回归用例
-└── ...
+src/benchmarks/ocr_quality.py                 # 指标与运行逻辑
+scripts/run_private_benchmarks.py             # 私有统一入口
+data/private_benchmarks/ocr/fixtures/         # Git 忽略的真实截图与 GT
+data/private_benchmarks/reports/              # Git 忽略的自动报告
 ```
 
 ---
