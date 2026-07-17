@@ -12,7 +12,7 @@ beautifulsoup4>=4.15.0
 
 # 微信自动化与 OCR
 pyautogui>=0.9.54
-pytesseract>=0.3.10
+pytesseract>=0.3.13
 pyobjc-framework-Vision>=12.2.1
 
 # 智能家居工具
