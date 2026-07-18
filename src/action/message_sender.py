@@ -9,6 +9,7 @@ import os
 import re
 import threading
 import time
+import unicodedata
 from abc import ABC, abstractmethod
 
 from src.action.system_automation import MacOSSystemAutomation, SystemAutomation
@@ -71,22 +72,19 @@ class WeChatMessageSender(MessageSender):
         """判断 chat_name 是否在静默白名单内。
 
         群聊实际名常带未读数后缀（如「共同富裕群 (45)」），而白名单写的是
-        干净群名（「共同富裕群」）。先剥掉末尾「 (N)」后缀再匹配；精确命中或
-        白名单条目作为子串出现都算命中，避免后缀/空格差异导致永远发不出去。
+        干净群名（「共同富裕群」）。先剥掉末尾「 (N)」后缀并统一全半角、空格，
+        再做精确匹配，避免相似名称的其他聊天被误发。
         """
         if not chat_name:
             return False
         # 剥掉末尾未读数后缀，如 "共同富裕群 (45)" -> "共同富裕群"
         cleaned = re.sub(r"\s*\(\d+\)\s*$", "", chat_name).strip()
-        candidates = {chat_name, cleaned}
-        for name in candidates:
-            if name in self._silent_whitelist:
-                return True
-            # 子串匹配：白名单条目是 chat_name 的子串（处理空格/全半角差异）
-            for w in self._silent_whitelist:
-                if w and (w in name or name in w):
-                    return True
-        return False
+        def normalize(value: str) -> str:
+            return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", value)).strip()
+
+        candidates = {normalize(chat_name), normalize(cleaned)}
+        whitelist = {normalize(name) for name in self._silent_whitelist}
+        return bool(candidates & whitelist)
 
     def in_silent_whitelist(self, chat_name: str) -> bool:
         """公开方法：判断 chat_name 是否在静默白名单内。"""

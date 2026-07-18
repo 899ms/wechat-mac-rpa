@@ -2,7 +2,7 @@ import hashlib
 import json
 
 from src.models.base import ChatMessage, SenderType
-from src.reply.few_shot import PersonaFewShotRetriever
+from src.reply.few_shot import PersonaFewShotRetriever, resolve_relationship
 from src.reply.generator import ReplyGenerator
 
 
@@ -43,7 +43,7 @@ def test_render_has_fact_isolation_and_budget(tmp_path):
         {"id": "two", "context": ["x" * 100], "reply": ["y" * 100]},
     ]
 
-    content, ids = PersonaFewShotRetriever.render(rows, max_chars=170)
+    content, ids = PersonaFewShotRetriever.render(rows, max_chars=260)
 
     assert ids == ["one"]
     assert "不是当前对话事实" in content
@@ -63,6 +63,7 @@ def test_generator_injects_examples_and_records_ids(tmp_path, monkeypatch):
     ])
     monkeypatch.setenv("PERSONA_FEW_SHOT_PATH", str(path))
     monkeypatch.setenv("ENABLE_PERSONA_FEW_SHOTS", "1")
+    monkeypatch.setenv("PERSONA_FEW_SHOT_ALLOW_UNREVIEWED", "1")
 
     class LLM:
         def __init__(self):
@@ -81,3 +82,22 @@ def test_generator_injects_examples_and_records_ids(tmp_path, monkeypatch):
     assert generator.last_few_shot_ids == ["style_one"]
     assert "本人真实聊天风格示例" in generator.last_user_prompt
     assert any(item.get("type") == "persona_few_shot" for item in generator.last_generation_trace)
+    assert "咋啦" not in generator.text_for_logging(generator.last_user_prompt)
+    assert "style_one" in generator.text_for_logging(generator.last_user_prompt)
+
+
+def test_relationship_resolution_reads_dedicated_section(tmp_path):
+    (tmp_path / "同事甲.md").write_text(
+        "# 人物\n## 与 Bot 的关系\n- 前同事，保持工作联系\n## 其他\n- 朋友喜欢旅游\n",
+        encoding="utf-8",
+    )
+
+    assert resolve_relationship("同事甲", tmp_path) == "colleague"
+
+
+def test_unapproved_report_is_not_ready(tmp_path):
+    path = tmp_path / "persona_examples.jsonl"
+    path.write_text("", encoding="utf-8")
+    (tmp_path / "report.json").write_text('{"review_status":"pending"}', encoding="utf-8")
+
+    assert PersonaFewShotRetriever(path).is_approved() is False

@@ -1,7 +1,7 @@
 """从 LLM 回复中提取 JSON 对象的通用工具。"""
 
 import json
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 
 def extract_json(text: str) -> Optional[Dict[str, Any]]:

@@ -12,8 +12,19 @@ from src.models.base import ActionResult, ChatMessage, PerceptionResult, SenderT
 
 class TestWeChatBot:
     @pytest.fixture
-    def bot(self):
-        return WeChatBot(PROFILE_WECHAT_MAC_1760X1280)
+    def bot(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("scripts.sync_knowledge.sync", lambda: False)
+        monkeypatch.setattr("src.bot.wechat_bot.GlobalStore", Mock)
+        monkeypatch.setattr("src.bot.wechat_bot.MemoryEngine", Mock)
+        db = Mock()
+        db._get_conn.return_value = Mock()
+        monkeypatch.setattr("src.badcase.case_db.get_db", lambda: db)
+        bot = WeChatBot(PROFILE_WECHAT_MAC_1760X1280, llm_client=Mock(), perception=Mock())
+        bot.global_store.chats = {}
+        bot.memory_engine.get_user_memory.return_value = ""
+        bot.debug_logger = Mock(current=None)
+        return bot
 
     def test_tick_no_new_messages(self, bot, tmp_path):
         """没有新消息时不发送回复"""
@@ -25,6 +36,8 @@ class TestWeChatBot:
         )
         bot.perception = Mock()
         bot.perception.perceive.return_value = mock_result
+        bot.policy = Mock()
+        bot.policy.should_reply.return_value = False
 
         # mock global_store 返回空未回复列表
         bot.global_store = Mock()
@@ -120,6 +133,8 @@ class TestWeChatBot:
         bot.perception = Mock()
         bot.perception.perceive.return_value = mock_result
 
+        bot.policy = Mock()
+        bot.policy.should_reply.return_value = False
         mock_state = Mock()
         bot.global_store = Mock()
         bot.global_store.merge_tick.return_value = (mock_state, [msg])
@@ -152,3 +167,52 @@ class TestWeChatBot:
         bot.run_auto(interval=5.0)
 
         sleep.assert_called_once_with(3.0)
+
+    def test_no_reply_chat_skips_llm_and_marks_processed(self, bot, tmp_path):
+        msg = ChatMessage(text="推送", sender="公众号", sender_type=SenderType.OTHER, chat_name="公众号")
+        bot.perception = Mock()
+        bot.perception.perceive.return_value = PerceptionResult(
+            chat_name="公众号", messages=[msg], chat_list_items=[], screenshot_path=str(tmp_path / "skip.png")
+        )
+        bot.policy = Mock()
+        bot.policy.should_reply.return_value = True
+        bot.generator = Mock()
+        bot.sender = Mock(silent_mode=False)
+        state = Mock(messages=[msg])
+        bot.global_store = Mock()
+        bot.global_store.merge_tick.return_value = (state, [msg])
+
+        bot.tick()
+
+        bot.generator.generate.assert_not_called()
+        bot.global_store.mark_replied.assert_called_once_with("公众号", msg, "")
+
+    def test_partial_send_failure_does_not_retry_delivered_reply(self, bot, tmp_path, monkeypatch):
+        bot._tick_id = 1
+        msg = ChatMessage(text="分两条回", sender="A", sender_type=SenderType.OTHER, chat_name="测试群")
+        bot.perception = Mock()
+        bot.perception.perceive.return_value = PerceptionResult(
+            chat_name="测试群", messages=[msg], chat_list_items=[], screenshot_path=str(tmp_path / "partial.png")
+        )
+        bot.policy = Mock()
+        bot.policy.should_reply.return_value = True
+        bot.generator = Mock()
+        bot.generator.generate.return_value = ["第一条", "第二条"]
+        bot.generator.text_for_logging.side_effect = lambda text: text
+        bot.generator.messages_for_logging.side_effect = lambda messages: messages
+        bot.sender = Mock(silent_mode=False)
+        bot.sender.send.side_effect = [
+            ActionResult(success=True, sent_text="第一条"),
+            ActionResult(success=False, error="发送失败"),
+        ]
+        state = Mock(messages=[msg], pending_self_messages=[])
+        bot.global_store = Mock()
+        bot.global_store.merge_tick.return_value = (state, [msg])
+        bot.global_store.chats = {"测试群": state}
+        bot._update_tick_send_result = Mock()
+        monkeypatch.setattr("src.bot.wechat_bot.time.sleep", Mock())
+
+        bot.tick()
+
+        bot.global_store.mark_replied.assert_called_once_with("测试群", msg, "第一条")
+        bot._update_tick_send_result.assert_called_once_with(2, ["第一条"], success=False)

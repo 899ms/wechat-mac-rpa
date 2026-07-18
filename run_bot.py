@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """wechat-twin Bot — 合并重构版本"""
 import logging
-import sys, os, fcntl
+import sys, os, fcntl, signal
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -80,15 +80,23 @@ def main():
             perception=perception,
         )
 
+        def _request_stop(signum, _frame):
+            print(f"\n👋 收到信号 {signum}，将在当前 tick 结束后停止...")
+            bot.running = False
+
+        signal.signal(signal.SIGTERM, _request_stop)
+        signal.signal(signal.SIGINT, _request_stop)
+
         try:
             bot.run_auto(interval=interval)
         except KeyboardInterrupt:
-            print("\n👋 停止...")
+            bot.running = False
+        finally:
+            print("\n👋 正在保存状态并停止后台任务...")
             bot.save_sessions()
             if hasattr(bot, 'memory_engine') and bot.memory_engine:
                 bot.memory_engine.shutdown()
             bot.running = False
-            sys.exit(0)
 
 
 if __name__ == "__main__":

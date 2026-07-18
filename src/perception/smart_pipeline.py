@@ -14,7 +14,6 @@
 
 import base64
 import hashlib
-
 import logging
 import os
 import re
@@ -153,8 +152,8 @@ class _QwenAPIClient:
         if not self.api_key:
             raise RuntimeError("DASHSCOPE_API_KEY not set")
         try:
-            from openai import OpenAI
             import httpx
+            from openai import OpenAI
         except ImportError as e:
             raise RuntimeError(f"package required: {e}")
         # 明确禁用代理：DashScope workspace endpoint 走本地代理会 hang

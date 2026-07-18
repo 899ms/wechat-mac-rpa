@@ -17,9 +17,9 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from fastapi import Body, FastAPI, Query
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 _logger = logging.getLogger("src.badcase.review_server")
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent.parent.parent

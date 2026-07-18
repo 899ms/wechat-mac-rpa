@@ -24,7 +24,7 @@ from typing import List, Optional
 try:
     import pytest
 except ModuleNotFoundError:  # daily benchmark 运行环境不要求安装测试依赖
-    pytest = None
+    pytest = None  # type: ignore[assignment]
 
 if pytest is not None and __name__ != "__main__" and os.environ.get("RUN_PRODUCTION_BENCHMARKS") != "1":
     pytest.skip("生产数据 benchmark 默认不参与单元测试", allow_module_level=True)

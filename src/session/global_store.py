@@ -12,10 +12,10 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from src.db import ChatHistoryRepository, init_db
 from src.models.base import MEDIA_MESSAGE_TYPES, ChatMessage, SenderType
 from src.utils.chat_utils import _is_group_chat_name
 from src.utils.screenshot_store import ScreenshotStore
-from src.db import init_db, ChatHistoryRepository
 
 _logger = logging.getLogger("src.global_store")
 
