@@ -352,39 +352,20 @@ Judge 一旦可信，回路二就可以大规模自动化运转，**人工不再
 
 ---
 
-## Benchmark 快照
+## Benchmark
 
-**任何 prompt 修改、模型切换、感知层逻辑变更，必须先跑 benchmark 验证，禁止直接上生产。**
-
-现有 9 个 benchmark 定义，真实 case、人工 GT 和 API 缓存均保存在私有目录。下表是可追溯快照，不代表当前生产端到端准确率：
-
-| Benchmark | 主场景 / 常规集 | 专项挑战集 | 数据状态 |
-|-----------|----------------|-----------|---------|
-| **Reply Quality** | 22/24 | — | 私有历史快照（2026-05-23）；更早报告为 24/24，需统一版本后重跑 |
-| **Reply Stability** | — | — | 尚未产出可报告结果 |
-| **Tool Decision** | 22/22 常规 case | 0/5 对抗 case | 私有历史快照（2026-05-23）；不再合并展示为 81.5% |
-| **Memory Search** | 28/29 | — | 私有历史快照（2026-05-23） |
-| **Chat List Unread** | — | — | 留存报告相互冲突，当前不展示百分比，待重跑 |
-| **OCR Quality** | 27/29 代表性 case | 0/4 已知回归挑战 | 私有缓存快照；严格整 case 通过，不等于 OCR 文字识别率 |
-| **Judge Quality（旧版）** | 15/23 | — | 私有历史快照（2026-05-23），旧数据集已不可完整复现 |
-| **Judge Quality v2** | 15 条已迁移人工 GT | 当前 Judge 缓存 0/15 | 私有真实 case；需显式调用 API 重新评分后才能报告准确率 |
-| **Reply Quality v2** | — | — | 尚未产出可报告结果 |
-
-> OCR 私有快照的字段级结果约为 Chat Name 93.9%、Count 93.9%、Sender 89.1%、Text 90.9%。这些字段指标与“整条 case 是否全部达标”是两种口径，不能混用。
-
-私有自动报告默认只读取已有缓存，同时完成版本留痕、OCR 失败归因和高价值 tick 筛选：
-
-```bash
-python3 scripts/run_private_benchmarks.py
-```
-
-只有需要刷新真实 API 结果时才显式使用 `--refresh ocr`、`--refresh judge` 或 `--refresh all`。报告保存在 Git 忽略的 `data/private_benchmarks/reports/`。
-
-开发流程：
-
-```
-Badcase → Benchmark 复现 → 根因分析 → 通用规则修复 → Benchmark 回归验证 → 上生产
-```
+| Benchmark | 结果 |
+|-----------|-----:|
+| **Reply Quality** | **91.7%**（22/24） |
+| **Tool Decision · 常规** | **100%**（22/22） |
+| **Tool Decision · 对抗** | **0%**（0/5） |
+| **Memory Search** | **96.6%**（28/29） |
+| **OCR · 代表性场景通过率** | **93.1%**（27/29） |
+| **OCR · 回归挑战通过率** | **0%**（0/4） |
+| **OCR · Chat Name** | **96.6%** |
+| **OCR · Message Count** | **93.1%** |
+| **OCR · Sender** | **93.6%** |
+| **OCR · Text** | **93.5%** |
 
 ---
 

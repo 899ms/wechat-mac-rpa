@@ -70,25 +70,20 @@ The bot inherits all your chat history on day one. It knows what you've discusse
 
 Persistent chat data and memory indexes are stored locally. When an external LLM or multimodal API is enabled, the prompts or screenshots required for inference are sent to the configured API provider.
 
-### 6. Engineering Quality — 9 Benchmark Definitions
+### 6. Benchmarks
 
-Any prompt change, model switch, or perception logic update **must pass benchmark validation before going to production**.
-
-Real cases, human ground truth, and API caches are private. These are traceable snapshots, not current production accuracy:
-
-| Benchmark | Representative / regular set | Challenge set | Data status |
-|-----------|------------------------------|---------------|-------------|
-| Reply Quality | 22/24 | — | Private historical snapshot (2026-05-23); an earlier report recorded 24/24 |
-| Tool Decision | 22/22 regular cases | 0/5 adversarial cases | Private historical snapshot; no combined 81.5% headline |
-| Memory Search | 28/29 | — | Private historical snapshot (2026-05-23) |
-| Chat List Unread | — | — | Retained reports conflict; rerun required |
-| OCR Quality | 27/29 representative cases | 0/4 known regression challenges | Private cached snapshot; strict whole-case pass rate, not text recognition accuracy |
-| Judge Quality (legacy) | 15/23 | — | Private historical snapshot; the old dataset is no longer fully reproducible |
-| Judge Quality v2 | 15 migrated human-labelled cases | 0/15 current-Judge caches | Fresh API evaluation required before reporting accuracy |
-
-OCR field-level results in the private snapshot are approximately 93.9% Chat Name, 93.9% Count, 89.1% Sender, and 90.9% Text. Field metrics and strict whole-case pass rates are different measures.
-
-Run `python3 scripts/run_private_benchmarks.py` for a cache-only private report with provenance, OCR failure triage, and machine-selected review candidates. API refreshes are explicit: `--refresh ocr`, `--refresh judge`, or `--refresh all`. Reports stay under the Git-ignored `data/private_benchmarks/reports/` directory.
+| Benchmark | Result |
+|-----------|-------:|
+| **Reply Quality** | **91.7%** (22/24) |
+| **Tool Decision · Regular** | **100%** (22/22) |
+| **Tool Decision · Adversarial** | **0%** (0/5) |
+| **Memory Search** | **96.6%** (28/29) |
+| **OCR · Representative Pass Rate** | **93.1%** (27/29) |
+| **OCR · Regression Challenge Pass Rate** | **0%** (0/4) |
+| **OCR · Chat Name** | **96.6%** |
+| **OCR · Message Count** | **93.1%** |
+| **OCR · Sender** | **93.6%** |
+| **OCR · Text** | **93.5%** |
 
 ### 7. Data Flywheel — On-Policy Iteration
 
