@@ -24,6 +24,8 @@ SENSITIVE_PATTERNS = [
     re.compile(r"(?<!\d)\d{17}[\dXx](?!\d)"),
     re.compile(r"(?<!\d)\d{16,19}(?!\d)"),
     re.compile(r"验证码|密码|身份证|银行卡|收款码|付款码|转账|红包|定位|详细地址"),
+    re.compile(r"(?i)ignore\s+(?:all\s+)?previous|system\s*prompt|developer\s*message|jailbreak|\bDAN\b"),
+    re.compile(r"忽略.{0,12}(?:之前|上面|此前).{0,8}(?:指令|要求|提示)|系统提示词|开发者消息|越狱提示|你现在是"),
 ]
 PLACEHOLDER_PATTERNS = [
     (re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)"), "[手机号]"),
@@ -54,7 +56,8 @@ class Candidate:
 
 
 def _stable_id(value: str, prefix: str = "chat") -> str:
-    return f"{prefix}_{hashlib.sha256(value.encode('utf-8')).hexdigest()[:10]}"
+    normalized = re.sub(r"^(私聊_|群聊_|曾经的好友_)", "", value).strip()
+    return f"{prefix}_{hashlib.sha256(normalized.encode('utf-8')).hexdigest()[:10]}"
 
 
 def _is_text(message: dict) -> bool:
@@ -295,6 +298,7 @@ def write_outputs(selected: list[Candidate], output_dir: Path, candidate_count: 
             for text in [*row["context"], *row["reply"]]
             for pattern in SENSITIVE_PATTERNS
         ),
+        "review_status": "pending",
         "external_model_used": False,
     }
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

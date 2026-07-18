@@ -145,3 +145,10 @@ class TestPasteVerification:
         assert "静默模式跳过发送" in result.error
         # 静默模式不应触发任何 UI 调用
         assert len(automation.calls) == 0
+
+    def test_silent_whitelist_requires_exact_normalized_name(self, monkeypatch):
+        monkeypatch.setenv("SILENT_WHITELIST", "柚子群")
+        sender = WeChatMessageSender(silent_mode=True, automation=MockSystemAutomation())
+
+        assert sender.in_silent_whitelist("柚子群 (12)") is True
+        assert sender.in_silent_whitelist("旧柚子群备份") is False

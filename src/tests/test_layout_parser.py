@@ -28,11 +28,13 @@ class TestLayoutParserRealFixtures:
     """使用真实 fixture 图片进行布局解析测试"""
 
     @pytest.fixture(scope="class")
-    def ocr_engine(self):
+    @classmethod
+    def ocr_engine(cls):
         return VisionOCREngine()
 
     @pytest.fixture(scope="class")
-    def parser(self):
+    @classmethod
+    def parser(cls):
         return LayoutParser(PROFILE_WECHAT_MAC_1760X1280)
 
     def _run_parse(self, ocr_engine, parser, image_name: str):

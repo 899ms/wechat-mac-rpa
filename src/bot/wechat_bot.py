@@ -425,6 +425,21 @@ class WeChatBot:
                     self.debug_logger.log_action("switch", action_input=switch_target, success=True)
                 return
 
+            # 免回复聊天无需调用 LLM；标记为已处理，避免每轮重复消耗。
+            if chat_name in {_normalize_chat_name(c) for c in self.no_reply_chats}:
+                skip_reason = f"当前聊天 '{chat_name}' 在免回复列表中"
+                self.logger.log_decision(
+                    tick_id, should_reply=False, reason=skip_reason,
+                    latest_text=unreplied[-1].text if unreplied else "",
+                )
+                self.debug_logger.log_action("none", action_input="", success=False, error="免回复聊天")
+                for msg in unreplied:
+                    self.global_store.mark_replied(chat_name, msg, "")
+                switch_target = self._try_switch_to_unread_chat(result)
+                if switch_target:
+                    self.debug_logger.log_action("switch", action_input=switch_target, success=True)
+                return
+
             # 传递完整消息上下文 + 所有未读消息，让 AI 生成多条回复
             all_messages = getattr(state, "messages", [])
             if not isinstance(all_messages, list):
@@ -499,14 +514,14 @@ class WeChatBot:
                     len(all_messages) if all_messages else 0,
                     len(unreplied),
                     getattr(self.generator, 'last_system_prompt', '') or '',
-                    getattr(self.generator, 'last_user_prompt', '') or '',
+                    self.generator.text_for_logging(getattr(self.generator, 'last_user_prompt', '') or ''),
                     _raw_with_thinking(getattr(self.generator, 'last_raw_response', '') or '', getattr(self.generator, 'last_thinking', '')),
                     _json.dumps(getattr(self.generator, 'last_tool_calls', []) or [], ensure_ascii=False),
                     _json.dumps(tool_results, ensure_ascii=False),
                     _serialize_msgs(all_messages[-50:]) if all_messages else '[]',
                     _serialize_msgs(unreplied) if unreplied else '[]',
-                    1,
-                    _json.dumps(replies, ensure_ascii=False),
+                    1 if replies else 0,
+                    '[]',
                     result.screenshot_path or '',
                     1 if getattr(self.generator, 'last_self_refine_applied', False) else 0,
                     getattr(self.generator, 'last_feedback_decision', '') or '',
@@ -516,7 +531,7 @@ class WeChatBot:
                     1 if any(tc.get('tool_name') == 'think' for tc in getattr(self.generator, 'last_tool_calls', []) or []) else 0,
                     getattr(self.generator, 'last_feedback_raw', '') or '',
                     getattr(self.generator, 'last_iterate_raw', '') or '',
-                    _serialize_llm_messages(getattr(self.generator, 'last_llm_messages', []) or []),
+                    _serialize_llm_messages(self.generator.messages_for_logging(getattr(self.generator, 'last_llm_messages', []) or [])),
                 ))
                 conn.commit()
             except Exception as e:
@@ -536,7 +551,7 @@ class WeChatBot:
             if self.debug_logger.current is not None:
                 self.debug_logger.log_reply_generation(
                     system_prompt=getattr(self.generator, 'last_system_prompt', ''),
-                    user_prompt=getattr(self.generator, 'last_user_prompt', ''),
+                    user_prompt=self.generator.text_for_logging(getattr(self.generator, 'last_user_prompt', '')),
                     raw_response=getattr(self.generator, 'last_raw_response', ''),
                     llm_calls=getattr(self.generator, 'last_llm_calls', []),
                     tool_calls=getattr(self.generator, 'last_tool_calls', []),
@@ -567,25 +582,14 @@ class WeChatBot:
                     self.global_store.mark_replied(chat_name, msg, "(未回复)")
                 return
 
-            # 免回复聊天：跳过回复，尝试切换到其他未读聊天
-            if chat_name in self.no_reply_chats:
-                self.logger.log_decision(
-                    tick_id, should_reply=False,
-                    reason=f"当前聊天 '{chat_name}' 在免回复列表中",
-                    latest_text=unreplied[-1].text if unreplied else ""
-                )
-                self.debug_logger.log_action("none", action_input=reply_text, success=False, error="免回复聊天")
-                switch_target = self._try_switch_to_unread_chat(result)
-                if switch_target:
-                    self.debug_logger.log_action("switch", action_input=switch_target, success=True)
-                return
-
             # 逐条发送回复，间隔 1.5 秒
             send_failed = False
             send_skipped = False  # 静默模式跳过（非真实失败），应视为已处理避免卡循环
+            sent_replies = []
             for i, reply in enumerate(replies):
                 action_result = self.sender.send(reply, chat_name=chat_name)
                 if action_result.success:
+                    sent_replies.append(reply)
                     self.logger.log_send(tick_id, success=True, text=reply)
                     self.debug_logger.log_action("send", action_input=reply, success=True)
                     # Bot 自己发的消息不直接进 history，放入 pending 等感知层确认
@@ -614,18 +618,25 @@ class WeChatBot:
                 if i < len(replies) - 1:
                     time.sleep(1.5)
 
-            # 只在发送成功或静默跳过时标记本轮 unreplied 为已处理。
-            # 真实发送失败不 mark_replied，否则对方消息被永久跳过。
+            self._update_tick_send_result(
+                tick_id,
+                sent_replies,
+                success=not send_failed and not send_skipped and len(sent_replies) == len(replies),
+            )
+
+            # 首条真实发送失败时保留未处理以便重试；若已有部分发送成功，则整批结束，
+            # 避免下一轮再次发送前面已经送达的回复。
             # 静默跳过 mark_replied：本就不打算发，不卡循环让 bot 能轮到其他聊天。
             # 注意：这里标记的是本轮所有 unreplied（不只是 to_reply），
             # 因为 bot 已经看过并决策过，不需要反复处理。
-            if not send_failed:
+            if not send_failed or sent_replies:
+                delivered_text = " | ".join(sent_replies)
                 to_reply_set = set(id(m) for m in to_reply)
                 for msg in unreplied:
                     # 实际回复的消息用真实 reply_text，选择不回复的消息用空字符串标记为已处理
                     self.global_store.mark_replied(
                         chat_name, msg,
-                        reply_text if id(msg) in to_reply_set else ""
+                        delivered_text if id(msg) in to_reply_set else ""
                     )
                 if send_skipped:
                     self.logger.info("[Bot] 静默跳过已 mark_replied，下轮不再重试 %s", chat_name)
@@ -635,14 +646,14 @@ class WeChatBot:
             # Judge 评分已由 generator._submit_to_judge 异步处理（唯一路径）
 
             # 触发记忆更新（异步，不阻塞）
-            if self.memory_engine is not None:
+            if self.memory_engine is not None and sent_replies:
                 if is_group:
                     # 群聊：同时更新群 wiki 和最后发言者 wiki
                     self.memory_engine.update_group_wiki(
                         group_name=chat_name,
                         chat_name=chat_name,
                         messages=to_reply,
-                        bot_replies=replies,
+                        bot_replies=sent_replies,
                     )
                     user_name = to_reply[-1].sender if to_reply else ""
                     if user_name:
@@ -650,7 +661,7 @@ class WeChatBot:
                             user_name=user_name,
                             chat_name=chat_name,
                             messages=to_reply,
-                            bot_replies=replies,
+                            bot_replies=sent_replies,
                         )
                 else:
                     # 私聊：只更新用户 wiki
@@ -658,7 +669,7 @@ class WeChatBot:
                         user_name=chat_name,
                         chat_name=chat_name,
                         messages=to_reply,
-                        bot_replies=replies,
+                        bot_replies=sent_replies,
                     )
             return
 
@@ -683,6 +694,29 @@ class WeChatBot:
             self.global_store.save()
         except Exception as e:
             self.logger.warning(f"保存全局状态失败: {e}")
+
+    def _update_tick_send_result(self, tick_id: int, replies_sent: list[str], success: bool) -> None:
+        """用实际发送结果修正生成阶段预写的 tick 日志。"""
+        conn = None
+        try:
+            import json
+
+            from src.badcase.case_db import get_db
+            conn = get_db()._get_conn()
+            conn.execute(
+                """UPDATE tick_log SET replies_sent_json=?, send_success=?
+                   WHERE id=(SELECT MAX(id) FROM tick_log WHERE session_id=? AND tick_id=?)""",
+                (json.dumps(replies_sent, ensure_ascii=False), 1 if success else 0, self.session_id, tick_id),
+            )
+            conn.commit()
+        except Exception as e:
+            self.logger.warning("tick_log 发送结果更新失败: %s", e)
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception as e:
+                    self.logger.warning("close tick_log connection failed: %s", e)
 
     def run_auto(self, interval: float = 5.0) -> None:
         """自动运行主循环"""

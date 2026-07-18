@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from sqlalchemy import create_engine, event, text
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from src.db.models import Base
 

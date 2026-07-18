@@ -9,6 +9,7 @@
 
 import json
 import logging
+import os
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -19,6 +20,7 @@ from urllib.request import Request, urlopen
 from src.utils.xml_utils import _extract_xml_text
 
 _logger = logging.getLogger("src.weflow_client")
+_DEFAULT_ACCESS_TOKEN = "weflow_token_123"  # nosec B105 - WeFlow 本机服务的公开默认值，不是私密凭据
 
 
 @dataclass
@@ -81,7 +83,9 @@ class WeFlowClient:
         parsed = urlparse(self.base_url)
         if parsed.scheme not in self._ALLOWED_SCHEMES:
             raise ValueError(f"WeFlow base_url 必须是 http/https，当前: {self.base_url}")
-        self.access_token = access_token or "weflow_token_123"
+        self.access_token = access_token or os.environ.get("WEFLOW_ACCESS_TOKEN", _DEFAULT_ACCESS_TOKEN)
+        if self.access_token == _DEFAULT_ACCESS_TOKEN:
+            _logger.warning("WeFlow 正在使用默认 access token；仅适合本机回环地址，生产请设置 WEFLOW_ACCESS_TOKEN")
         self.timeout = timeout
         self._contacts_cache: Optional[list[WeFlowContact]] = None
         self._contacts_ts: float = 0

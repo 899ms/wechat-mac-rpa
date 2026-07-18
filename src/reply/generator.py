@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.models.base import MEDIA_MESSAGE_TYPES, ChatMessage, SenderType
-from src.reply.few_shot import PersonaFewShotRetriever
+from src.reply.few_shot import PersonaFewShotRetriever, resolve_relationship
 from src.reply.session_memory import SessionMemory, _extract_query_key
 from src.tools import get_registry
 
@@ -115,10 +115,15 @@ class ReplyGenerator:
             "PERSONA_FEW_SHOT_PATH",
             str(project_root / "data" / "few_shot" / "persona_examples.jsonl"),
         ))
-        self.enable_persona_few_shots = os.environ.get("ENABLE_PERSONA_FEW_SHOTS", "1").lower() in ("1", "true", "yes", "on")
+        self.enable_persona_few_shots = os.environ.get("ENABLE_PERSONA_FEW_SHOTS", "0").lower() in ("1", "true", "yes", "on")
         self.persona_few_shot_count = _env_int("PERSONA_FEW_SHOT_COUNT", 8, 0, 12)
         self.persona_few_shot_max_chars = _env_int("PERSONA_FEW_SHOT_MAX_CHARS", 2500, 500, 5000)
         self.persona_few_shot_retriever = PersonaFewShotRetriever(few_shot_path)
+        allow_unreviewed = os.environ.get("PERSONA_FEW_SHOT_ALLOW_UNREVIEWED", "0").lower() in ("1", "true", "yes", "on")
+        self.persona_few_shot_ready = self.persona_few_shot_retriever.is_approved() or allow_unreviewed
+        self.persona_wiki_dir = project_root / "data" / "memory" / "wiki" / "users"
+        if self.enable_persona_few_shots and not self.persona_few_shot_ready:
+            _logger.warning("[PersonaFewShot] 已启用但 report.json 未审核通过，跳过注入")
         _logger.info(f"[ReplyGenerator] init: llm_client={type(llm_client).__name__ if llm_client else None}")
         # 最后一次调用的 prompt/response（供 debug 使用）
         self.last_system_prompt: str = ""
@@ -232,6 +237,22 @@ class ReplyGenerator:
         if self.enable_self_refine:
             self.enable_react_tools = True
 
+    def text_for_logging(self, text: str) -> str:
+        """日志中只保留 few-shot ID，避免复制历史聊天正文。"""
+        if not self.last_few_shot_content or self.last_few_shot_content not in text:
+            return text
+        marker = f"【persona few-shot 正文已省略；ids={','.join(self.last_few_shot_ids)}】"
+        return text.replace(self.last_few_shot_content, marker)
+
+    def messages_for_logging(self, messages: List[Dict]) -> List[Dict]:
+        redacted = []
+        for message in messages:
+            item = dict(message)
+            if isinstance(item.get("content"), str):
+                item["content"] = self.text_for_logging(item["content"])
+            redacted.append(item)
+        return redacted
+
     def _submit_to_judge(self, tick_id: int, replies: List[str], unreplied: List[ChatMessage], all_messages: List[ChatMessage], is_group: bool):
         """把当前 tick 的数据提交给 JudgeWorker 异步判定"""
         import json
@@ -254,13 +275,13 @@ class ReplyGenerator:
                 "bot_reply_text": " | ".join(replies) if replies else "",
                 "reply_text": " | ".join(replies) if replies else "",
                 "tool_calls": self.last_tool_calls,
-                "memory_injected": self.last_user_prompt,
-                "full_user_prompt": self.last_user_prompt,
+                "memory_injected": self.text_for_logging(self.last_user_prompt),
+                "full_user_prompt": self.text_for_logging(self.last_user_prompt),
                 "reply_raw_response": self.last_raw_response,
                 "reply_generation_trace": self.last_generation_trace,
                 "full_system_prompt": self.last_system_prompt,
                 "full_tools_context": self.last_tools_context,
-                "full_llm_messages": self.last_llm_messages,
+                "full_llm_messages": self.messages_for_logging(self.last_llm_messages),
                 "created_at": __import__('datetime').datetime.now().isoformat(),
                 "tool_results_json": json.dumps(
                     [{"tool": t.get("tool_name", ""), "args": t.get("arguments", ""), "result": str(t.get("result_preview", ""))}
@@ -538,9 +559,7 @@ class ReplyGenerator:
                     if self.last_thinking:
                         assistant_msg["reasoning_content"] = self.last_thinking
                     messages.append(assistant_msg)
-                    t_parse_start = time.time()
                     replies = self._parse_replies(text)
-                    t_parse_ms = (time.time() - t_parse_start) * 1000
                     if replies:
                         _logger.info("[Generate] deepseek 直接生成 replies=%d 条", len(replies))
                         self.last_llm_calls = llm_calls
@@ -699,12 +718,18 @@ class ReplyGenerator:
                 user_prompt += "\n\n" + "\n\n".join(skill_parts)
         self.last_skill_injected_content = "\n\n".join(skill_parts) if skill_parts else ""
 
-        if self.enable_persona_few_shots and self.persona_few_shot_count:
+        if self.enable_persona_few_shots and self.persona_few_shot_ready and self.persona_few_shot_count:
+            relationship = None if is_group else resolve_relationship(
+                chat_name,
+                self.persona_wiki_dir,
+                os.environ.get("PERSONA_NAME", "本人"),
+            )
             few_shot_rows = self.persona_few_shot_retriever.retrieve(
                 query=route_text,
                 chat_name=chat_name,
                 is_group=is_group,
                 limit=self.persona_few_shot_count,
+                relationship=relationship,
             )
             few_shot_content, few_shot_ids = self.persona_few_shot_retriever.render(
                 few_shot_rows,

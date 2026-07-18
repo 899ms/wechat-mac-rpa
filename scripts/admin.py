@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, File
 from src.badcase.case_db import get_db
 
 WORK_DIR = str(Path(__file__).parent.parent)
-KIMI_BIN = "/Users/yihanwang/.local/bin/kimi"
+KIMI_BIN = os.environ.get("KIMI_BIN", str(Path.home() / ".local" / "bin" / "kimi"))
 
 app = FastAPI(title="wechat-twin Admin")
 

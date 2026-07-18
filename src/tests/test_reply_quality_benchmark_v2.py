@@ -11,11 +11,12 @@ Bot 回复质量 Benchmark — 基于生产环境人工标注的真实 tick
 配合 Judge benchmark 使用，Judge 测"自动判定是否准确"，这个测"Bot 本身回复质量"。
 
 用法:
-    python -m pytest src/tests/test_reply_quality_benchmark_v2.py -v
+    RUN_PRODUCTION_BENCHMARKS=1 python -m pytest src/tests/test_reply_quality_benchmark_v2.py -v
     python src/tests/test_reply_quality_benchmark_v2.py  # CLI 详细报告
 """
 
 import json
+import os
 import sqlite3
 import sys
 from dataclasses import dataclass
@@ -23,6 +24,9 @@ from pathlib import Path
 from typing import List
 
 import pytest
+
+if __name__ != "__main__" and os.environ.get("RUN_PRODUCTION_BENCHMARKS") != "1":
+    pytest.skip("生产数据 benchmark 默认不参与单元测试", allow_module_level=True)
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
